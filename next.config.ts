@@ -17,8 +17,15 @@ const securityHeaders = [
   { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
 ];
 
+// CMS images: only the public "cms-media" bucket of this project's Supabase
+// (see src/lib/content/media.ts). No other remote images are allowed.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  images: supabaseUrl
+    ? { remotePatterns: [new URL(`${supabaseUrl}/storage/v1/object/public/cms-media/**`)] }
+    : undefined,
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

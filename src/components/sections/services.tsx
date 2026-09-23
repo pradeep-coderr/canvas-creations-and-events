@@ -74,19 +74,22 @@ export function Services({ services = featuredServices }: { services?: Service[]
           className="lg:sticky lg:top-[calc(var(--header-height)+3rem)] lg:col-span-5 lg:self-start"
         />
 
-        <div className="lg:col-span-7">
-          <ol className="border-t border-foreground/15">
-            {services.map((service, i) => (
-              <li key={service.id} className="border-b border-foreground/15">
-                <Reveal>
-                  <ServiceRow
-                    service={service}
-                    number={numbered ? String(i + 1).padStart(2, "0") : undefined}
-                  />
-                </Reveal>
-              </li>
-            ))}
-          </ol>
+        <div className="border-t border-foreground/15 lg:col-span-7">
+          {/* With no published services, the enquiry prompt stands alone. */}
+          {services.length > 0 && (
+            <ol>
+              {services.map((service, i) => (
+                <li key={service.id} className="border-b border-foreground/15">
+                  <Reveal>
+                    <ServiceRow
+                      service={service}
+                      number={numbered ? String(i + 1).padStart(2, "0") : undefined}
+                    />
+                  </Reveal>
+                </li>
+              ))}
+            </ol>
+          )}
 
           <Reveal>
             <SiteLink

@@ -12,13 +12,21 @@ import { Services } from "@/components/sections/services";
 import { Testimonials } from "@/components/sections/testimonials";
 import { VideoStory } from "@/components/sections/video-story";
 import { WhyCanvas } from "@/components/sections/why-canvas";
+import { getHomepageCollections } from "@/lib/content/public";
 import { localBusinessJsonLd, serializeJsonLd } from "@/lib/structured-data";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
-export default function Home() {
+// Statically rendered with CMS content fetched at build time, then
+// regenerated at most hourly. Admin content saves should also call
+// revalidatePath("/") so edits appear straight away.
+export const revalidate = 3600;
+
+export default async function Home() {
+  const content = await getHomepageCollections();
+
   return (
     <main id="main">
       {/* Business structured data: verified facts only (see lib/structured-data.ts). */}
@@ -28,16 +36,16 @@ export default function Home() {
       />
       <Hero />
       <Intro />
-      <Services />
-      <CategoryStrip />
-      <GalleryPreview />
+      <Services services={content.services} />
+      <CategoryStrip categories={content.categories} />
+      <GalleryPreview items={content.gallery} />
       <AboutFounder />
-      <Process />
+      <Process steps={content.processSteps} />
       {/* Trust right after "how we work"; renders nothing until real testimonials exist. */}
-      <Testimonials />
-      <WhyCanvas />
+      <Testimonials testimonials={content.testimonials} />
+      <WhyCanvas principles={content.principles} />
       <VideoStory />
-      <Faq />
+      <Faq faqs={content.faqs} />
       <Enquiry />
       <Contact />
     </main>

@@ -2,14 +2,20 @@ import { Container } from "@/components/layout/container";
 import { Section } from "@/components/layout/section";
 import { Reveal } from "@/components/motion/reveal";
 import { SectionHeading } from "@/components/shared/section-heading";
-import { whyCanvas } from "@/data/home";
+import { whyCanvas, type Principle } from "@/data/home";
 import { cn } from "@/lib/utils";
 
 // Desktop "staircase": each principle steps further right, a quiet
 // cinematic cadence without cards or rules.
 const steps = ["", "lg:ml-[25%]", "lg:ml-[50%]"];
 
-export function WhyCanvas() {
+export function WhyCanvas({
+  principles = whyCanvas.principles,
+}: {
+  principles?: Principle[];
+}) {
+  if (principles.length === 0) return null;
+
   return (
     <Section tone="dark" aria-labelledby="why-title">
       <Container>
@@ -28,7 +34,7 @@ export function WhyCanvas() {
         />
 
         <ol className="mt-16 space-y-12 sm:mt-20 lg:space-y-16">
-          {whyCanvas.principles.map((principle, i) => (
+          {principles.map((principle, i) => (
             <li key={principle.id} className={cn("max-w-md", steps[i])}>
               <Reveal>
                 <span

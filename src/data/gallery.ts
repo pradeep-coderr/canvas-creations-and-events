@@ -1,7 +1,9 @@
 import type { StaticImageData } from "next/image";
 
 /**
- * Portfolio images. Maps onto a future `gallery_items` table.
+ * Portfolio images. The live list comes from the CMS (`gallery_items` table, via
+ * src/lib/content/public.ts). This file keeps the type and the built-in copy
+ * used when no database is configured or it can't be reached.
  *
  * Real client photography only — never stock or generated images. Place
  * files in public/images/gallery/ and add entries like:

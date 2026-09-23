@@ -8,10 +8,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { sortedFaqs } from "@/data/faq";
+import { sortedFaqs, type FaqItem } from "@/data/faq";
 import { faqSection } from "@/data/home";
 
-export function Faq() {
+export function Faq({ faqs = sortedFaqs }: { faqs?: FaqItem[] }) {
+  // Nothing to answer yet: no empty heading.
+  if (faqs.length === 0) return null;
+
   return (
     <Section id="faq" tone="ivory" aria-labelledby="faq-title">
       <Container size="narrow">
@@ -24,7 +27,7 @@ export function Faq() {
           {/* Radix Accordion: buttons with aria-expanded/controls, arrow-key
               navigation between questions, one open at a time. */}
           <Accordion type="single" collapsible className="border-t border-foreground/15">
-            {sortedFaqs.map((faq) => (
+            {faqs.map((faq) => (
               <AccordionItem key={faq.id} value={faq.id}>
                 <AccordionTrigger>{faq.question}</AccordionTrigger>
                 <AccordionContent>

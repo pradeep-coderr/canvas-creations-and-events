@@ -12,6 +12,12 @@ export interface EditorialImage {
 /**
  * Homepage copy. Only facts we actually know — no invented claims, numbers
  * or services.
+ *
+ * CMS: process steps and principles are read from the `process_steps` and
+ * `principles` tables (src/lib/content/public.ts); the section copy has been
+ * copied into `home_content`, `about_content` and `video_story` but is still
+ * read from here until the admin content screens exist. Everything here is
+ * also the built-in fallback when no database is configured.
  */
 export const hero = {
   eyebrow: "Event styling & décor",

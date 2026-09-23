@@ -2,10 +2,12 @@ import { Container } from "@/components/layout/container";
 import { Section } from "@/components/layout/section";
 import { Reveal } from "@/components/motion/reveal";
 import { SectionHeading } from "@/components/shared/section-heading";
-import { processSection } from "@/data/home";
+import { processSection, type ProcessStep } from "@/data/home";
 
 /** How working with the studio unfolds: a numbered editorial sequence. */
-export function Process() {
+export function Process({ steps = processSection.steps }: { steps?: ProcessStep[] }) {
+  if (steps.length === 0) return null;
+
   return (
     <Section tone="ivory" aria-labelledby="process-title">
       <Container>
@@ -17,7 +19,7 @@ export function Process() {
         />
 
         <ol className="mt-14 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:mt-20 lg:grid-cols-4 lg:gap-x-8">
-          {processSection.steps.map((step, i) => (
+          {steps.map((step, i) => (
             <li key={step.id}>
               <Reveal className="border-t border-foreground/15 pt-6">
                 {/* The <ol> already conveys order to assistive tech. */}

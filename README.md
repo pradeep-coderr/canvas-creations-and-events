@@ -102,6 +102,33 @@ Private area for managing enquiries: list (newest first, filter by status with c
 - **How access is enforced:** `src/proxy.ts` (Next 16 proxy, admin routes only) just refreshes the session. Every admin page and server action calls `requireAdmin()` (`src/lib/admin/session.ts`: verified JWT via `getClaims()` + `admin_users` membership), and RLS enforces the same rules in the database.
 - Code: `src/app/admin/` (login, list, detail, `actions.ts`), status vocabulary `src/lib/enquiry-status.ts` (matches the DB CHECK).
 
+## CMS content model (Supabase)
+
+Editable website content lives in Supabase and is edited from `/admin`. There is no separate CMS. The schema and the admin content screens are built in stages: **the schema exists now; the admin screens come next.**
+
+- **Migrations:** `supabase/migrations/…_create_cms_content.sql` (schema, RLS) and `…_seed_cms_content.sql` (a verbatim copy of the copy already on the site; nothing invented).
+- **Collections:** `services`, `categories`, `gallery_items` (→ `categories`, → `media_assets`), `testimonials`, `faqs`, `process_steps`, `principles`.
+  - Each has `sort_order` and `is_published`, and new rows start as drafts.
+  - `services`, `gallery_items` and `testimonials` also have `is_featured`, which controls what the homepage shows.
+- **Singletons:** one row each, created by the seed and updatable but never deleted.
+  - `home_content`: section copy.
+  - `about_content`: About/founder. The founder name, role and image stay empty until real ones are provided.
+  - `video_story`: an optional video, either an uploaded file with a poster, or a YouTube/Vimeo embed validated by host.
+- **Media:** `media_assets` rows reference files in a future public Storage bucket `cms-media`. Content links to media by foreign key and never stores URLs. `next.config.ts` allows only that bucket path for `next/image`.
+- **Stays in code** (`src/data/site.ts`, components, config): business name, phone, address and socials (also used by JSON-LD, the manifests and emails); navigation and routes; design tokens and layout; security, auth, PWA and service worker.
+- **Security (RLS):**
+  - The public (anon) and signed-in non-admins can read only published collection rows, the singletons, and media used by visible content.
+  - Only admins (`admin_users`, checked by `private.is_admin()`) can read drafts or insert, update or delete anything.
+  - Enquiry rules are unchanged.
+- **How the site reads it:** `src/lib/content/public.ts` (server-only) queries with a cookie-less anon client (`src/lib/supabase/public.ts`) and maps rows to the existing types in `src/data/*`. Components receive plain props and never touch Supabase.
+  - Wired so far: services, categories, gallery preview, testimonials, FAQs, process steps, principles. Section copy is still read from `src/data/home.ts`.
+  - **Empty is a real answer:** unpublishing everything hides those sections cleanly.
+  - `src/data/*` is used only when no database is configured, or a query fails (logged as `[content] … could not be loaded`).
+- **Caching:** the homepage stays static.
+  - Content is fetched at build time and cached in the Next.js data cache under the tag `cms-content`, with a 1-hour `revalidate`.
+  - **Any code that changes content must call `revalidateTag("cms-content")`** (constant `CMS_CONTENT_TAG`) so the site updates immediately.
+  - Editing directly in the Supabase dashboard shows up within an hour.
+
 ## Production & deployment (Vercel)
 
 ### Environment variables

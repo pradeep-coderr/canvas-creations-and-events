@@ -2,7 +2,9 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { site, type NavLink } from "./site";
 
 /**
- * Frequently asked questions. Maps onto a future `faqs` table.
+ * Frequently asked questions. The live list comes from the CMS (`faqs` table, via
+ * src/lib/content/public.ts). This file keeps the type and the built-in copy
+ * used when no database is configured or it can't be reached.
  *
  * Only questions whose answers come from verified business information are
  * published. Pricing, availability, service area, lead times and policies

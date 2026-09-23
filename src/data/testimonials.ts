@@ -1,5 +1,7 @@
 /**
- * Client testimonials. Maps onto a future `testimonials` table.
+ * Client testimonials. The live list comes from the CMS (`testimonials` table, via
+ * src/lib/content/public.ts). This file keeps the type and the built-in copy
+ * used when no database is configured or it can't be reached.
  *
  * Intentionally empty: only real, client-approved words belong here — never
  * invented quotes, names or ratings. The section does not render until at

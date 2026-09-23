@@ -1840,3 +1840,154 @@ All local test data and the temp admin were deleted; the test server was stopped
 - After deploying: install on the owner's phone from `/admin/login`, then check the icon, launch into `/admin`, the shortcuts (Android) and sign-out/sign-in inside the app.
 - An admin offline page ("You're offline, Canvas Admin needs a connection") would be possible without caching private data, but it means the worker handling `/admin` navigations. It's deferred to keep the "never touches /admin" rule simple.
 - The brief was cut off in section 11; any later sections (for example, further verification or the commit message) weren't received.
+
+---
+
+## Phase 13 — CMS Architecture & Content Model
+
+**Date:** Thursday 24 September 2026 · **Timezone:** NPT (UTC+05:45) · **Work window:** ~00:40 → ~01:25
+**Result:** Commit `feat: establish CMS content model` (the hash is in the final report; a commit can't contain its own hash). Not pushed. **Both migrations were applied locally and to the hosted project (you approved the push).**
+
+### What I inspected first
+
+- `src/data/*` already mirrored the future tables:
+  - Every file had a `Maps onto a future … table` note.
+  - `Services`, `GalleryPreview`, `Testimonials` and `CategoryStrip` already took optional props with local defaults.
+  - Relationships were by string (`GalleryItem.categoryId → Category.id`).
+- Hard-coded content:
+  - `site.ts` (identity/contact/socials/nav).
+  - `home.ts` (all section copy, including 4 process steps and 3 principles).
+  - `services.ts` (1 service), `faq.ts` (3 FAQs, one built from phone/address and switching on whether online enquiries are live).
+  - `categories`, `gallery` and `testimonials` are empty on purpose.
+- Security pattern to follow: explicit grants and RLS, with admin checked via `admin_users` (own-row RLS). Enquiries: public insert-only, admin select + status update, no deletes.
+- The homepage is statically rendered, and the server Supabase client reads cookies, which would make it dynamic. So public content needs a cookie-less client.
+- Cache Components are **not** enabled, so the "previous" caching model applies (`revalidate`, data cache, `revalidateTag`); checked in `node_modules/next/dist/docs`.
+
+### Architecture decisions
+
+| Decision | Choice and why |
+| --- | --- |
+| CMS platform | None added. Supabase tables + RLS + the existing `/admin` auth (`requireAdmin`, `admin_users`) |
+| Singletons vs generic blocks | Three typed singleton tables (`home_content`, `about_content`, `video_story`), not a generic key/value or JSON page builder. The single row is enforced by `id boolean primary key default true check (id)` |
+| Collections | `services`, `categories`, `gallery_items`, `testimonials`, `faqs`, `process_steps`, `principles` (the "Why Canvas" items, a real collection on the page). UUID keys; `slug` only where it'll be a URL/stable key (services, categories); `sort_order`; `is_published` (default **false**, so new rows are drafts); `is_featured` where the homepage selects a subset |
+| `site_settings` table | **Not created.** Business identity (name, phone, address, socials, email once supplied) is used by JSON-LD, metadata, both manifests and email templates, and rarely changes. It stays in `src/data/site.ts`, as does the navigation. Content settings are the homepage singletons |
+| Relationships | Real foreign keys: `gallery_items.category_id → categories` (on delete set null); content → `media_assets` |
+| Media | Small `media_assets` table (kind image/video, storage path in a future `cms-media` bucket, alt required for images, optional dimensions). Content uses **composite FKs (media id, kind)**, so a gallery item or poster can only point at an image and a video file only at a video. Gallery media and video/poster are `on delete restrict`; optional images are `set null (image_id)`. No uploads/Storage bucket yet |
+| Video | `video_story.provider` = none / `upload` (media file + poster required) / `youtube` / `vimeo` (embed URL checked against the provider's hosts). The public component still supports only local files, so embeds are modelled but not rendered yet |
+| Text rules | Domains `cms_line` (1–200 chars trimmed, single line), `cms_text` (1–2000), `cms_slug`, `cms_href` (site-relative `/…` but not `//host`, `tel:`, `mailto:`, `https:` only, so no `javascript:`). Arrays of domains for paragraphs and title lines, with count and no-null checks |
+| Roles | Single admin role (existing). Editor/author roles, approvals, drafts-with-revisions: not added; they can be layered on `private.is_admin()` later |
+| Initial content | A second migration copies the **existing** site copy verbatim (1 service, 3 FAQs, 4 steps, 3 principles, all section copy, About paragraphs). Empty collections stay empty. Founder name/role/image, hero image and video stay NULL. The "how to enquire" FAQ uses its online wording (a database implies online enquiries) |
+
+### Content ownership: CMS vs code
+
+| Content | Where it lives now | Why |
+| --- | --- | --- |
+| Services, categories, gallery, testimonials, FAQs, process steps, principles | **CMS**, and read from it | Client-editable collections |
+| Hero, intro, section headings/descriptions, gallery empty state, enquiry/contact copy | **CMS** (`home_content`) but still read from `home.ts` | Editable once the admin screens exist |
+| About/founder copy, founder name/role/portrait | **CMS** (`about_content`), still read from `home.ts` | As above; founder fields empty until real |
+| Video/story copy + video | **CMS** (`video_story`), still read from `home.ts` | As above |
+| Name, slogan, description, phone, address, socials, email | **Code** (`site.ts`) | Identity used by SEO/JSON-LD, manifests, emails; rarely changes |
+| Navigation, anchors, CTA targets (e.g. hero CTA `href`), routes | **Code** | Structure, not copy (labels are CMS) |
+| Enquiry "offline" notice, form labels/validation messages | **Code** | System/accessibility copy tied to behaviour |
+| Design tokens, typography, layout, breakpoints, image cropping classes | **Code** | Not exposed to the CMS |
+| Security headers, CSP, auth, PWA manifests, service worker | **Code** | Security/platform configuration |
+
+### RLS / security
+
+- Every CMS table: `revoke all` from anon/authenticated, then explicit grants.
+- **Collections:**
+  - anon + authenticated `SELECT` where `is_published`.
+  - Admins: `SELECT` all, plus `INSERT`/`UPDATE`/`DELETE`.
+- **Singletons:**
+  - Public `SELECT`.
+  - Admin `UPDATE` only; no insert or delete grants, so the row can't be removed or duplicated.
+- **Media:**
+  - Public `SELECT` only for media referenced by content the reader can see. The policy's subqueries run under each content table's RLS, so draft-only media stays hidden.
+  - Admins have full access.
+- **`private.is_admin()`:** `SECURITY INVOKER`, `search_path = ''`, in a non-API schema; execute is granted to `authenticated` only (anon policies never call it). Policies wrap it as `(select private.is_admin())` so it runs once per query.
+- **Enquiries and `admin_users`:** not touched.
+
+### Application data layer
+
+| File | Role |
+| --- | --- |
+| `src/lib/supabase/public.ts` (new) | `createPublicClient()`: anon key, no session or cookies (keeps pages static). Server-only. Every request is tagged `cms-content` (`CMS_CONTENT_TAG`) |
+| `src/lib/content/public.ts` (new) | Server-only queries for services, categories, gallery preview (with media + category), testimonials, FAQs, process steps and principles. Explicit `is_published` filter on top of RLS; order by `sort_order`, then `created_at`. Maps rows to the **existing** types (`sort_order → order`, `slug → id` for services/categories, `author_name → name`, FAQ action columns → `action`, media → `{ src, alt }`). `getHomepageCollections()` fetches all seven in parallel |
+| `src/lib/content/media.ts` (new) | `cmsMediaUrl(path)` → public Storage URL for the `cms-media` bucket |
+| `src/app/(site)/page.tsx` | Async; passes the collections to sections; `revalidate = 3600`. The route stays **static** (`○ /  1h`) |
+| Sections | `Faq`, `Process`, `WhyCanvas` got optional props with the local defaults (same pattern as the existing ones) and render nothing when empty. `Services` keeps its enquiry prompt when there are no services (the top rule moved from the list to the column, so the look is unchanged) |
+| `next.config.ts` | `images.remotePatterns`: only `<NEXT_PUBLIC_SUPABASE_URL>/storage/v1/object/public/cms-media/**` |
+| `src/data/*` | Types and built-in copy kept, not deleted. Comments now say the database is the source of truth |
+| `supabase/migrations/20260923185556_create_cms_content.sql` (new) | Schema, domains, constraints, indexes, triggers, grants, RLS |
+| `supabase/migrations/20260923185558_seed_cms_content.sql` (new) | Verbatim copy of the existing site copy |
+| `README.md` | New "CMS content model (Supabase)" section |
+
+- **Fallback rule:** use `src/data` only when no database is configured or a query throws (logged server-side with code/message). An empty result is shown as empty, never replaced.
+- **Section copy** (`home_content` / `about_content` / `video_story`) is in the database but still **read from `home.ts`** until the admin screens exist. Wiring it before it can be edited adds risk without benefit.
+- **Admin structure for next phase (routes not created yet):**
+  - `/admin` stays the enquiries list (the PWA `start_url` and shortcuts point there).
+  - Planned: `/admin/content` (overview) → `/admin/content/home`, `/services`, `/gallery`, `/faqs`, `/testimonials`, `/process`, … behind the same `requireAdmin()` layout, plus a header nav.
+  - Writes should use the cookie session client (`src/lib/supabase/server.ts`) so RLS sees the admin, then `revalidateTag(CMS_CONTENT_TAG)`.
+
+### Tests actually run
+
+**Local Supabase (Docker), `rls13.mjs`: 141 checks, 141 pass.** Real sessions for a local admin and a local signed-in non-admin, plus anon, over the Data API:
+
+| Area | Checks |
+| --- | --- |
+| Public reads | anon and non-admin get only published rows in all 7 collections; the draft category and draft FAQ are hidden; only media used by published content is visible (draft-gallery and unused media hidden); singletons readable; `admin_users`/`enquiries` still denied; `is_admin` not callable via RPC (PGRST202) |
+| Public writes | anon: every insert/update/publish/reorder/delete on all collections, singletons and media → **42501**. Non-admin: inserts → 42501; updates/deletes → 0 rows (RLS). A direct DB check confirmed nothing changed (no `sort_order = 99`, singleton text unchanged, no `hack-*` rows) |
+| Admin | reads drafts; inserts media/categories/gallery/FAQ (drafts by default); publishes and reorders; `updated_at` trigger advances; the change is visible publicly; deletes; updates a singleton; **cannot** create a second singleton row or delete one; still cannot delete enquiries |
+| Constraints | bad slug, duplicate slug, blank label, negative order, `javascript:` and `//host` hrefs, label without href, gallery → video asset (FK), gallery without media, image without alt, `..` in path, a YouTube provider with a non-YouTube URL, upload without poster, video slot → image asset, empty title lines: **all rejected**. A valid YouTube embed is accepted |
+| Relationships | public gallery embeds media + category; an unpublished category embeds as `null`; ordering follows `sort_order`; media used by the gallery can't be deleted; deleting a service image nulls `image_id` only; deleting a category keeps the gallery item with `category_id` null |
+
+**`supabase db lint`:** no issues.
+
+**Local production builds** (local Supabase, `NEXT_PUBLIC_SITE_URL=https://www.example.com`):
+
+| Build | Result |
+| --- | --- |
+| A: temporary published testimonial + categories, draft category/FAQ, extra first process step, "Elegant" unpublished | testimonial rendered; categories in `sort_order` (A before B); drafts absent; extra step first; "Elegant" gone; `/` still static (1h) |
+| B: every collection unpublished (empty DB) | FAQ, Process, Why Canvas, Categories, Testimonials absent; Services shows heading + enquiry prompt (screenshots at 390/1440 look intentional); 7 widths: no overflow, 1 h1, footer, no console errors |
+| D: unreachable database (`http://127.0.0.1:1`) | build succeeds; one `[content] … could not be loaded` log per collection; page shows the built-in copy |
+| C: seed state | the DB-rendered page text is **identical** to the built-in-copy render (144/144 text nodes); the outline and page heights match Phase 11 at all 7 widths |
+
+**Regression on build C:** all pass, no console errors.
+- Phase 3 suite (focus trap, Escape, reduced motion) and Phase 6 suite (CTAs, anchors, FAQ keyboard, form validation, live submit, mobile bar/menu).
+- Header scroll state at 390/1440.
+- Metadata suite (canonical, JSON-LD, admin noindex, no private data in the head, 404s).
+- Date picker + admin Select.
+- Admin PWA suite (manifest/installability, shortcuts, mobile admin 375–430, status change, worker boundary, offline, sign-out/expired session).
+- Public PWA suite (worker, caches with no admin/private data, offline homepage, offline form).
+
+**Leak check:** no table or column names, Supabase URL or cache tag in the HTML or client JS; the content modules aren't in any client chunk.
+
+**Hosted project (after `db push`, dry run first): anonymous checks only, `hosted13.mjs`: 19 checks, 19 pass.**
+- Published-only reads.
+- Seed counts match the site (1/3/4/3, empty collections, no media).
+- The three singletons are readable.
+- anon insert/update/delete/singleton update → 42501; `enquiries` and `admin_users` still denied; `is_admin` not exposed.
+- Hosted admin and non-admin sessions were **not** tested: no hosted test users were created and I don't have the admin password. The same SQL was verified locally.
+- The final `bun run build` with the hosted env loaded all seven collections from the hosted tables (**0** fallback logs). Your dev server (hosted) renders the same homepage.
+
+**Final gate:** `bun install --frozen-lockfile`, typecheck, lint, build and `git diff --check` all pass.
+
+All local test rows, the three local test users and the temp files were deleted; the local database is back to the seed state. My test server (3059) was stopped; your dev server (3000) was untouched. On hosted, only the migrations were applied: no test rows, and the existing enquiry ("Fly Man") wasn't touched.
+
+### Problems found and fixed
+
+1. **The data cache outlived builds.**
+   - Build B still showed build A's test rows: with `revalidate = 3600`, the Supabase responses went into `.next/cache/fetch-cache` and the next build reused them (`x-nextjs-cache: HIT`). Production behaves the same way: the data cache survives deploys.
+   - Fix: every public content request is now tagged `cms-content`, so content changes can invalidate it precisely (next phase: `revalidateTag(CMS_CONTENT_TAG)` on save).
+   - For my test builds I cleared only `.next/cache/fetch-cache`, never `.next`, and your dev server (`.next/dev`) was untouched.
+2. **Fallback log was uninformative** for network failures (empty code) → it now logs the message too.
+3. **Services with zero items** would have left an empty `<ol>` → the list is omitted and the top rule moved to the column.
+4. My first check reported the service "missing" because `&` is `&amp;` in HTML; it wasn't a bug.
+
+### Remaining / deferred
+
+- **Admin CMS screens** (next phase): the routes above; forms with Zod mirroring the DB domains; reordering; publish toggles; `revalidateTag` on save; warn before unpublishing the last FAQ (the nav's "FAQ" link would then point at a missing section).
+- **Wire the section copy** (`home_content`, `about_content`, `video_story`) into the public sections once it's editable.
+- **Media:** create the `cms-media` bucket with Storage policies (public read, admin write), an upload flow writing `media_assets`, and dimensions. Local `next/image` from `127.0.0.1` is blocked by Next's local-IP guard, so test media against hosted or configure it deliberately.
+- **Video embeds:** extend `VideoStory` to render YouTube/Vimeo (privacy-enhanced) when chosen.
+- **Hosted admin-session RLS check** after the admin screens exist (as the real admin).
