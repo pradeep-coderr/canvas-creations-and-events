@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useForm, type FieldPath } from "react-hook-form";
+import { Controller, useForm, type FieldPath } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -52,7 +53,7 @@ const fields: FieldConfig[] = [
   { name: "email", label: "Email", type: "email", autoComplete: "email" },
   { name: "phone", label: "Phone", optional: true, type: "tel", autoComplete: "tel", inputMode: "tel" },
   { name: "eventType", label: "Type of event", optional: true },
-  { name: "eventDate", label: "Event date", optional: true, type: "date" },
+  { name: "eventDate", label: "Event date", optional: true },
   { name: "venue", label: "Venue or location", optional: true },
 ];
 
@@ -77,6 +78,7 @@ export function EnquiryForm({
   const thanksRef = useRef<HTMLHeadingElement>(null);
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -186,12 +188,31 @@ export function EnquiryForm({
           const id = `enquiry-${f.name}`;
           return (
             <Field key={f.name} data-invalid={!!error || undefined}>
-              <FieldLabel htmlFor={id}>
+              <FieldLabel htmlFor={id} id={`${id}-label`}>
                 {f.label}
                 {f.optional && (
                   <span className="font-normal text-muted-foreground">(optional)</span>
                 )}
               </FieldLabel>
+              {f.name === "eventDate" ? (
+                <Controller
+                  control={control}
+                  name="eventDate"
+                  render={({ field }) => (
+                    <DatePicker
+                      id={id}
+                      labelId={`${id}-label`}
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      ref={field.ref}
+                      disablePast
+                      aria-invalid={!!error || undefined}
+                      aria-describedby={error ? `${id}-error` : undefined}
+                    />
+                  )}
+                />
+              ) : (
               <Input
                 id={id}
                 type={f.type ?? "text"}
@@ -202,6 +223,7 @@ export function EnquiryForm({
                 aria-describedby={error ? `${id}-error` : undefined}
                 {...register(f.name)}
               />
+              )}
               {error && <FieldError id={`${id}-error`}>{error.message}</FieldError>}
             </Field>
           );

@@ -2,31 +2,36 @@
 
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { enquiryStatusLabels, enquiryStatuses, type EnquiryStatus } from "@/lib/enquiry-status";
 import { updateEnquiryStatus, type StatusState } from "../../../actions";
 
 export function StatusForm({ id, status }: { id: string; status: EnquiryStatus }) {
   const [state, action, pending] = useActionState<StatusState, FormData>(updateEnquiryStatus, {});
+  const current = state.status ?? status;
 
   return (
     <form action={action} className="mt-4 space-y-4">
       <input type="hidden" name="id" value={id} />
-      <label htmlFor="enquiry-status" className="sr-only">
-        Enquiry status
-      </label>
-      <select
-        id="enquiry-status"
-        name="status"
-        defaultValue={state.status ?? status}
-        key={state.status ?? status}
-        className="h-11 w-full rounded-md border border-input bg-background px-3 text-base text-foreground hover:border-foreground/45 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 focus-visible:outline-none"
-      >
-        {enquiryStatuses.map((value) => (
-          <option key={value} value={value}>
-            {enquiryStatusLabels[value]}
-          </option>
-        ))}
-      </select>
+      {/* shadcn Select; `name` makes Radix submit the value with the form. */}
+      <Select key={current} name="status" defaultValue={current}>
+        <SelectTrigger id="enquiry-status" aria-label="Enquiry status">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {enquiryStatuses.map((value) => (
+            <SelectItem key={value} value={value}>
+              {enquiryStatusLabels[value]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <Button type="submit" className="w-full" disabled={pending}>
         {pending ? "Saving…" : "Update status"}
       </Button>

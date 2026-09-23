@@ -1597,3 +1597,28 @@ The server action is still the only public entry point. Steps, in order:
 - **Commit** this phase (not done yet).
 - **Deferred:** password reset / magic links, multiple roles, internal notes on enquiries, notification resend button, pagination beyond 200, CSV export.
 - **Still open:** Resend credentials (email not live), `rls_auto_enable()` advisor note, business email, client content, the Prettier decision, the GitHub remote.
+
+---
+
+### Phase 9 follow-up: shadcn date picker and status select (2026-09-23)
+
+**Request:** replace the native date input (enquiry form) and native `<select>` (admin status) with shadcn components; the native ones looked out of place.
+
+- **Added** via the shadcn CLI (overwrite prompts declined; checksums of all existing `ui/*` files unchanged): `ui/calendar.tsx` and `ui/popover.tsx`. New dependencies required by shadcn's Calendar: **`react-day-picker@10`**, **`date-fns@4`**.
+- **Brand restyle:** project `cn` import.
+  - Calendar: 40px day cells (touch-friendly), Cormorant month title, Rose Ink selected day, blush "today" marker.
+  - Popover: hairline border + `shadow-soft`; open/close animations only under `motion-safe:` (as in Phase 6).
+- **New `ui/date-picker.tsx`** (shadcn Popover + Calendar pattern):
+  - The trigger matches the other controls (44px, 16px text, same border, focus and error styles).
+  - Works on the existing `"YYYY-MM-DD"` string (no schema change); past days disabled; weeks start Monday; "Clear date" option.
+  - Accessible name = label + chosen date (`aria-labelledby`). Errors are announced via `aria-describedby`; the error style uses `data-invalid` (lint caught that `aria-invalid` isn't valid on a button).
+- **Enquiry form:** the event date uses `DatePicker` through RHF `Controller` (keeps first-error focus and on-touch validation). Every other field stays shadcn `Input`.
+- **Admin status form:** now the shadcn `Select` with `name="status"` (Radix submits it with the form); the server still validates.
+- **No native `type="date"` inputs or `<select>` elements remain in `src`.**
+
+**Verified** (local test build, then cleaned up):
+
+- **Date picker** at 1280 and 390px: Enter opens it and focus moves into the calendar; past days disabled; 40px cells; Escape closes and returns focus. Picking the 15th of next month shows "Thu 15 October 2026", and a real submit stored `event_date = 2026-10-15`.
+- **Admin Select:** keyboard open, 6 options, Booked → "Status updated to Booked.", DB `booked`. No console errors.
+- **Regression:** frozen install ✅ · typecheck ✅ · lint ✅ · build ✅ · 7 widths ✅ (no overflow, all anchors) · interaction/a11y suite ✅ (its past-date step was removed: past dates can no longer be picked in the UI; the server still rejects them).
+- **Cleanup:** local test enquiry and temporary local admin deleted. Hosted suite rows deleted. One hosted enquiry, "Fly Man" (23:43 NPT, not from my tests), left untouched.
