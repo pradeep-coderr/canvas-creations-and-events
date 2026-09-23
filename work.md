@@ -979,3 +979,178 @@ These stay in `home.ts` because each is small homepage content, which avoids tin
 - **Anchors still to build:** `#faq`, `#contact`, `#enquire` (all Enquire CTAs and the About CTA point to `#enquire`).
 - **Not built, per brief:** testimonials, FAQ, enquiry form, contact, footer, Supabase, auth, admin, email, lightbox, gallery page, booking.
 - **Still open:** business email, Supabase project, the Prettier decision, GitHub remote.
+
+---
+---
+
+## Phase 6 — Trust, Enquiry, Contact & Footer
+
+**Date:** Wednesday, 23 September 2026
+**Timezone:** Nepal Time, NPT (UTC+05:45)
+**Work window:** 22:09:57 → ~22:24 (commit)
+**Goal:** Testimonials, FAQ, Enquiry, Contact and Footer, so the public homepage is structurally complete. Frontend only: no backend, no email.
+**Result:** Commit `feat: complete homepage conversion sections` (not pushed)
+
+### Timeline
+
+| Time (NPT) | Step |
+| --- | --- |
+| 22:09:57 | Inspection: tree clean at `419d390`; no media beyond the logo; `#enquire` already referenced by header, menu, hero, services and About; email `null` in `site.ts`; your dev server on port 3000 |
+| ~22:10 | `shadcn add accordion` (overwrite prompts declined; checksums of every existing `ui/*` file unchanged); accordion restyled |
+| ~22:11 | Data: `testimonials.ts` (empty), `faq.ts` (3 verified Q&As), section copy in `home.ts`; `lib/enquiry.ts` (schema + `submitEnquiry`) |
+| ~22:12 – 22:14 | `EnquiryForm`, Testimonials, FAQ, Enquiry, Contact, SiteFooter, MobileCtaBar; layout + page order; previews on `/design-system` |
+| ~22:15 | Type check ✅, lint ✅; 7-width audit; full-page screenshots |
+| ~22:16 | Footer Explore list → 2 columns on phones |
+| ~22:17 | Interaction suite (CTAs, anchors, FAQ keyboard, form validation, preview success, mobile bar, reduced motion) |
+| ~22:18 | **Bug fix:** reduced motion didn't stop accordion, Sheet or Select animations → `motion-safe:` gating |
+| ~22:19 | Motion re-verified in both modes; clean-load console check |
+| 22:20 | Production build ✅ + 7-width production audit ✅ (my server on port 3057, stopped afterwards) |
+| ~22:24 | This entry; commit |
+
+### Sections created
+
+| Section | File | Anchor | Tone | Treatment |
+| --- | --- | --- | --- | --- |
+| Testimonials | `sections/testimonials.tsx` | — | white | One large italic Cormorant lead quote, up to two smaller below; `figure > blockquote + figcaption`; no stars, avatars or carousel. **Renders nothing while `testimonials` is empty (it is).** |
+| FAQ | `sections/faq.tsx` | `#faq` | ivory | Centred narrow column; Radix accordion (single, collapsible); Cormorant questions, hairline rules, rotating chevron |
+| Enquiry | `sections/enquiry.tsx` + `enquiry-form.tsx` | `#enquire` | blush | 5/7 split: sticky context on the left, form on the right, directly on blush (white fields, no card) |
+| Contact | `sections/contact.tsx` | `#contact` | white | Large statement on the left; `<address><dl>` with Call / Based in / Follow rows in Cormorant, separated by hairlines |
+| Footer | `layout/site-footer.tsx` | `<footer>` (in root layout, outside `<main>`) | dark | Logo + slogan; Explore (`site.navigation` + `site.enquiry`); Contact; Follow; © year |
+| Mobile CTA bar | `layout/mobile-cta-bar.tsx` | `nav[aria-label="Quick contact"]` | white | Mobile only; Call + Enquire (see below) |
+
+**Page order:** Hero → Intro → Services → CategoryStrip → GalleryPreview → AboutFounder → Process → **Testimonials** → WhyCanvas → VideoStory → **Faq → Enquiry → Contact**, then the footer in the layout.
+
+**Testimonials placement:** right after Process ("how we work"), so proof follows the process. While empty, Process (ivory) flows straight into Why Canvas (dark). When filled, a white section sits between them, so the tones still alternate.
+
+**Tone rhythm, bottom half:** Why (dark) → Video (white) → FAQ (ivory) → Enquiry (blush) → Contact (white) → Footer (dark). No extra dark blocks.
+
+### Content & data structures
+
+| File | Contents | Future table |
+| --- | --- | --- |
+| `data/testimonials.ts` | `Testimonial { id, quote, name, eventType?, featured, order }`, `featuredTestimonials` (≤3). **Empty.** | `testimonials` |
+| `data/faq.ts` | `FaqItem { id, question, answer, action?, order }`, `sortedFaqs`. Answers built from `site.ts` values (phone, locality, region), so nothing is duplicated | `faqs` |
+| `data/home.ts` | `testimonialsSection`, `faqSection`, `enquirySection` (incl. `offlineNotice`), `contactSection` | — |
+
+**Published FAQs (verifiable only):**
+
+1. How do I make an enquiry? → by phone (real number, plus a call link); "also find us on Instagram, Facebook and TikTok". A code comment says to update this when the form goes live.
+2. What details help with an enquiry? → date, type of celebration, venue, ideas. Informational, with no promises.
+3. Where are you based? → "Munno Para, South Australia", from `site.ts`.
+
+**Deliberately not published:** pricing, availability, lead times, service area, deposits, response times, hours.
+
+### Enquiry architecture
+
+- **`src/lib/enquiry.ts`**
+  - `enquirySchema` (Zod 4): shared by the form now and a future server action later (validate on both sides).
+    - `name` required, max 100
+    - `email` required, max 254, valid format
+    - `phone` optional, digits/spaces/`+()-` with at least 8 digits
+    - `eventType` optional, max 100
+    - `eventDate` optional, `YYYY-MM-DD`, not in the past
+    - `venue` optional, max 200
+    - `message` required, max 2000
+    - All inputs are trimmed.
+  - Types: `EnquiryInput` / `Enquiry` / `EnquiryResult` (`sent` | `unavailable` | `error`).
+  - `enquiriesEnabled = false`.
+  - `submitEnquiry()` is the **single integration point**. It currently returns `{ status: "unavailable" }`; later it becomes a server action call (Supabase insert + Resend email). The UI won't need changes.
+- **`EnquiryForm`** (the only new client component besides the bar): React Hook Form + `zodResolver`, `mode: "onTouched"`, `noValidate`.
+  - States: `idle` / `submitting` (button disabled, "Sending…") / `sent` / `unavailable` / `error`.
+- **Honesty:**
+  - While `enquiriesEnabled` is false, a notice sits **above** the fields: "Online enquiries are still being set up, so this form can't send messages yet. For now, please call us." plus a call link. The form references it via `aria-describedby`.
+  - A valid submit shows: "Your details look good, but online enquiries aren't connected yet, so nothing has been sent. Please call us on 0426 071 109. Your details are still in the form."
+  - The form **never shows "Thank you" / "sent"** without a real backend (verified).
+- **Success state:** a "Thank you." heading that receives focus, plus a "Send another enquiry" link. It's only reachable through `preview` mode, used solely on the dev-only `/design-system` page (simulated 600ms delivery), or later through a real backend.
+- **Fields asked (7):** name, email, phone (optional), type of event (free text, optional; there's no dropdown because categories aren't verified), event date (optional, native date picker), venue or location (optional), message. **Not asked:** budget, guest count.
+
+### Mobile CTA bar decision
+
+Added. The page is about 9,600px tall on phones, and between the hero and the enquiry section there was no visible call/enquire action without opening the menu.
+
+- It's shown **only when none of** the hero, `#enquire`, `#contact` or the footer is on screen (IntersectionObserver). It never covers the form (or the keyboard while typing in it), the contact details, or the page end.
+- When hidden it's `inert` + `aria-hidden`, so it can't be focused.
+- Safe-area bottom padding; solid background with a hairline (no blur); 44px buttons; `z-30`, below the header and menu; `lg:hidden`.
+
+### Design decisions
+
+1. **Four jobs, four treatments:** proof (large italic quotes), answers (centred accordion), conversion (split layout with a sticky context column), direct contact (statement plus a typographic definition list). None use cards.
+2. **The form sits directly on blush;** white fields supply the structure. The offline notice uses a gold left rule, not an alert box.
+3. **Footer is quiet:** four groups, champagne eyebrows, a small logo badge, one hairline above the copyright. No legal or company details were invented.
+4. **Contact shows the address exactly as supplied** (street without number, locality, postcode); the footer shows locality only. No map (not required, no dependency).
+5. **No structured data added:** no LocalBusiness, Review or Rating schema (production HTML checked: no `aggregateRating`, no stars).
+
+### Accessibility (tested)
+
+| Check | Result |
+| --- | --- |
+| Headings | One h1; FAQ questions are h3 (Radix header); no skipped levels at any width |
+| Landmarks | `<header>`, `<nav aria-label="Main">`, `<main>`, `<nav aria-label="Footer">`, `<footer>` (outside `<main>`), `<nav aria-label="Quick contact">` |
+| FAQ | Enter opens (`aria-expanded` changes to `true`, region `role="region"` visible); ArrowDown moves to the next question; Space toggles (single mode closes the previous one); focus ring visible |
+| Form labels | Visible `<label for>` on every field; "(optional)" in the label text; required fields `aria-required` |
+| Form errors | Empty submit focuses **Name**; errors render as `role="alert"`; the input gets `aria-invalid="true"` and `aria-describedby="enquiry-name-error"`, which resolves to the message text |
+| Validation messages seen | "Please enter your name." · "Please enter your email address." · "Please tell us a little about your celebration." · "Please enter a valid email address." · "Please enter a valid phone number, or leave it blank." · "Please choose a date that hasn't passed." |
+| Submit outcome | Announced through a `role="status"` live region; the success heading receives focus |
+| Inputs | 16px font (no iOS zoom); `autocomplete` name/email/tel; `inputmode="tel"` |
+| External links | Contact and footer socials: `target="_blank" rel="noopener noreferrer"` + screen-reader text "(opens in a new tab)" |
+| Reduced motion | Accordion, Sheet (menu) and Select open/close animations off; bar transition off; reveals off |
+
+### Responsive behaviour
+
+| Width | `scrollWidth` = viewport | Page height (dev) |
+| --- | --- | --- |
+| 375 | ✅ | 9650 |
+| 390 | ✅ | 9554 |
+| 430 | ✅ | 9570 |
+| 768 | ✅ | 9133 |
+| 1024 | ✅ | 8045 |
+| 1280 | ✅ | 8344 |
+| 1440 | ✅ | 8399 |
+
+- Form: one column on phones, two from `sm` (message and submit full width).
+- The Enquiry and Contact splits stack below `lg`.
+- Footer: 1 column on phones (with a 2-column link list), 2 at `sm`, 12-column layout at `lg`.
+
+### Anchors & CTAs (measured)
+
+| Trigger | Result |
+| --- | --- |
+| Header / hero / services row / About CTA / footer "Enquire Now" (desktop) | `#enquire` at 96px (header 97px), each one |
+| Header nav FAQ, Contact; footer nav FAQ | `#faq` / `#contact` at 96px |
+| Mobile menu FAQ, Contact, Enquire Now | at 72px (mobile header), menu closed |
+| Mobile bar Enquire | `#enquire` at 72px; bar then hides |
+
+All six nav anchors now exist: `#services`, `#gallery`, `#about`, `#faq`, `#contact`, `#enquire`.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| `bun run typecheck` / `lint` | ✅ exit 0 (after every change) |
+| `bun run build` | ✅ all routes static |
+| Dev audit, 7 widths | ✅ no overflow, no failed requests, no console or hydration errors |
+| Production audit, 7 widths (port 3057) | ✅ same; server HTML contains `#faq`, `#enquire`, `#contact`, the footer and the form; © 2026 rendered; no inline `opacity:0` |
+| `/design-system` in production | ✅ 404 |
+| Fabricated content | ✅ none: no testimonials, ratings, hours, prices, response times or email |
+
+### Issues found / fixed
+
+1. **Reduced motion didn't stop open/close animations** (accordion, and since Phase 3 the Sheet menu; also Select). `data-open:animate-*` has higher specificity than `motion-reduce:animate-none`, so the override never applied. Now the animations only run under `motion-safe:`. Verified: `accordion-down`/`enter` normally, `none` with reduce.
+2. **shadcn accordion's fixed inner height** (`h-(--radix-accordion-content-height)` on the wrapper) could clip text if the viewport width changes while a question is open. Removed.
+3. **Footer Explore list** was a tall single column on phones → 2 columns.
+4. **Test artifacts, not site bugs:**
+   - An LCP warning only appeared after scripted scrolling; clean loads (390, 1440, `/design-system`) show no warnings.
+   - "Missing" `aria-controls` on closed FAQ triggers: Radix only links the panel while it's mounted (open), which is correct.
+   - The copyright year grep split on React's `<!-- -->` text marker; "© 2026" is present.
+
+### Remaining / deferred
+
+- **Backend for enquiries** (next phase): Supabase table + RLS, server action calling `submitEnquiry` → insert → Resend email. Then set `enquiriesEnabled = true`, update the FAQ "How do I make an enquiry?" answer, and remove the offline notice.
+- **Content from the client:**
+  - real testimonials (with permission to publish names)
+  - FAQ answers they want public (pricing, service area, lead times…)
+  - a business email
+  - plus everything from earlier phases (photos, services, categories, founder story, process, video)
+- **Copyright year** is set at build time; a rebuild keeps it current.
+- **Not built, per brief:** Supabase, storage, auth, RLS, admin, CMS, email, Edge Functions, lightbox, gallery page, booking, pricing.
+- **Still open:** Prettier decision, GitHub remote.

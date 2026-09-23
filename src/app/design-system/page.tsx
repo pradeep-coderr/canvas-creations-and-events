@@ -27,10 +27,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { CategoryStrip } from "@/components/sections/category-strip";
 import { GalleryPreview } from "@/components/sections/gallery-preview";
+import { EnquiryForm } from "@/components/sections/enquiry-form";
 import { Services } from "@/components/sections/services";
+import { Testimonials } from "@/components/sections/testimonials";
 import type { Category } from "@/data/categories";
 import type { GalleryItem } from "@/data/gallery";
 import type { Service } from "@/data/services";
+import type { Testimonial } from "@/data/testimonials";
 
 // Internal reference for the design system. Available in development only.
 export const metadata: Metadata = {
@@ -64,6 +67,15 @@ const sampleGallery: GalleryItem[] = [1, 2, 3, 4, 5].map((n) => ({
   id: `sample-${n}`,
   src: placeholder,
   alt: "",
+  featured: true,
+  order: n,
+}));
+
+const sampleTestimonials: Testimonial[] = [1, 2, 3].map((n) => ({
+  id: `sample-${n}`,
+  quote: `Sample testimonial ${n}. Placeholder text used only to check the layout of a quote.`,
+  name: `Sample client ${n}`,
+  eventType: "Sample event",
   featured: true,
   order: n,
 }));
@@ -262,6 +274,13 @@ export default function DesignSystemPage() {
       <Services services={sampleServices} />
       <CategoryStrip categories={sampleCategories} />
       <GalleryPreview items={sampleGallery} />
+      <Testimonials testimonials={sampleTestimonials} />
+      <Section tone="blush" aria-label="Enquiry form preview">
+        <Container size="narrow">
+          <Label>Enquiry form, preview mode (simulated delivery, shows the success state)</Label>
+          <EnquiryForm preview />
+        </Container>
+      </Section>
     </main>
   );
 }

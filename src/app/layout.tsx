@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
+import { MobileCtaBar } from "@/components/layout/mobile-cta-bar";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { MotionProvider } from "@/components/motion/motion-provider";
 import { site } from "@/data/site";
@@ -42,6 +44,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <MotionProvider>
           <SiteHeader />
           {children}
+          <SiteFooter />
+          <MobileCtaBar />
         </MotionProvider>
       </body>
     </html>

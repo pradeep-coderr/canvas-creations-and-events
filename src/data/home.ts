@@ -165,3 +165,29 @@ export const videoStory = {
   emptyText: "Video stories from our events will live here.",
   tiktokCta: "Watch on TikTok",
 };
+
+export const testimonialsSection = {
+  eyebrow: "Kind words",
+  title: "From our clients",
+};
+
+export const faqSection = {
+  eyebrow: "FAQ",
+  title: "Questions, answered.",
+};
+
+export const enquirySection = {
+  eyebrow: "Enquire",
+  title: "Let's plan something beautiful.",
+  description:
+    "Tell us a little about your celebration. The more you share, the better we can understand what you have in mind.",
+  // Shown while the form has no backend (see src/lib/enquiry.ts).
+  offlineNotice:
+    "Online enquiries are still being set up, so this form can't send messages yet. For now, please call us.",
+};
+
+export const contactSection = {
+  eyebrow: "Contact",
+  title: "Let's make something memorable.",
+  description: "Prefer to talk it through? Give us a call, or follow along online.",
+};
