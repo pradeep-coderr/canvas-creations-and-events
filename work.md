@@ -840,3 +840,142 @@ No `overflow-x: hidden` anywhere; nothing overflows to begin with. The populated
 - **No lightbox and no dedicated gallery page** (deferred per brief). The markup already carries `data-gallery-index`.
 - **Not built, per brief:** about/founder, process, why Canvas, testimonials, FAQ, enquiry form, contact, footer, Supabase, email.
 - **Still open:** business email, Supabase project, the Prettier decision, GitHub remote.
+
+---
+---
+
+## Phase 5 — Brand Story, Process, Why Canvas & Video
+
+**Date:** Wednesday, 23 September 2026
+**Timezone:** Nepal Time, NPT (UTC+05:45)
+**Work window:** 22:00:24 → ~22:08 (commit)
+**Goal:** Continue the homepage below the Gallery: About/Founder, Process, Why Canvas, Video storytelling. Honest content and media states.
+**Result:** Commit `feat: build brand story sections` (not pushed)
+
+### Timeline
+
+| Time (NPT) | Step | Evidence |
+| --- | --- | --- |
+| 22:00:24 | Inspection: tree clean at `7a945cc`; `founder/`, `gallery/`, `services/`, `videos/` all empty (only `.gitkeep`); your dev server on port 3000 | `date`, `ls` |
+| ~22:01 | Data: `HeroImage` → `EditorialImage` (shared); `about`, `processSection`, `whyCanvas`, `videoStory` in `home.ts` | `home.ts` |
+| ~22:01 | Honesty correction: rewrote "began with a simple idea" (invented origin story) as present-tense philosophy; neutral About heading | `home.ts` |
+| 22:01:47 | About/Founder, Process components | `about-founder.tsx`, `process.tsx` |
+| ~22:02 | Why Canvas, Video Story; `page.tsx` order | components |
+| ~22:02 | Type check ✅, lint ✅; 7-width audit; full-page screenshots | script output |
+| 22:03:41 | Fix: compact video empty state; Why Canvas heading as two lines | `video-story.tsx`, `home.ts` |
+| 22:03:56 | Fix: space between heading lines for the accessible name | `why-canvas.tsx` |
+| ~22:04 | Anchors, accessible name, focus, mobile menu, reduced-motion tests | script output |
+| ~22:05 | Production build ✅ + 7-width production audit ✅ (my server on port 3057, stopped afterwards) | command output |
+| ~22:08 | This entry; commit | `work.md` |
+
+### Sections created
+
+| Section | File | Anchor / label | Tone | Layout |
+| --- | --- | --- | --- | --- |
+| About / Founder | `sections/about-founder.tsx` | `#about` (nav) | white | Asymmetric 5/6 split: portrait slot left (desktop), eyebrow + heading + two paragraphs + one text-link CTA (`/#enquire`) right. Text comes first in the DOM (reading order); `lg:order-first` puts the image first visually. |
+| Process | `sections/process.tsx` | `aria-labelledby="process-title"` | ivory | Four numbered columns with a hairline over each (1 column → 2 at `sm` → 4 at `lg`). Rose Ink italic numerals, hidden from screen readers because the `<ol>` already conveys order. |
+| Why Canvas | `sections/why-canvas.tsx` | `why-title` | dark | Heading set as two lines, then three principles in a desktop **staircase** (0 / 25% / 50% offsets); no rules, no cards. Champagne numerals. |
+| Video story | `sections/video-story.tsx` | `video-title` | white | With a local video: native `<video controls playsInline preload="none" poster aria-label>` in a `<figure>` with a caption. Without one: a compact framed note with the TikTok link. |
+
+Page order: Hero → Intro → Services → CategoryStrip → GalleryPreview → **AboutFounder → Process → WhyCanvas → VideoStory**. Process, Why Canvas and Video were **not** added to the nav; they're supporting sections.
+
+### Content & data structures (`src/data/home.ts`)
+
+| Export | Shape | Future entity |
+| --- | --- | --- |
+| `EditorialImage` | `{ src, alt, position? }` (renamed from `HeroImage`; used by hero and about) | media |
+| `about` | `{ eyebrow, title, body: string[], image: EditorialImage \| null, cta }` | about content |
+| `processSection` | `{ eyebrow, title, steps: ProcessStep[] }`, `ProcessStep { id, title, description }` (numbers come from order) | process steps |
+| `whyCanvas` | `{ eyebrow, titleLines: string[], principles: Principle[] }`, `Principle { id, title, description }` | brand principles |
+| `videoStory` | `{ eyebrow, title, video: VideoContent \| null, emptyText, tiktokCta }`, `VideoContent { src, poster, title, caption? }` | video content |
+
+These stay in `home.ts` because each is small homepage content, which avoids tiny single-use files. Arrays carry stable `id`s for a later move to Supabase.
+
+**Honesty:**
+
+- No founder name, biography, history, qualifications, numbers, guarantees or superlatives.
+- Process steps and principles are marked **provisional** in code comments. Principles are drawn from the brand personality in the original brief (personal, creative, elegant) and phrased as approach, not claims.
+- One line was caught and rewritten before any checks: "began with a simple idea" would have been an invented origin story.
+
+### Media availability
+
+| Slot | Real asset? | What renders |
+| --- | --- | --- |
+| Founder/studio portrait | ❌ none in `public/images/founder/` | Blush panel with the **real full logo** (`mix-blend-multiply` blends its white disc into the blush). Brand content, not a fake portrait, and a different treatment from the hero's ivory monogram panel. Swaps to `ImageFrame` when `about.image` is set. |
+| Event video | ❌ none in `public/images/videos/` | Compact ivory note with an inset gold hairline: "Video stories from our events will live here." plus a "Watch on TikTok" link (the real profile from `site.ts`). **No fake player, play button, poster or stock footage.** |
+
+### Design decisions
+
+1. **Tone sequence:** Gallery (dark) → About (white) → Process (ivory) → Why Canvas (dark) → Video (white). The page turns personal after the gallery, and the second dark section gives Why Canvas its cinematic weight.
+2. **Each section has a different structure** (split, columns with rules, staircase, centred frame) so nothing reads as a repeated template. Services (Phase 4) uses horizontal rows; Process uses vertical columns.
+3. **Blush used once** (the About portrait slot). **Gold** only in hairlines, the video frame's inset rule and the existing dividers. **Rose Ink** for Process numerals; **champagne** for Why Canvas numerals on charcoal.
+4. **One CTA per section at most:** About has a single text link to `/#enquire`; Process and Why Canvas have none; Video has only the TikTok link.
+5. **Video player, once media exists:** native controls (keyboard-accessible by default), `preload="none"` so nothing downloads until the visitor asks, a poster required by the type, no autoplay and no sound.
+
+### Motion
+
+- `Reveal` (the CSS scroll-driven version from Phase 4) wraps: the About text and media blocks, each Process step, each principle, and the video frame. Headings aren't animated individually.
+- Verified: `cc-reveal` runs normally; with `prefers-reduced-motion: reduce` it becomes `animation-name: none` at opacity 1.
+- Server HTML has no inline `opacity:0` (production check), so the JavaScript-opacity problem from before Phase 4 hasn't returned.
+
+### Responsive behaviour
+
+| Width | `scrollWidth` = viewport | Page height (dev) |
+| --- | --- | --- |
+| 375 | ✅ | 6208 |
+| 390 | ✅ | 6139 |
+| 430 | ✅ | 6149 |
+| 768 | ✅ | 6410 |
+| 1024 | ✅ | 5753 |
+| 1280 | ✅ | 6079 |
+| 1440 | ✅ | 6121 |
+
+- **About:** text then image on phones (4:3), 3:2 on tablets, side by side with a 4:5 image on desktop.
+- **Process:** 1 → 2 → 4 columns.
+- **Why Canvas:** the staircase only from `lg`; stacked below.
+- **Video:** the empty note is `max-w-3xl` and padded (not 16:9); a real video is always 16:9 up to `max-w-5xl`.
+
+### Accessibility (tested)
+
+| Check | Result |
+| --- | --- |
+| Headings | One h1; H2 per section with H3 steps and principles; **no skipped levels** at any width |
+| Landmarks | Every new `<section>` has `aria-labelledby` pointing to its heading |
+| Accessible name | Two-line heading reads "Designed with intention. Styled with heart." (checked in Chrome's accessibility tree; the first attempt had no space between the sentences) |
+| Anchors | Desktop nav → About lands at 96px (header 97px); mobile menu → About lands at 72px and closes the menu |
+| Focus | About CTA and "Watch on TikTok": `:focus-visible` with the 4px ring |
+| Decorative | Process/principle numerals `aria-hidden` (list order is semantic); portrait-slot logo `alt=""` |
+| External link | TikTok: new tab + screen-reader text "(opens in a new tab)" |
+| Reduced motion | Reveals off |
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| `bun run typecheck` / `lint` | ✅ exit 0 (after every change) |
+| `bun run build` | ✅ all routes static |
+| Dev audit, 7 widths | ✅ no overflow, no console, hydration or React errors, **no failed requests** |
+| Production audit, 7 widths (port 3057) | ✅ same results; `about`, `process-title`, `why-title`, `video-title` present in server HTML |
+| Images | ✅ the About logo is lazy and loads when scrolled to (256w, `complete`, no failures). The audit's "not loaded" count is this lazy image before scrolling, not a broken request |
+
+### Issues found / fixed
+
+1. **Invented origin story** in draft About copy ("began with…") → present-tense philosophy; the heading no longer promises a founder story.
+2. **Video empty state too large** (a 16:9 frame roughly 1024×576 around one sentence) → compact framed note.
+3. **Why Canvas heading wrapped mid-sentence** on phones → two stored lines, one sentence per line.
+4. **Accessible name ran the sentences together** ("intention.Styled") → an explicit space between the lines; verified in the accessibility tree.
+5. **Audit false positive:** "broken image" was a not-yet-loaded lazy image. Confirmed by scrolling it into view; the audit reads the network log for real failures.
+6. **Resolved from Phase 4:** `#gallery` is no longer the last section; nav → Gallery now lands exactly under the header (96px).
+
+### Remaining / deferred
+
+- **Content from the client:**
+  - founder/studio portrait, and founder name and story if they want it public
+  - their actual process
+  - their own words for what makes them different
+  - event video + poster frame (+ captions/subtitles file, then add a `<track>`)
+  - hero photo, service list, categories, gallery photos (from earlier phases)
+- **The video player path is untested with real media,** because none exists. It's type-checked and uses native controls. Verify playback and keyboard controls once a file is added.
+- **Anchors still to build:** `#faq`, `#contact`, `#enquire` (all Enquire CTAs and the About CTA point to `#enquire`).
+- **Not built, per brief:** testimonials, FAQ, enquiry form, contact, footer, Supabase, auth, admin, email, lightbox, gallery page, booking.
+- **Still open:** business email, Supabase project, the Prettier decision, GitHub remote.

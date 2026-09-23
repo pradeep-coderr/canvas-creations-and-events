@@ -1,0 +1,66 @@
+import Image from "next/image";
+import { ArrowRight } from "lucide-react";
+import { Container } from "@/components/layout/container";
+import { Section } from "@/components/layout/section";
+import { Reveal } from "@/components/motion/reveal";
+import { ImageFrame } from "@/components/shared/image-frame";
+import { SectionHeading } from "@/components/shared/section-heading";
+import { SiteLink } from "@/components/shared/site-link";
+import { Button } from "@/components/ui/button";
+import { about } from "@/data/home";
+
+/** The human side of the brand: portrait slot beside the studio's story. */
+export function AboutFounder() {
+  return (
+    <Section id="about" aria-labelledby="about-title">
+      <Container className="grid items-center gap-12 lg:grid-cols-12 lg:gap-16 xl:gap-24">
+        {/* Text first in the DOM (reading order); the image leads visually on desktop. */}
+        <Reveal className="lg:col-span-6 lg:col-start-7">
+          <SectionHeading
+            id="about-title"
+            eyebrow={about.eyebrow}
+            title={about.title}
+            align="start"
+          />
+          <div className="mt-8 max-w-xl space-y-5 text-lead text-muted-foreground">
+            {about.body.map((paragraph) => (
+              <p key={paragraph}>{paragraph}</p>
+            ))}
+          </div>
+          <Button asChild variant="link" className="mt-10">
+            <SiteLink href={about.cta.href}>
+              {about.cta.label}
+              <ArrowRight data-icon="inline-end" />
+            </SiteLink>
+          </Button>
+        </Reveal>
+
+        <Reveal className="lg:order-first lg:col-span-5">
+          {about.image ? (
+            <ImageFrame
+              src={about.image.src}
+              alt={about.image.alt}
+              ratio="portrait"
+              sizes="(min-width: 1280px) 460px, (min-width: 1024px) 38vw, 100vw"
+              imageClassName={about.image.position}
+              className="aspect-4/3 sm:aspect-3/2 lg:aspect-4/5"
+            />
+          ) : (
+            // Portrait slot until a real founder/studio photo exists: the
+            // full logo on blush, so the section still carries the brand.
+            <div className="flex aspect-4/3 items-center justify-center bg-surface-blush sm:aspect-3/2 lg:aspect-4/5">
+              <Image
+                src="/images/logo/canvas-creations-logo-512.png"
+                alt=""
+                width={512}
+                height={512}
+                sizes="(min-width: 1024px) 240px, 40vw"
+                className="w-[40%] max-w-60 mix-blend-multiply"
+              />
+            </div>
+          )}
+        </Reveal>
+      </Container>
+    </Section>
+  );
+}
