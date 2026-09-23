@@ -1507,3 +1507,93 @@ The server action is still the only public entry point. Steps, in order:
 - **The visitor waits for the email step:** usually well under a second; at most about 17s in the worst case (two 8-second timeouts plus the pause).
 - **Not built, per brief:** admin UI, auth, admin RLS, customer confirmation emails, quotes and bookings, CMS, inbox.
 - **Carried over:** the `rls_auto_enable()` advisor note, business email, client content, the Prettier decision, the GitHub remote. The local Supabase stack is still running (3 containers).
+
+---
+---
+
+## Phase 9 — Admin Enquiries Portal (self-directed)
+
+**Date:** Wednesday, 23 September 2026 · **Timezone:** NPT (UTC+05:45) · **Work window:** 23:21 → ~23:37
+**Why this task:** you asked me to choose the next task. The biggest gap was that nobody could see or manage enquiries except in the raw Supabase dashboard, and every earlier phase had deferred the admin portal. The schema (status vocabulary, indexes) was already designed for it.
+**Result:** implemented and verified locally and on hosted (migration pushed with your approval). **Not committed yet.**
+
+### Plan (as announced) → done
+
+1. **DB migration** `supabase/migrations/20260923173616_admin_enquiry_access.sql`:
+   - `admin_users (user_id → auth.users, cascade)`, with RLS: a user can see only their own row. Public roles have no other grants.
+   - Enquiries: `grant select` + `grant update (status)` to `authenticated`, plus policies "Admins can read enquiries" and "Admins can update enquiry status". The admin check is a plain `exists (… admin_users where user_id = (select auth.uid()))` subquery, so **no SECURITY DEFINER function** is needed.
+   - No delete for anyone (archive instead).
+2. **Auth:** email + password. Local `config.toml`: `[auth] enable_signup = false`. (`[auth.email] enable_signup` must stay `true`: in this CLI it disables the email *provider*, which blocked all logins. Found and fixed during testing.)
+3. **App:**
+   - Public pages moved into the `src/app/(site)/` route group (URLs unchanged); the root layout is now just the shell.
+   - `src/proxy.ts`: Next 16's proxy (the renamed `middleware`), matching `/admin/*` only; it only refreshes the session (`src/lib/supabase/proxy.ts`).
+   - `src/lib/admin/session.ts`: `getAdmin()` (verified JWT via `getClaims()` + `admin_users` membership, cached per request) and `requireAdmin()`. **Called by every admin page and server action,** as the Next docs advise against relying on the proxy for authorization.
+   - `src/app/admin/`:
+     - `layout.tsx`: `noindex, nofollow`, ivory shell
+     - `login/`: `useActionState`, generic errors, non-admins signed straight back out
+     - `(portal)/layout.tsx`: header with sign-out
+     - `(portal)/page.tsx`: list, newest first, status filter with counts, ≤200 rows
+     - `(portal)/enquiries/[id]/`: detail + status form with a live-region confirmation
+     - `actions.ts`: `signIn`, `signOut`, `updateEnquiryStatus` (Zod: uuid + status enum)
+   - `src/lib/enquiry-status.ts`: statuses, labels and Zod enum (matches the DB CHECK).
+   - `src/lib/datetime.ts`: shared Adelaide-time formatters. The email template now uses them instead of its own copy.
+4. **README:** admin section (creating and removing admins, disabling sign-up, how access is enforced); the local start command now includes auth.
+
+### Security matrix (local, real login tokens via the Auth API)
+
+| Role | Read enquiries | Update status | Update other column | Delete | admin_users read | Self-promote |
+| --- | --- | --- | --- | --- | --- | --- |
+| anon | 401 | 401 | 401 | 401 | 401 | 401 |
+| logged-in non-admin | `[]` (sees nothing) | 0 rows affected | 403 | 403 | `[]` | 403 |
+| admin | ✅ all rows | ✅ (`updated_at` refreshed) | **403** | **403** | own row only | 403 |
+
+- An admin setting status `deleted` → rejected by the CHECK constraint.
+- A wrong password → no token.
+- Public sign-up (local) → `signup_disabled`.
+
+### Browser E2E (production build against the local stack, port 3057)
+
+- **Logged out:** `/admin` and the detail page redirect to `/admin/login`. The login page is `noindex, nofollow`, with no public header.
+- **Wrong password:** "Incorrect email or password." (`role="alert"`, linked by `aria-describedby`).
+- **Non-admin:** "This account doesn't have access to the admin area.", signed out immediately (`/admin` redirects again).
+- **Admin list:**
+  - Counts per status and `aria-current` on the active filter.
+  - The `?status=new` filter works; `?status=deleted` falls back to All.
+- **Detail and status change:**
+  - The detail page shows all fields.
+  - Status → Quoted: "Status updated to Quoted." (live region). The DB confirms `quoted`, with `updated_at` refreshed.
+  - **A tampered `<option value="deleted">` was rejected** ("Choose a valid status."); the DB was unchanged.
+- **Bad ids:** a malformed id and an unknown UUID both give a 404.
+- **Keyboard:** skip link → home → Sign out → filters, with focus visible.
+- **Width:** no horizontal overflow at 375px or 768px (list and detail).
+- **Sign out** → login, and `/admin` redirects.
+- **Server log:** codes and user ids only (`sign-in failed { code }`, `refused: not an admin { userId }`, `signed in`, `status updated { id, status }`). No passwords or enquiry content.
+
+### Public-site regression (after the route-group move)
+
+- **7 widths:** no overflow, all 6 anchors, 1 h1, no console errors or failed requests. The public page still has its header, footer and quick-contact bar, **no noindex, and no link to /admin**.
+- **Phase 6/7 interaction and accessibility suite (dev → hosted):** all pass (CTAs and anchors, FAQ keyboard, form validation and focus, live submit, preview, mobile bar and menu, reduced motion). The suite's hosted row was deleted.
+
+### Hosted (you approved the push)
+
+- Dry run listed only `20260923173616`, then pushed.
+- Hosted policies: enquiries = public INSERT + admin SELECT + admin UPDATE; admin_users = own-row SELECT.
+- Public probes: enquiries select/delete and admin_users select/insert → all 401. 0 admins, 0 enquiries.
+- **Sign-up setting on hosted not confirmed:** the probe used the reserved `example.com`, which hosted rejects before checking. I didn't probe with a real address, since that would create an account. Recommend turning sign-up off in the dashboard; non-admin accounts see nothing either way.
+
+### Verification
+
+`bun install --frozen-lockfile` (no changes) · typecheck ✅ · lint ✅ · build ✅ (`/admin*` dynamic, proxy active, public pages static) · secret scan: 0 files · `git diff --check` clean · dev server: `/admin` → 307 → `/admin/login` (200), `/` 200.
+
+### Issues found / fixed
+
+1. **`[auth.email] enable_signup = false` disabled email logins entirely** in this CLI → reverted. Sign-ups are blocked by `[auth] enable_signup = false` alone (verified: `signup_disabled`, while logins work).
+2. **Test harness:** Windows `node` output added `\r` to generated test passwords and tokens (logins failed, and requests went out unauthenticated). Fixed in the harness and re-run; the anon results were valid throughout.
+3. **Cleanup:** local seed enquiry and both local test accounts deleted; temp credential files removed; local and hosted enquiries at 0.
+
+### Remaining
+
+- **You:** create your admin login on hosted (Dashboard → Authentication → Add user, auto-confirm), then register it (`insert into public.admin_users …`, or tell me the email and I'll run it). Turn off public sign-up in the dashboard.
+- **Commit** this phase (not done yet).
+- **Deferred:** password reset / magic links, multiple roles, internal notes on enquiries, notification resend button, pagination beyond 200, CSV export.
+- **Still open:** Resend credentials (email not live), `rls_auto_enable()` advisor note, business email, client content, the Prettier decision, the GitHub remote.

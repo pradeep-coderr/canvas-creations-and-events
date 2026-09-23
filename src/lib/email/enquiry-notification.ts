@@ -1,5 +1,6 @@
 import "server-only";
 import { site } from "@/data/site";
+import { formatDateTime, formatEventDate } from "@/lib/datetime";
 import type { Enquiry } from "@/lib/enquiry";
 
 /*
@@ -34,25 +35,6 @@ function singleLine(value: string) {
   return value.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function formatEventDate(isoDate: string) {
-  const [year, month, day] = isoDate.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-AU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(year, month - 1, day)));
-}
-
-function formatReceived(date: Date) {
-  return new Intl.DateTimeFormat("en-AU", {
-    dateStyle: "full",
-    timeStyle: "short",
-    timeZone: "Australia/Adelaide",
-  }).format(date);
-}
-
 export interface EnquiryNotificationInput {
   id: string;
   enquiry: Enquiry;
@@ -60,7 +42,7 @@ export interface EnquiryNotificationInput {
 }
 
 export function buildEnquiryNotification({ id, enquiry, receivedAt }: EnquiryNotificationInput) {
-  const received = formatReceived(receivedAt);
+  const received = formatDateTime(receivedAt);
   const rows: [label: string, text: string, href?: string][] = [
     ["Name", enquiry.name],
     ["Email", enquiry.email, `mailto:${enquiry.email}`],
