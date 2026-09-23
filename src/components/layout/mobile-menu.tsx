@@ -1,7 +1,7 @@
 "use client";
 
+import { useRef, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { MenuIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,13 +14,41 @@ import {
 } from "@/components/ui/sheet";
 import { site } from "@/data/site";
 
+// Scroll to an in-page anchor, or navigate normally if it isn't on this page.
+function goTo(href: string) {
+  const url = new URL(href, window.location.href);
+  const target =
+    url.pathname === window.location.pathname && url.hash
+      ? document.getElementById(url.hash.slice(1))
+      : null;
+  if (target) {
+    window.history.pushState(null, "", url.hash);
+    target.scrollIntoView(); // honours scroll-padding-top and smooth scrolling
+  } else {
+    window.location.assign(href);
+  }
+}
+
 /**
  * Mobile navigation (below lg). Radix Dialog provides the focus trap,
  * Escape-to-close, focus return and aria-expanded/aria-controls.
+ *
+ * Links close the menu first and navigate once it has closed: while open,
+ * the dialog's scroll lock would stop the page scrolling to an anchor.
  */
 export function MobileMenu() {
+  const [open, setOpen] = useState(false);
+  const pendingHref = useRef<string | null>(null);
+
+  const navigate = (event: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    pendingHref.current = href;
+    setOpen(false);
+  };
+
   return (
-    <Sheet>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button variant="ghost" className="gap-2.5 px-3 lg:hidden">
           <span className="text-eyebrow font-semibold uppercase">Menu</span>
@@ -32,6 +60,12 @@ export function MobileMenu() {
         side="right"
         showCloseButton={false}
         className="gap-0 bg-surface-ivory"
+        onCloseAutoFocus={() => {
+          const href = pendingHref.current;
+          pendingHref.current = null;
+          // Next frame: the scroll lock has been released by then.
+          if (href) requestAnimationFrame(() => goTo(href));
+        }}
       >
         <SheetTitle className="sr-only">Menu</SheetTitle>
         <SheetDescription className="sr-only">
@@ -63,25 +97,27 @@ export function MobileMenu() {
                 className="border-b border-highlight/40 motion-safe:animate-rise"
                 style={{ animationDelay: `${120 + i * 50}ms` }}
               >
-                <SheetClose asChild>
-                  <Link
-                    href={item.href}
-                    className="block py-3.5 font-display text-display-sm font-medium transition-colors duration-300 hover:text-primary"
-                  >
-                    {item.label}
-                  </Link>
-                </SheetClose>
+                <a
+                  href={item.href}
+                  onClick={(e) => navigate(e, item.href)}
+                  className="block py-3.5 font-display text-display-sm font-medium transition-colors duration-300 hover:text-primary"
+                >
+                  {item.label}
+                </a>
               </li>
             ))}
           </ul>
         </nav>
 
         <div className="space-y-5 px-5 pt-8 pb-8 sm:px-8">
-          <SheetClose asChild>
-            <Button asChild size="lg" className="w-full">
-              <Link href={site.enquiry.href}>{site.enquiry.label}</Link>
-            </Button>
-          </SheetClose>
+          <Button asChild size="lg" className="w-full">
+            <a
+              href={site.enquiry.href}
+              onClick={(e) => navigate(e, site.enquiry.href)}
+            >
+              {site.enquiry.label}
+            </a>
+          </Button>
           <p className="text-center text-sm text-muted-foreground">
             Prefer to talk?{" "}
             <a

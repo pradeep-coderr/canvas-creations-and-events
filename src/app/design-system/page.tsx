@@ -25,7 +25,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { stagger } from "@/lib/motion";
+import { CategoryStrip } from "@/components/sections/category-strip";
+import { GalleryPreview } from "@/components/sections/gallery-preview";
+import { Services } from "@/components/sections/services";
+import type { Category } from "@/data/categories";
+import type { GalleryItem } from "@/data/gallery";
+import type { Service } from "@/data/services";
 
 // Internal reference for the design system. Available in development only.
 export const metadata: Metadata = {
@@ -39,6 +44,29 @@ const tones = ["default", "ivory", "blush", "dark"] as const;
 // own bg-muted surface shows. Not a business asset.
 const placeholder =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+// Sample data for layout checks only (see the notice rendered on the page).
+const sampleServices: Service[] = [1, 2, 3].map((n) => ({
+  id: `sample-${n}`,
+  title: `Sample service ${n}`,
+  summary: "Sample description, used to check the layout of a service row.",
+  href: n === 2 ? "/design-system" : undefined,
+  image: n === 3 ? { src: placeholder, alt: "" } : undefined,
+  order: n,
+  featured: true,
+}));
+const sampleCategories: Category[] = [1, 2, 3, 4, 5].map((n) => ({
+  id: `sample-${n}`,
+  label: `Sample category ${n}`,
+  order: n,
+}));
+const sampleGallery: GalleryItem[] = [1, 2, 3, 4, 5].map((n) => ({
+  id: `sample-${n}`,
+  src: placeholder,
+  alt: "",
+  featured: true,
+  order: n,
+}));
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
@@ -198,7 +226,7 @@ export default function DesignSystemPage() {
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {(["portrait", "square", "landscape", "tall"] as const).map(
               (ratio, i) => (
-                <Reveal key={ratio} delay={i * stagger}>
+                <Reveal key={ratio}>
                   <ImageFrame
                     src={placeholder}
                     alt=""
@@ -217,6 +245,23 @@ export default function DesignSystemPage() {
           </div>
         </Container>
       </Section>
+
+      {/*
+        Populated states of homepage sections, rendered with SAMPLE DATA so
+        the layouts can be checked before real content exists. None of this
+        is client content and none of it appears on the homepage.
+      */}
+      <Section tone="blush" aria-label="Sample data notice" className="py-10 sm:py-10 lg:py-10">
+        <Container>
+          <p className="text-center text-sm font-semibold">
+            Below: homepage sections with sample data. Design reference only,
+            not client content.
+          </p>
+        </Container>
+      </Section>
+      <Services services={sampleServices} />
+      <CategoryStrip categories={sampleCategories} />
+      <GalleryPreview items={sampleGallery} />
     </main>
   );
 }

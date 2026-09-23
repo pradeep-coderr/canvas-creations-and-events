@@ -690,3 +690,153 @@ The primary CTA is above the fold at every size. The desktop nav appears from 10
 - **No active-section highlighting in the nav** (needs scroll-spy once sections exist).
 - **Not built, per brief:** services, gallery, about/founder, process, testimonials, FAQ, enquiry form, contact, footer, Supabase, email.
 - **Still open:** business email, Supabase project, the Prettier decision, GitHub remote.
+
+---
+---
+
+## Phase 4 — Homepage Content Sections
+
+**Date:** Wednesday, 23 September 2026
+**Timezone:** Nepal Time, NPT (UTC+05:45)
+**Work window:** 21:41:54 → ~21:55 (commit)
+**Goal:** Intro, Services, Category strip and Gallery foundation below the hero. Honest content, future-ready data.
+**Result:** Commit `feat: build homepage content sections` (not pushed)
+
+### Timeline
+
+| Time (NPT) | Step | Evidence |
+| --- | --- | --- |
+| 21:41:54 | Inspection: tree clean at `78ceab9`; still **no photography**; no verified service or category list; your dev server on port 3000 | `date`, `find` |
+| 21:42:10 | `Reveal` rebuilt as CSS scroll-driven animation (fixes the Phase 2 deferred issue) | `reveal.tsx`, `globals.css` |
+| 21:42:24 – 21:42:32 | Data: `services.ts`, `categories.ts`, `gallery.ts`; section copy in `home.ts` | data files |
+| 21:43 – 21:44 | Intro, Services, CategoryStrip, GalleryPreview; `page.tsx`; sample-data demos on `/design-system` | components |
+| ~21:45 | Type check ✅, lint ✅; 7-width audit; full-page screenshots | script output |
+| 21:46:36 | Fix: category separators → spacing-only layout | `category-strip.tsx` |
+| 21:46:47 | Canonical `aspect-3/2` / `aspect-4/5` classes | `gallery-preview.tsx` |
+| 21:48:19 | **Bug fix:** same-hash re-click did nothing → `SiteLink` | `site-link.tsx` + 4 call sites |
+| 21:50:04 | **Bug fix:** mobile menu links didn't scroll (scroll lock) → close, then navigate | `mobile-menu.tsx` |
+| ~21:51 | Production build ✅ + 7-width production audit ✅ (my server on port 3057, stopped afterwards) | command output |
+| 21:52 | Category strip re-screenshotted after the fix | `cat-375.png`, `cat-1440.png` |
+| ~21:55 | This entry; commit | `work.md` |
+
+### Sections created
+
+| Section | File | Anchor | Tone | Notes |
+| --- | --- | --- | --- | --- |
+| Intro | `sections/intro.tsx` | `#intro` | white | Centred, narrow column: eyebrow "The studio", display statement, one lead paragraph, sprig divider. Reduced top padding so hero + intro read as one deliberate pause. Not in the nav (no nav change needed). |
+| Services | `sections/services.tsx` | `#services` | ivory | 5/7 split: sticky heading on the left; on the right, a hairline-ruled `<ol>` of service rows plus a permanent "Planning something?" row linking to `#enquire`. |
+| Category strip | `sections/category-strip.tsx` | — | white | **Renders nothing until verified categories exist.** Typographic list: italic Cormorant, stacked on phones, wrapped row above. |
+| Gallery preview | `sections/gallery-preview.tsx` | `#gallery` | dark | With images: large lead image + two stacked + a pair beneath (12-column grid), lightbox-ready markup. Without images: a deliberate empty state (see below). |
+
+`src/app/page.tsx` is now explicit: `<Hero /> <Intro /> <Services /> <CategoryStrip /> <GalleryPreview />`.
+
+### Content & data architecture
+
+| File | Contents | Future table |
+| --- | --- | --- |
+| `data/site.ts` | Business-wide (unchanged this phase) | — |
+| `data/home.ts` | Homepage section copy: `hero`, `intro`, `servicesSection`, `categoriesSection`, `gallerySection` | — |
+| `data/services.ts` | `Service { id, title, summary, image?, href?, order, featured }` + `featuredServices` | `services` |
+| `data/categories.ts` | `Category { id, label, order }` + `sortedCategories` | `categories` |
+| `data/gallery.ts` | `GalleryItem { id, src, alt, title?, categoryId?, featured, order }` + `galleryPreview` (≤5 featured) | `gallery_items` |
+
+- Every collection has a stable slug `id` and an explicit `order`, and relationships go by id (`GalleryItem.categoryId → Category.id`). Swapping the arrays for Supabase queries later won't change the components.
+- Components take their data as props that default to the real data, so the same components render sample data on `/design-system` without it touching the homepage.
+
+**Honesty rules applied:**
+
+- **Services:** one entry only, "Event styling & decoration". That's the one offering the business brief confirms. No invented catalogue. Numbering (01, 02…) switches on automatically once there's more than one service.
+- **Categories:** empty array. The strip doesn't render, so nothing invented appears.
+- **Gallery:** empty array. The empty state says truthfully that the portfolio is being curated and links to the real Instagram, Facebook and TikTok profiles from `site.ts`. No placeholder frames pretending to be work.
+- **Copy:** no services, materials, reach, numbers, awards or superlatives. "South Australia" comes from the business brief.
+- **Sample data** exists only on the dev-only `/design-system` page, under a visible notice ("design reference only, not client content"), and is labelled "Sample service 1" and so on. That page returns 404 in production.
+
+### Design decisions
+
+1. **Rhythm:** hero (white) → intro (white, a calm centred pause) → services (ivory, asymmetric) → categories (white, typographic; hidden for now) → gallery (charcoal). The charcoal gallery gives the page its strongest visual moment and will frame photography well. It's the only dark section, and it's easy to change through the `tone` prop.
+2. **Services as an editorial list, not cards:** hairline rules, Cormorant titles, muted summaries.
+   - Linked rows get a 44px round arrow that's visible without hover, so touch users see the affordance.
+   - On hover the title turns rose, the circle's border turns rose and the arrow nudges right. All subtle, and the nudge is `motion-safe`.
+   - Rows without an `href` are plain, non-interactive elements, so nothing fakes interactivity.
+3. **The enquiry row is always present** so the services list ends with a clear next step even while it holds only one service.
+4. **Category strip uses spacing, not separators.** Gold diamonds between items looked accidental whenever a wrapped line began with one (seen in screenshots), and CSS can't suppress a separator at the start of a wrapped line. There's no horizontal scrolling either, so every item is visible and overflow isn't possible.
+5. **Gallery grid:** on desktop the lead image spans two rows (7 columns) beside two 3:2 images (5 columns), then two 6-column images. On mobile the lead is full width with a 2×2 grid below, and a trailing odd image spans the full width. Images load lazily (not eager) with slot-specific `sizes`. Markup is `ul > li[data-gallery-index] > figure > ImageFrame + figcaption`, so a lightbox can attach later without changing the markup.
+6. **Gold and blush restraint:** gold appears only in the intro and gallery divider sprigs and in link underlines. Blush is used only as hover or accent backgrounds.
+
+### Motion: `Reveal` rebuilt (resolves a Phase 2 deferred item)
+
+The Motion-based `Reveal` rendered `opacity: 0` in server HTML, so content was invisible until JavaScript ran. It's now a **server component** that adds a `reveal` utility: a CSS scroll-driven animation (`animation-timeline: view()`, `animation-range: entry 0% entry 45%`, a 24px rise with `ease-elegant`).
+
+- Content is fully visible in server HTML (verified: no inline `opacity:0`).
+- No JavaScript, and no flicker for content already in view.
+- Browsers without scroll timelines (Firefox today) show content statically. With reduced motion it's `animation: none`.
+- The API is simpler (no `delay`); the one `/design-system` usage was updated.
+- Used selectively: the intro block, each service row, the enquiry row, the category list and gallery items. Headings of the other sections are not animated.
+
+### Responsive behaviour (measured, dev and production)
+
+| Width | `scrollWidth` = viewport | Page height (dev) | Notes |
+| --- | --- | --- | --- |
+| 375 | ✅ 375 | 2728 | Services stack (heading, then rows); gallery CTA full-width |
+| 390 | ✅ 390 | 2686 | |
+| 430 | ✅ 430 | 2685 | |
+| 768 | ✅ 768 | 2940 | Still single-column services |
+| 1024 | ✅ 1024 | 2426 | 5/7 services split; sticky heading |
+| 1280 | ✅ 1280 | 2553 | |
+| 1440 | ✅ 1440 | 2569 | |
+
+No `overflow-x: hidden` anywhere; nothing overflows to begin with. The populated states (3 services, 5 categories, 5 gallery images) were also checked at 375, 768 and 1440 on `/design-system`: no overflow, the grid collapses as designed.
+
+### Accessibility (tested)
+
+| Check | Result |
+| --- | --- |
+| Headings | One h1; outline H1 → H2 (intro) → H2 (services) → H3 (service) → H2 (gallery); **no skipped levels** at any width |
+| Sections | Each `<section>` labelled by its heading (`aria-labelledby`); list semantics (`ol` for services, `ul` for categories and gallery) |
+| Anchors | `#intro`, `#services`, `#gallery` exist; desktop nav → Services lands at 96px (header 97px, clear of it); mobile menu → Services lands at 72px (mobile header height); Gallery scrolls to the end of the page (it's currently the last section) |
+| Keyboard | Enquiry row and social links: 2px outline; Instagram button: champagne ring with charcoal offset on the dark surface (read after the 300ms transition) |
+| Interactivity | Only real links are interactive; rows without an `href` render as a `div` |
+| External links | `target="_blank" rel="noopener noreferrer"` + screen-reader text "(opens in a new tab)" |
+| Images | No homepage images added this phase; gallery `alt` is required by the type |
+| Reduced motion | `.reveal` → `animation-name: none`, opacity 1 |
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| `bun run typecheck` | ✅ exit 0 (after every change) |
+| `bun run lint` | ✅ exit 0 |
+| `bun run build` | ✅ all routes static |
+| Dev audit, 7 widths (your server on port 3000) | ✅ no overflow, no broken images, no failed requests, no console, hydration or React errors |
+| Production audit, 7 widths (`next start` on port 3057) | ✅ same results |
+| `/design-system` in production | ✅ 404 |
+| Fabricated content check | ✅ homepage shows only the verified service, neutral copy and real social links |
+
+### Issues found / fixed
+
+1. **Same-hash links did nothing on a second click (also affected Phase 3's nav).**
+   - Next's `<Link>` skips navigation to an identical URL, so Services → scroll up → Services left the page where it was (measured: section stayed at 1362px).
+   - Added `shared/site-link.tsx`: in-page anchors render a native `<a>`, which the browser always scrolls; other routes keep `<Link>`. Used in the header, hero and services.
+   - Verified: the second click now lands at 96px.
+2. **Mobile menu links changed the URL but didn't scroll (also since Phase 3).**
+   - The dialog's scroll lock blocks the jump to the anchor.
+   - Links now close the menu first, then navigate on `onCloseAutoFocus` in the next frame (`scrollIntoView`, which honours `scroll-padding-top`). Ctrl/⌘/Shift-click still behaves natively.
+   - Verified by actual scroll position.
+3. **Category separators** started wrapped lines; replaced with a spacing-only layout.
+4. **Tailwind canonical classes:** `aspect-[3/2]` → `aspect-3/2` and similar; confirmed `cn` still merges them correctly against `ImageFrame`'s default ratio.
+5. **Test-harness notes:** keyboard labels once broke on regex escaping, and the Instagram ring was first read mid-transition. Both were re-run correctly; neither was a site bug.
+
+### Remaining / deferred
+
+- **Real content needed from the client:**
+  - the service list (titles, short descriptions, optional photos)
+  - celebration categories
+  - gallery photography
+  - a hero photo
+
+  Each drops into its data file with no component changes.
+- **Anchors still to build:** `#about`, `#faq`, `#contact`, `#enquire` (the Services enquiry row and all Enquire buttons point to `#enquire`).
+- **`#gallery` is the last section,** so it can't scroll to the very top yet; that resolves when more sections follow.
+- **No lightbox and no dedicated gallery page** (deferred per brief). The markup already carries `data-gallery-index`.
+- **Not built, per brief:** about/founder, process, why Canvas, testimonials, FAQ, enquiry form, contact, footer, Supabase, email.
+- **Still open:** business email, Supabase project, the Prettier decision, GitHub remote.

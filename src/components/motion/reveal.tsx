@@ -1,27 +1,17 @@
-"use client";
+import { cn } from "@/lib/utils";
 
-import { motion } from "motion/react";
-import { duration, easeElegant, fadeUp } from "@/lib/motion";
-
-interface RevealProps {
-  children: React.ReactNode;
-  /** Seconds. For lists, use `index * stagger` from `@/lib/motion`. */
-  delay?: number;
-  className?: string;
-}
-
-/** Fades and lifts its content in once, when it scrolls into view. */
-export function Reveal({ children, delay = 0, className }: RevealProps) {
-  return (
-    <motion.div
-      className={className}
-      variants={fadeUp}
-      initial="hidden"
-      whileInView="visible"
-      viewport={{ once: true, amount: 0.2 }}
-      transition={{ duration: duration.slow, ease: easeElegant, delay }}
-    >
-      {children}
-    </motion.div>
-  );
+/**
+ * Fades and lifts its content in as it scrolls into view.
+ *
+ * Pure CSS (`reveal` utility in globals.css, scroll-driven animation): the
+ * content is always present and visible in the server-rendered HTML, needs
+ * no JavaScript, and is static for reduced-motion users or browsers without
+ * scroll timelines. Use for below-the-fold content; above-the-fold entrances
+ * use `motion-safe:animate-rise` instead.
+ */
+export function Reveal({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return <div className={cn("reveal", className)} {...props} />;
 }

@@ -96,6 +96,28 @@
   --sidebar-ring: var(--cc-rose-ink);
 }
 
+/*
+ * Scroll reveal (used by <Reveal>): fade + short rise as an element enters
+ * the viewport, driven by the scroll position — no JavaScript. Content is
+ * visible in server HTML, stays static where scroll timelines are
+ * unsupported (e.g. Firefox today) and for reduced-motion users.
+ */
+@keyframes cc-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@utility reveal {
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      animation: cc-reveal auto var(--ease-elegant) both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 45%;
+    }
+  }
+}
+
 /* Desktop header is taller (lg breakpoint) */
 @media (min-width: 64rem) {
   :root {

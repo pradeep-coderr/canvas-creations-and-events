@@ -1,9 +1,9 @@
 import Image from "next/image";
-import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { ImageFrame } from "@/components/shared/image-frame";
 import { Button } from "@/components/ui/button";
+import { SiteLink } from "@/components/shared/site-link";
 import { hero } from "@/data/home";
 import { site } from "@/data/site";
 
@@ -47,13 +47,13 @@ export function Hero() {
             style={{ animationDelay: "240ms" }}
           >
             <Button asChild size="lg" className="w-full sm:w-auto">
-              <Link href={site.enquiry.href}>{site.enquiry.label}</Link>
+              <SiteLink href={site.enquiry.href}>{site.enquiry.label}</SiteLink>
             </Button>
             <Button asChild variant="link" className="self-center sm:self-auto">
-              <Link href={hero.secondaryCta.href}>
+              <SiteLink href={hero.secondaryCta.href}>
                 {hero.secondaryCta.label}
                 <ArrowRight data-icon="inline-end" />
-              </Link>
+              </SiteLink>
             </Button>
           </div>
 

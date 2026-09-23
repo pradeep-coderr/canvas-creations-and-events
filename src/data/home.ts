@@ -22,3 +22,35 @@ export const hero = {
   // it here, e.g. { src: "/images/gallery/hero.jpg", alt: "…" }.
   image: null as HeroImage | null,
 };
+
+export const intro = {
+  eyebrow: "The studio",
+  title: "Every celebration begins as a blank canvas.",
+  body: "Canvas Creations and Events is an event styling and décor studio in South Australia. We design each setting around the people and the moment it celebrates, so the finished space feels unmistakably yours.",
+};
+
+export const servicesSection = {
+  eyebrow: "Services",
+  title: "Styling, shaped around your celebration.",
+  description:
+    "Every event is different. Tell us what you are planning and we will talk through how to bring it to life.",
+  enquiry: {
+    title: "Planning something?",
+    text: "Tell us about your celebration.",
+  },
+};
+
+export const categoriesSection = {
+  eyebrow: "What we style",
+  title: "Celebrations worth remembering",
+};
+
+export const gallerySection = {
+  eyebrow: "Our work",
+  title: "Moments, styled.",
+  // Shown while src/data/gallery.ts has no images.
+  emptyTitle: "Our portfolio is on its way.",
+  emptyText:
+    "We are curating a selection of our celebrations for this page. In the meantime, follow along on social media.",
+  instagramCta: "See more on Instagram",
+};
