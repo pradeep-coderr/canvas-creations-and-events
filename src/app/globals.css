@@ -3,7 +3,7 @@
 @import "shadcn/tailwind.css";
 
 /*
- * Canvas Creations & Events — theme foundation
+ * Canvas Creations & Events — design tokens
  *
  * Layer 1 (`--cc-*`): raw brand palette. Reference these ONLY from this file.
  *   They are deliberately not exposed as Tailwind utilities.
@@ -11,8 +11,17 @@
  *   `text-muted-foreground`, `bg-surface-blush`, ...). shadcn components read
  *   the same tokens, so they inherit the brand automatically.
  *
- * The site is light-only by design; the `dark` variant is kept so shadcn
- * component classes compile, but no `.dark` token set is defined.
+ * Colour ratio: ~75% white/ivory neutrals, ~20% blush/rose, ~5% gold.
+ * Gold is for hairlines, borders and ornaments — never small text on a light
+ * surface (every gold shade is below 4.5:1 on white/ivory).
+ *
+ * Dark surfaces: put `data-tone="dark"` on a container (the `Section`
+ * component does this). The semantic tokens are redefined inside that scope,
+ * so every component adapts without `dark:` classes. There is no site-wide
+ * dark mode; the `dark` variant is kept only so shadcn classes compile.
+ *
+ * Contrast (WCAG AA) was measured for every text/background pair used here;
+ * see work.md → Phase 2 for the numbers.
  */
 
 @custom-variant dark (&:is(.dark *));
@@ -30,6 +39,9 @@
   --cc-gold-deep: #b77a31;
   --cc-charcoal: #302a29;
   --cc-muted: #756a67;
+  /* Derived: rose-deep mixed 22% toward charcoal. The only rose that passes
+     4.5:1 as text on white/ivory/blush and with white text on top of it. */
+  --cc-rose-ink: #9b605a;
 
   /* Core semantic tokens (shadcn contract) */
   --background: var(--cc-white);
@@ -38,24 +50,29 @@
   --card-foreground: var(--cc-charcoal);
   --popover: var(--cc-white);
   --popover-foreground: var(--cc-charcoal);
-  /* Deep rose rather than rose: white text on rose fails WCAG AA contrast */
-  --primary: var(--cc-rose-deep);
+  --primary: var(--cc-rose-ink);
   --primary-foreground: var(--cc-white);
+  --primary-hover: color-mix(in srgb, var(--cc-rose-ink) 86%, var(--cc-charcoal));
   --secondary: var(--cc-blush-soft);
   --secondary-foreground: var(--cc-charcoal);
   --muted: var(--cc-ivory);
   --muted-foreground: var(--cc-muted);
   --accent: var(--cc-blush);
   --accent-foreground: var(--cc-charcoal);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: color-mix(in oklab, var(--cc-charcoal) 12%, var(--cc-white));
-  --input: color-mix(in oklab, var(--cc-charcoal) 16%, var(--cc-white));
-  --ring: var(--cc-rose);
+  --destructive: #b42318;
+  /* Decorative dividers and hairlines */
+  --border: color-mix(in srgb, var(--cc-charcoal) 12%, var(--cc-white));
+  /* Form control boundaries: >= 3:1 on white/ivory (WCAG 1.4.11) */
+  --input: color-mix(in srgb, var(--cc-muted) 80%, var(--cc-white));
+  --ring: var(--cc-rose-ink);
   --radius: 0.625rem;
 
   /* Brand-specific semantic tokens */
   --surface-ivory: var(--cc-ivory);
   --surface-blush: var(--cc-blush);
+  /* Small accent text: eyebrows, small highlights */
+  --emphasis: var(--cc-rose-ink);
+  /* Decorative gold: hairlines, borders, ornaments */
   --highlight: var(--cc-gold);
   --highlight-strong: var(--cc-gold-deep);
   --highlight-soft: var(--cc-champagne);
@@ -69,12 +86,60 @@
   --chart-5: var(--cc-muted);
   --sidebar: var(--cc-ivory);
   --sidebar-foreground: var(--cc-charcoal);
-  --sidebar-primary: var(--cc-rose-deep);
+  --sidebar-primary: var(--cc-rose-ink);
   --sidebar-primary-foreground: var(--cc-white);
   --sidebar-accent: var(--cc-blush);
   --sidebar-accent-foreground: var(--cc-charcoal);
   --sidebar-border: var(--border);
-  --sidebar-ring: var(--cc-rose);
+  --sidebar-ring: var(--cc-rose-ink);
+}
+
+/* Dark editorial surface (charcoal), scoped — see header comment */
+[data-tone="dark"] {
+  color-scheme: dark;
+  --background: var(--cc-charcoal);
+  --foreground: var(--cc-ivory);
+  --card: color-mix(in srgb, var(--cc-charcoal) 92%, var(--cc-ivory));
+  --card-foreground: var(--cc-ivory);
+  --muted: color-mix(in srgb, var(--cc-charcoal) 90%, var(--cc-ivory));
+  --muted-foreground: color-mix(in srgb, var(--cc-ivory) 72%, var(--cc-charcoal));
+  /* Rose on charcoal is 5.28:1; charcoal text on rose is also 5.28:1 */
+  --primary: var(--cc-rose);
+  --primary-foreground: var(--cc-charcoal);
+  --primary-hover: color-mix(in srgb, var(--cc-rose) 85%, var(--cc-ivory));
+  --accent: color-mix(in srgb, var(--cc-charcoal) 90%, var(--cc-ivory));
+  --accent-foreground: var(--cc-ivory);
+  --destructive: #f97066;
+  --border: color-mix(in srgb, var(--cc-ivory) 16%, var(--cc-charcoal));
+  --input: color-mix(in srgb, var(--cc-ivory) 42%, var(--cc-charcoal));
+  --ring: var(--cc-champagne);
+  --emphasis: var(--cc-champagne);
+}
+
+@theme {
+  /*
+   * Type scale — fluid, so no per-breakpoint font sizes are needed.
+   * display-* pair with `font-display`; lead/eyebrow with `font-sans`.
+   * Body copy uses Tailwind's text-base / text-sm.
+   */
+  --text-display-xl: clamp(2.75rem, 1.6rem + 4.2vw, 5.25rem);
+  --text-display-xl--line-height: 1.04;
+  --text-display-xl--letter-spacing: -0.015em;
+  --text-display-lg: clamp(2.25rem, 1.7rem + 2.2vw, 3.75rem);
+  --text-display-lg--line-height: 1.08;
+  --text-display-lg--letter-spacing: -0.01em;
+  --text-display-md: clamp(1.75rem, 1.45rem + 1.2vw, 2.5rem);
+  --text-display-md--line-height: 1.15;
+  --text-display-sm: clamp(1.375rem, 1.25rem + 0.5vw, 1.75rem);
+  --text-display-sm--line-height: 1.25;
+  --text-lead: clamp(1.0625rem, 1rem + 0.3vw, 1.25rem);
+  --text-lead--line-height: 1.65;
+  --text-eyebrow: 0.75rem;
+  --text-eyebrow--line-height: 1.4;
+  --text-eyebrow--letter-spacing: 0.22em;
+
+  /* Slow, elegant deceleration — mirrored in src/lib/motion.ts */
+  --ease-elegant: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @theme inline {
@@ -91,6 +156,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -104,6 +170,7 @@
 
   --color-surface-ivory: var(--surface-ivory);
   --color-surface-blush: var(--surface-blush);
+  --color-emphasis: var(--emphasis);
   --color-highlight: var(--highlight);
   --color-highlight-strong: var(--highlight-strong);
   --color-highlight-soft: var(--highlight-soft);
@@ -130,16 +197,47 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Warm, low shadows. Prefer borders; use these sparingly. */
+  --shadow-soft:
+    0 1px 2px color-mix(in srgb, var(--cc-charcoal) 5%, transparent),
+    0 12px 32px -16px color-mix(in srgb, var(--cc-charcoal) 16%, transparent);
+  --shadow-lift:
+    0 2px 4px color-mix(in srgb, var(--cc-charcoal) 5%, transparent),
+    0 24px 48px -20px color-mix(in srgb, var(--cc-charcoal) 22%, transparent);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
   html {
     @apply font-sans;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background leading-relaxed text-foreground;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  ::selection {
+    background-color: var(--cc-blush-soft);
+    color: var(--cc-charcoal);
+  }
+  /* Visible keyboard focus for anything without its own focus style */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 }
