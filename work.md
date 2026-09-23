@@ -1622,3 +1622,98 @@ The server action is still the only public entry point. Steps, in order:
 - **Admin Select:** keyboard open, 6 options, Booked → "Status updated to Booked.", DB `booked`. No console errors.
 - **Regression:** frozen install ✅ · typecheck ✅ · lint ✅ · build ✅ · 7 widths ✅ (no overflow, all anchors) · interaction/a11y suite ✅ (its past-date step was removed: past dates can no longer be picked in the UI; the server still rejects them).
 - **Cleanup:** local test enquiry and temporary local admin deleted. Hosted suite rows deleted. One hosted enquiry, "Fly Man" (23:43 NPT, not from my tests), left untouched.
+
+---
+---
+
+## Phase 10 — Production Readiness, SEO & Deployment Hardening
+
+**Date:** Wednesday 23 → Thursday 24 September 2026 · **Timezone:** NPT (UTC+05:45) · **Work window:** 23:55 → ~00:10
+**Result:** Commit `chore: harden production readiness` (not pushed). **Nothing was deployed.**
+
+### Git state before starting (brief step 1)
+
+The brief assumed Phase 9 was uncommitted (the Phase 9 entry above says "Not committed yet" because it was written just before committing). Checked: `git status` was clean, `git diff` was empty, `git diff --check` was clean. The Phase 9 work is already in **`a9489db feat: add admin enquiries portal`** (23 files, including the admin migration), with its follow-up in **`b0f1a51 feat: use shadcn date picker and select`**. So **no "feat: build admin enquiries portal" commit was created**: there was nothing to commit, and renaming an existing commit would rewrite history.
+
+### Metadata audit (before)
+
+- The root layout held the public title and description, so **the admin area inherited the public marketing description**.
+- There was no `metadataBase`, canonical, Open Graph, Twitter, robots, sitemap, manifest, JSON-LD, `not-found` or `error` file.
+- `next.config.ts` was empty. Icons came from the Phase 1 files (`favicon.ico`, `icon.png`, `apple-icon.png`).
+
+### Changes
+
+| File | Change |
+| --- | --- |
+| `src/lib/site-url.ts` (new) | `getSiteUrl()` / `absoluteUrl()`: `NEXT_PUBLIC_SITE_URL` → `VERCEL_PROJECT_PRODUCTION_URL` → `http://localhost:3000`. No hard-coded domain; an invalid value fails the build. |
+| `src/app/layout.tsx` | Now only route-neutral metadata: `metadataBase`, `applicationName`, a plain `title`. |
+| `src/app/(site)/layout.tsx` | Public metadata: title and template, description, Open Graph (`website`, `en_AU`, siteName, url `/`, logo image 512×512 with alt), Twitter `summary`. |
+| `src/app/(site)/page.tsx` | `alternates.canonical: "/"`; JSON-LD script. |
+| `src/lib/structured-data.ts` (new) | `localBusinessJsonLd()` + `serializeJsonLd()` (escapes `<` as `<`, the Next.js-documented pattern). |
+| `src/app/robots.ts` (new) | Allow `/`; disallow `/admin`, `/design-system`; sitemap URL. |
+| `src/app/sitemap.ts` (new) | `/` only (monthly, priority 1). |
+| `src/app/not-found.tsx` (new) | Branded site-wide 404 (logo, eyebrow, Cormorant heading, "Back to the homepage"). |
+| `src/app/admin/(portal)/not-found.tsx` (new) | "Enquiry not found" inside the admin shell, with a link back. |
+| `src/app/(site)/error.tsx` (new) | Minimal branded public error boundary: generic message, retry and phone number; no error details shown. |
+| `next.config.ts` | Security headers, `poweredByHeader: false`, `X-Robots-Tag: noindex, nofollow` for `/admin` and `/admin/:path*`. |
+| `.env.example`, `README.md` | `NEXT_PUBLIC_SITE_URL`; a new "Production & deployment (Vercel)" section. |
+
+### Decisions
+
+- **Open Graph image:** the real square logo (Twitter `summary` card, not `summary_large_image`). No fabricated promotional or social image. A proper landscape share image should come from real client photography later.
+- **Structured data used:** `LocalBusiness` with `@id`, name, slogan, description, url, telephone (`+61426071109`), logo, image (logo), a `PostalAddress` (Duffield Avenue, Munno Para, SA, 5115, AU) and `sameAs` (Instagram, Facebook, TikTok).
+  - **Not used:** openingHours, priceRange, aggregateRating/review, email, geo, foundingDate, numberOfEmployees, areaServed/radius, services.
+  - It's static data only, never user input, and appears on the public homepage only.
+- **Robots policy:** crawl everything public; disallow `/admin` and `/design-system`. Page-level `noindex` stays on both (robots.txt alone doesn't prevent indexing).
+- **Sitemap policy:** only `/` (the only public page); there are no gallery or service routes to include.
+- **Security headers:**
+
+  | Header | Decision |
+  | --- | --- |
+  | `X-Content-Type-Options: nosniff` | ✅ added |
+  | `Referrer-Policy: strict-origin-when-cross-origin` | ✅ added |
+  | `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), browsing-topics=()` | ✅ added |
+  | Clickjacking: `X-Frame-Options: DENY` + `Content-Security-Policy: frame-ancestors 'none'` | ✅ added (this CSP restricts framing only, so nothing else can break) |
+  | `X-Powered-By` | ✅ removed |
+  | Full script/style/connect CSP | ❌ deferred: Next.js inline scripts need per-request nonces, which would force dynamic rendering of the static pages. A fragile CSP isn't an improvement. |
+  | HSTS | ❌ not added: Vercel sends HSTS on its domains; add it only once the custom domain is confirmed HTTPS-only, including subdomains. |
+
+- **Images:** audited every `next/image` / `ImageFrame`. `alt=""` only on decorative images; eager only above the fold (header logo, hero LCP image, small logos on the login and 404 pages); footer and About images lazy; `sizes` on all; no remote image config. **No changes needed.**
+- **Vercel:** no `vercel.json` and no extra packages. Bun is detected from `bun.lock`, build command `bun run build`. `NEXT_PUBLIC_*` variables must be set before the build (static homepage). Admin routes are dynamic, and the proxy covers `/admin` only.
+
+### Verification (production build with `NEXT_PUBLIC_SITE_URL=https://www.example.com`, a reserved test domain, against the local Supabase stack with a temporary local admin)
+
+| Check | Result |
+| --- | --- |
+| Status codes | `/` 200 · `/robots.txt` 200 · `/sitemap.xml` 200 · `/admin` 307 → login · `/admin/login` 200 · `/design-system` **404** · `/no-such-page` **404** · `/admin/no-such-page` 404 · `/admin/enquiries/not-a-uuid` and a real id while logged out → 307 → login |
+| robots.txt | `Allow: /` · `Disallow: /admin` · `Disallow: /design-system` · `Sitemap: https://www.example.com/sitemap.xml` |
+| sitemap.xml | exactly one `<loc>https://www.example.com/</loc>` |
+| Headers on `/` | all five security headers present; no `X-Powered-By` |
+| Headers on `/admin/login` | also `X-Robots-Tag: noindex, nofollow` |
+| 404 bodies | no stack traces, `node_modules`, Supabase or Postgres mentions; `noindex` |
+| Homepage (browser) | `lang=en-AU`, 1 h1, title, description, **no robots noindex**, canonical `https://www.example.com/`, full og:* and twitter:* tags, **JSON-LD parses** with exactly the properties above |
+| Admin login, list, detail (browser) | `noindex, nofollow`; **no** description, canonical, OG, Twitter, JSON-LD or public nav. Detail page: the enquiry's name, email and message **absent from `<head>`**; a `<script>` in the name renders as text |
+| Admin unknown id (logged in) | "Enquiry not found" inside the admin shell, noindex |
+| Public 404 (browser) | branded page, home link, noindex, no OG |
+| 7 widths | no overflow, all 6 anchors, 1 h1, no console errors, **no failed requests** (lazy-image counts at 375/768 are the known cold-load effect) |
+| Date picker + admin Select | same results as the Phase 9 follow-up (keyboard, past days disabled, 40px cells, stored date correct; Select → `booked`) |
+| Phase 3 suite (dev) | skip link first; dialog focus trap (16 Tabs); Escape returns focus; Tab order; 2px focus ring; reduced motion |
+| Phase 6 suite (dev → hosted) | CTAs and anchors, FAQ keyboard, first-error focus, alerts, success focus, mobile bar and menu, reduced motion. Its hosted row was deleted |
+| Header scroll state (isolated, dev and prod, 390 and 1440) | top: not scrolled · 600px: scrolled · back to top: not scrolled |
+| Final gate | `bun install --frozen-lockfile` · typecheck · lint · build · `git diff --check` (see commit) |
+
+### Issues found / fixed
+
+1. **Admin inherited the public description** (it lived in the root layout) → public metadata moved to the `(site)` layout; verified that admin pages have none.
+2. **Unbranded default 404** → site and admin not-found pages.
+3. **My mistake:** I ran `rm -rf .next` while your dev server was running. It deleted part of `.next/dev`, and the dev server started returning **500** (`TurbopackInternalError: Failed to restore meta`). A file-watcher nudge didn't help; you restarted the dev server (PID 35852) and it has served 200 since. Afterwards I built without deleting anything. Lesson: never remove `.next` while a dev server uses it.
+4. **The Phase 3 suite reported "header scrolled at top: true"** → an isolated re-test showed the correct behaviour on dev and prod; it was a timing overlap with the menu's smooth scroll in that script. No code change.
+
+### Remaining / deferred
+
+- **Set `NEXT_PUBLIC_SITE_URL`** to the real domain in Vercel once it's known (until then the Vercel production domain is used).
+- **Deploy to Vercel** (not done). Set all variables before the first build.
+- **Resend:** verify the sending domain and set credentials; real delivery is still unverified.
+- **Full CSP with nonces** (would make pages dynamic) and **HSTS on the custom domain**: later.
+- **A proper Open Graph image** from real photography; a web app manifest if wanted.
+- **Hosted:** keep public sign-up off; one real enquiry ("Fly Man") is in the database.

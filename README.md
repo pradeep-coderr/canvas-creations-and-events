@@ -102,6 +102,45 @@ Private area for managing enquiries: list (newest first, filter by status with c
 - **How access is enforced:** `src/proxy.ts` (Next 16 proxy, admin routes only) just refreshes the session. Every admin page and server action calls `requireAdmin()` (`src/lib/admin/session.ts`: verified JWT via `getClaims()` + `admin_users` membership), and RLS enforces the same rules in the database.
 - Code: `src/app/admin/` (login, list, detail, `actions.ts`), status vocabulary `src/lib/enquiry-status.ts` (matches the DB CHECK).
 
+## Production & deployment (Vercel)
+
+### Environment variables
+
+| Variable | Scope | Required | Notes |
+| --- | --- | --- | --- |
+| `NEXT_PUBLIC_SITE_URL` | public | recommended | Canonical origin, e.g. `https://your-domain.com.au`. Used for canonical and Open Graph URLs, `robots.txt`, `sitemap.xml` and JSON-LD. Fallback: Vercel's `VERCEL_PROJECT_PRODUCTION_URL`, then `http://localhost:3000`. |
+| `NEXT_PUBLIC_SUPABASE_URL` | public | yes | Hosted Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | public | yes | **Publishable** key only |
+| `RESEND_API_KEY` | server-only | for email | Never `NEXT_PUBLIC_` |
+| `RESEND_FROM_EMAIL` | server-only | for email | Must be a sender that is valid for your Resend account (verified domain) |
+| `ENQUIRY_NOTIFICATION_EMAIL` | server-only | for email | Notification recipient(s) |
+
+`NEXT_PUBLIC_*` values are inlined at **build** time and the homepage is static, so set them in Vercel (Production) **before** deploying and redeploy after changing them. The Resend variables are read at runtime. Never add the Supabase secret / `service_role` key.
+
+### Vercel settings
+
+- No `vercel.json` is needed. Vercel detects Next.js and uses Bun because of `bun.lock`; the build command is `bun run build` (`next build`).
+- `/admin*` routes are dynamic (auth cookies); `src/proxy.ts` refreshes Supabase sessions for `/admin` only.
+- `/design-system` is development-only (404 in production).
+
+### Before going live
+
+1. Hosted Supabase: all migrations applied (`bunx supabase db push`), the admin user created **and** registered in `admin_users` (see Admin portal), public sign-up turned off.
+2. Vercel environment variables set (table above), then deploy.
+3. Resend: verify the sending domain, set the three variables, send one real test enquiry and confirm it arrives.
+4. Check that `/robots.txt` and `/sitemap.xml` show the real domain; submit the sitemap in Google Search Console.
+
+### SEO & indexing
+
+- Public metadata (`src/app/(site)/layout.tsx`): title and template, description, `en_AU` Open Graph and a Twitter `summary` card using the real logo (no fabricated social image). Canonical URL on the homepage.
+- JSON-LD `LocalBusiness` on the homepage, built only from verified `site.ts` data (`src/lib/structured-data.ts`): no hours, prices, ratings, email or coordinates.
+- `robots.txt` allows `/` and disallows `/admin` and `/design-system`; `sitemap.xml` lists `/` only.
+- Admin pages: `noindex, nofollow` meta **and** an `X-Robots-Tag` header; they inherit no public metadata.
+
+### Security headers (`next.config.ts`)
+
+`X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, a restrictive `Permissions-Policy`, `X-Frame-Options: DENY` plus a CSP of only `frame-ancestors 'none'`, and no `X-Powered-By`. A full script/style CSP is **not** set: it would need per-request nonces and dynamic rendering of the static pages. HSTS is provided by Vercel on its domains; add your own only once the custom domain is HTTPS-only.
+
 ## Scripts
 
 | Command             | Purpose                         |

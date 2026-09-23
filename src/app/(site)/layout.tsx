@@ -1,6 +1,39 @@
+import type { Metadata } from "next";
 import { MobileCtaBar } from "@/components/layout/mobile-cta-bar";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
+import { site } from "@/data/site";
+
+const title = `${site.name} | ${site.slogan}`;
+// The real client logo (square) — no promotional image is fabricated.
+const logo = {
+  url: "/images/logo/canvas-creations-logo-512.png",
+  width: 512,
+  height: 512,
+  alt: `${site.name} logo`,
+};
+
+// Public-site metadata. Relative URLs resolve against metadataBase (root
+// layout, from NEXT_PUBLIC_SITE_URL).
+export const metadata: Metadata = {
+  title: { default: title, template: `%s | ${site.name}` },
+  description: site.description,
+  openGraph: {
+    type: "website",
+    locale: "en_AU",
+    siteName: site.name,
+    title,
+    description: site.description,
+    url: "/",
+    images: [logo],
+  },
+  twitter: {
+    card: "summary",
+    title,
+    description: site.description,
+    images: [logo],
+  },
+};
 
 /** Public website chrome. The admin area (/admin) has its own layout. */
 export default function SiteLayout({ children }: LayoutProps<"/">) {

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
 import { MotionProvider } from "@/components/motion/motion-provider";
 import { site } from "@/data/site";
+import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -17,12 +18,13 @@ const cormorant = Cormorant_Garamond({
   display: "swap",
 });
 
+// Only route-neutral metadata here. Public marketing metadata (description,
+// Open Graph, canonical) lives in app/(site); the admin area sets its own
+// noindex metadata and must not inherit any of it.
 export const metadata: Metadata = {
-  title: {
-    default: `${site.name} | ${site.slogan}`,
-    template: `%s | ${site.name}`,
-  },
-  description: site.description,
+  metadataBase: getSiteUrl(),
+  applicationName: site.name,
+  title: site.name,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
