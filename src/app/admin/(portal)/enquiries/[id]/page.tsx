@@ -56,7 +56,9 @@ export default async function AdminEnquiryPage({ params }: PageProps<"/admin/enq
     <>
       <Link
         href="/admin"
-        className="inline-flex items-center gap-2 rounded-sm text-sm font-medium text-muted-foreground hover:text-foreground"
+        // -my-3 py-3: a 44px tap target (the only way back in an installed
+        // iOS app, which has no browser back button) without shifting layout.
+        className="-my-3 inline-flex items-center gap-2 rounded-sm py-3 text-sm font-medium text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" aria-hidden="true" />
         All enquiries

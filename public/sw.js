@@ -9,7 +9,8 @@
  *   - Other public navigations offline → a small "you're offline" page
  *
  * What it never touches (the browser handles these normally, uncached):
- *   - /admin and everything under it (private, authenticated)
+ *   - /admin and everything under it (private, authenticated), including
+ *     the admin app manifest. The installable admin app works online only.
  *   - any non-GET request (form submissions / server actions)
  *   - other origins (Supabase, Resend, social sites)
  *   - React Server Component requests (RSC header / _rsc param)

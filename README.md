@@ -143,7 +143,26 @@ Private area for managing enquiries: list (newest first, filter by status with c
 
 ## Progressive Web App
 
-The public site can be installed ("Install app" in Chrome/Edge, "Add to Home Screen" on Android and iOS). No PWA package is used.
+There are two installable apps with separate identities. No PWA package is used.
+
+### Admin app ("Canvas Admin"): the one the business installs
+
+- **How to install:** open `/admin/login` (or `/admin` when signed in) on your phone.
+  - Android Chrome: menu → "Add to Home screen" / "Install app".
+  - iOS Safari: Share → "Add to Home Screen".
+  - Chrome/Edge desktop: the install icon in the address bar.
+- **Launching:** the icon opens `/admin`. The normal sign-in check runs: signed in → enquiries list; no or expired session → `/admin/login`. There is no special PWA login.
+- **Manifest:** `src/app/admin/manifest.webmanifest/route.ts` → `/admin/manifest.webmanifest` (static).
+  - Linked from the admin layout, so every admin page, including sign-in, uses it instead of the public one.
+  - `id` `/admin`, `start_url` and `scope` `/admin`, standalone.
+  - Same monogram icons as the public site.
+- **Why `/admin` and not `/admin/`:** Next.js redirects `/admin/` to `/admin`, and a `/admin/` scope would leave the dashboard itself out of scope, so the installed app would show a browser bar there. `/admin` covers `/admin`, `/admin/login` and `/admin/enquiries/*`.
+- **Shortcuts** (long-press the icon on Android, right-click on desktop; iOS doesn't support them): "New enquiries" (`/admin?status=new`) and "All enquiries" (`/admin`).
+- **Online only:** the service worker never handles or caches anything under `/admin`. Offline, the app shows the browser's offline screen.
+
+### Public site
+
+The public site stays installable too ("Canvas Creations", scope `/`) and keeps its offline homepage. The two apps don't collide: they have different ids, and the admin scope is narrower.
 
 - **Manifest:** `src/app/manifest.ts` → `/manifest.webmanifest`.
   - Name "Canvas Creations and Events", short name "Canvas Creations".

@@ -1775,3 +1775,68 @@ The Phase 3/6 suites ran against the local production server (local Supabase), *
 - **Install it for real once deployed:** Chrome/Edge desktop (address-bar install icon), Android Chrome (Add to Home screen), iOS Safari (Share → Add to Home Screen). Check the icon shape and the standalone launch.
 - Real client photography will make the offline homepage cache larger; the media cap (60) keeps it bounded.
 - If the enquiry form is ever needed offline, that's a deliberate product decision (on-device storage of personal data).
+
+---
+
+## Phase 12 — Admin PWA Experience
+
+**Date:** Thursday 24 September 2026 · **Timezone:** NPT (UTC+05:45)
+**Result:** Commit `feat: make the admin installable` (the brief was cut off partway through section 11, so you confirmed the commit separately). Not pushed; nothing deployed.
+
+### Why
+
+Phase 11 made the **public site** the install target (`start_url`/`scope` `/`). The real requirement is an installable **admin** app that opens straight into `/admin`.
+
+### Architecture decision: Option A (keep the public app, add a separate admin app)
+
+- **Separate identities:** the two manifests have different `id`s (`/` and `/admin`). Chrome treats them as two apps, and the narrower `/admin` scope wins for admin URLs.
+- **One manifest per page:** Next.js's `app/manifest.ts` only works at the app root. The admin manifest is therefore a static route handler, linked via `metadata.manifest` in `src/app/admin/layout.tsx`, which **replaces** the root link. Verified: every admin page has exactly one `<link rel="manifest">`, the admin one, and public pages have only the public one.
+- **Nothing removed:** the public offline homepage (Phase 11) is unaffected. The owner installs from the admin, so there's no confusion about which app opens.
+- **Option B not chosen:** removing public installability would have given up working functionality without solving anything.
+
+### Changes
+
+| File | Change |
+| --- | --- |
+| `src/app/admin/manifest.webmanifest/route.ts` (new) | Static admin manifest. Name "Canvas Creations Admin" (built from `site.shortName`), short "Canvas Admin"; `id`/`start_url`/`scope` `/admin`; standalone; white theme/background; the same four monogram icons; shortcuts "New enquiries" (`/admin?status=new`) and "All enquiries" (`/admin`) with the 192 icon. No private data |
+| `src/app/admin/layout.tsx` | `manifest: "/admin/manifest.webmanifest"`; `appleWebApp.title` "Canvas Admin" (the iOS home-screen name). Applies to login, list and detail |
+| `src/app/admin/(portal)/enquiries/[id]/page.tsx` | The "All enquiries" back link was 20px tall; it's now a 44px tap target via `py-3 -my-3`, with no visual or layout change. It's the only way back in an installed iOS app (no browser back button) |
+| `public/sw.js` | Comment only: the admin manifest is also under the `/admin` early return. **No logic change**, and the admin stays uncached |
+| `README.md` | PWA section rewritten for the two apps |
+
+- **`/admin` vs `/admin/`:** the brief suggested `/admin/`. Next.js 308-redirects `/admin/` to `/admin` (no `trailingSlash`), and a `/admin/` scope would put the dashboard itself **out of scope** (a browser bar would appear on the main screen). So `start_url` and `scope` are `/admin`, which prefix-matches `/admin`, `/admin/login` and `/admin/enquiries/*`.
+- **No service worker for the admin:** it isn't needed for installability (Chrome reports no errors with no worker registered), and offline admin data is deliberately not supported.
+- **No standalone-specific CSS:** there's no `viewport-fit=cover`, the header is white like `theme_color`, and nothing is fixed to the bottom in the admin.
+
+### Verification (local production build, local Supabase, temporary local admin, 2 seed enquiries; headless Chrome 153 over CDP)
+
+| Check | Result |
+| --- | --- |
+| `/admin/login`, logged out, fresh profile (public site never visited, **no service worker**) | manifest `/admin/manifest.webmanifest`, **0 manifest errors, 0 installability errors**, app id `/admin`, start `/admin`, scope `/admin`, shortcuts parsed, 1 manifest link |
+| `/` for comparison | public manifest, app id `/`, installable, 1 manifest link |
+| After sign-in (`/admin`) | still the admin manifest, installable |
+| Launch via start_url, signed in | `/admin` → "All enquiries", newest first |
+| Shortcut `/admin?status=new` | "New enquiries", only the new row, the "New" filter marked current |
+| Mobile 375/390/430 list | no horizontal overflow, 0 clipped elements; Sign out visible (36px); filter chips wrap (3/3/2 rows, 36px); rows 108px tall; newest enquiry at y≈318/275 |
+| Mobile detail | no overflow; back link **44px** (was 20); status Select 44px tall, full width |
+| Status change at 390 (tap Select → Contacted → Save) | "Status updated to Contacted.", database `contacted`; back link → `/admin`; history back → detail |
+| Worker boundary (worker installed via the public site, page controlled) | 4 admin responses, **0 from the worker**; admin HTML `Cache-Control: private, no-cache, no-store…`; manifest fetch not from the worker (only `/favicon.ico` was); caches: 30 entries, **0 `/admin`**, **0** bodies containing enquiry data or auth tokens |
+| Offline `/admin` | browser offline error, not served from any cache |
+| Sign out | → `/admin/login`, still the admin manifest (in scope) |
+| start_url signed out / cookies cleared (expired session) | → `/admin/login`; a deep link to an enquiry → login, private name not shown |
+| All admin navigations | inside scope `/admin` |
+| Regressions | metadata suite (admin noindex, no public metadata, no private data in `<head>`); date picker + admin Select; headers (`X-Robots-Tag` also on the admin manifest). All pass, no console errors |
+| typecheck · lint · build | pass |
+
+**Not tested:**
+- **A real install:** the CDP `PWA.install` isn't available in headless Chrome, and I didn't install headfully on this machine.
+- **`display-mode: standalone` rendering:** CDP can't emulate it.
+- **iOS and Android devices.**
+
+All local test data and the temp admin were deleted; the test server was stopped; your dev server on 3000 was not touched.
+
+### Remaining
+
+- After deploying: install on the owner's phone from `/admin/login`, then check the icon, launch into `/admin`, the shortcuts (Android) and sign-out/sign-in inside the app.
+- An admin offline page ("You're offline, Canvas Admin needs a connection") would be possible without caching private data, but it means the worker handling `/admin` navigations. It's deferred to keep the "never touches /admin" rule simple.
+- The brief was cut off in section 11; any later sections (for example, further verification or the commit message) weren't received.
