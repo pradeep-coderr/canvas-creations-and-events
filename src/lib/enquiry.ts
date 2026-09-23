@@ -15,8 +15,9 @@ const optionalText = (max: number, label: string) =>
     .max(max, `Please keep ${label} under ${max} characters.`);
 
 /**
- * Enquiry validation. Shared by the form (client) and, later, the server
- * action that stores and emails the enquiry — validate on both sides.
+ * Enquiry validation, shared by the form (client) and the `submitEnquiry`
+ * server action, which re-validates every submission — the browser is never
+ * trusted. Database CHECK constraints mirror these limits.
  */
 export const enquirySchema = z.object({
   name: z
@@ -59,23 +60,13 @@ export const enquirySchema = z.object({
 export type EnquiryInput = z.input<typeof enquirySchema>;
 export type Enquiry = z.output<typeof enquirySchema>;
 
+/**
+ * Outcome of `submitEnquiry` (src/lib/submit-enquiry.ts):
+ *   sent        — the enquiry is stored in the database (not emailed yet)
+ *   unavailable — this deployment has no database configured
+ *   error       — nothing was stored; safe, generic message for the visitor
+ */
 export type EnquiryResult =
   | { status: "sent" }
   | { status: "unavailable" }
   | { status: "error"; message: string };
-
-/**
- * Whether enquiries can actually be delivered. False until the Supabase +
- * email backend exists; the UI then says so instead of faking success.
- */
-export const enquiriesEnabled = false;
-
-/**
- * Deliver an enquiry. The single integration point for the future backend
- * (replace the body with a server action call). Until then it never claims
- * the enquiry was sent.
- */
-export async function submitEnquiry(enquiry: Enquiry): Promise<EnquiryResult> {
-  void enquiry;
-  return { status: "unavailable" };
-}

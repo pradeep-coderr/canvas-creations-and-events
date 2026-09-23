@@ -12,3 +12,15 @@ export function getSupabaseEnv() {
 
   return { url, publishableKey };
 }
+
+/**
+ * Whether Supabase is configured for this deployment. Drives features that
+ * depend on it (online enquiries) without throwing. Evaluated at build time
+ * for statically rendered pages.
+ */
+export function isSupabaseConfigured() {
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  );
+}

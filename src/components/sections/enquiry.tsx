@@ -2,6 +2,7 @@ import { Container } from "@/components/layout/container";
 import { Section } from "@/components/layout/section";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { enquirySection } from "@/data/home";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { EnquiryForm } from "./enquiry-form";
 
 /** The canonical enquiry target (#enquire) for every Enquire CTA. */
@@ -19,7 +20,7 @@ export function Enquiry() {
         />
         {/* Not wrapped in Reveal: form controls stay static and fully present. */}
         <div className="lg:col-span-7">
-          <EnquiryForm />
+          <EnquiryForm enabled={isSupabaseConfigured()} />
         </div>
       </Container>
     </Section>

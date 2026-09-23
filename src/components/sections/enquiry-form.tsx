@@ -11,13 +11,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { enquirySection } from "@/data/home";
 import { site } from "@/data/site";
 import {
-  enquiriesEnabled,
   enquirySchema,
-  submitEnquiry,
   type Enquiry,
   type EnquiryInput,
   type EnquiryResult,
 } from "@/lib/enquiry";
+import { submitEnquiry } from "@/lib/submit-enquiry";
 import { cn } from "@/lib/utils";
 
 type Status = "idle" | "submitting" | EnquiryResult["status"];
@@ -58,11 +57,20 @@ const fields: FieldConfig[] = [
 ];
 
 /**
- * Enquiry form. Validation is real; delivery goes through `submitEnquiry`,
- * which reports "unavailable" until a backend exists — the form never
- * claims an enquiry was received when it wasn't.
+ * Enquiry form. Validates in the browser, then calls the `submitEnquiry`
+ * server action, which validates again and stores the enquiry. The success
+ * state appears only after the database confirms the insert.
+ *
+ * `enabled` comes from the server (is Supabase configured?). When false the
+ * form says so up front and never pretends to send.
  */
-export function EnquiryForm({ preview = false }: { preview?: boolean }) {
+export function EnquiryForm({
+  enabled = false,
+  preview = false,
+}: {
+  enabled?: boolean;
+  preview?: boolean;
+}) {
   const [status, setStatus] = useState<Status>("idle");
   const thanksRef = useRef<HTMLHeadingElement>(null);
   const {
@@ -76,17 +84,27 @@ export function EnquiryForm({ preview = false }: { preview?: boolean }) {
     mode: "onTouched",
   });
 
-  const live = preview || enquiriesEnabled;
+  const live = preview || enabled;
 
   useEffect(() => {
     if (status === "sent") thanksRef.current?.focus();
   }, [status]);
 
-  const onSubmit = async (enquiry: Enquiry) => {
+  const onSubmit = async (enquiry: Enquiry, event?: React.BaseSyntheticEvent) => {
+    // Read the honeypot from the submitted form (not part of the schema).
+    const form = event?.target instanceof HTMLFormElement ? event.target : null;
+    const honeypot = form ? String(new FormData(form).get("hp_field") ?? "") : "";
     setStatus("submitting");
-    const result = preview ? await previewSubmit() : await submitEnquiry(enquiry);
-    setStatus(result.status);
-    if (result.status === "sent") reset(emptyForm);
+    try {
+      const result = preview
+        ? await previewSubmit()
+        : await submitEnquiry(enquiry, honeypot);
+      setStatus(result.status);
+      if (result.status === "sent") reset(emptyForm);
+    } catch {
+      // The server action itself failed (e.g. network): nothing was confirmed.
+      setStatus("error");
+    }
   };
 
   if (status === "sent") {
@@ -100,7 +118,7 @@ export function EnquiryForm({ preview = false }: { preview?: boolean }) {
           Thank you.
         </h3>
         <p className="mt-4 text-muted-foreground">
-          Your enquiry has been sent. We will be in touch.
+          We&apos;ve received your enquiry.
         </p>
         <Button variant="link" className="mt-8" onClick={() => setStatus("idle")}>
           Send another enquiry
@@ -110,7 +128,12 @@ export function EnquiryForm({ preview = false }: { preview?: boolean }) {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate aria-describedby={live ? undefined : "enquiry-offline"}>
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      noValidate
+      aria-describedby={live ? undefined : "enquiry-offline"}
+      className="relative"
+    >
       {!live && (
         <p
           id="enquiry-offline"
@@ -125,6 +148,20 @@ export function EnquiryForm({ preview = false }: { preview?: boolean }) {
           </a>
         </p>
       )}
+
+      {/* Honeypot for bots: hidden from sight, assistive tech and keyboard.
+          Deliberately named so browsers don't autofill it. */}
+      <div aria-hidden="true" className="absolute -left-[9999px] size-px overflow-hidden">
+        <label htmlFor="enquiry-hp-field">Leave this field empty</label>
+        <input
+          id="enquiry-hp-field"
+          name="hp_field"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          defaultValue=""
+        />
+      </div>
 
       <div className="grid gap-x-6 gap-y-6 sm:grid-cols-2">
         {fields.map((f) => {

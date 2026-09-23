@@ -1154,3 +1154,185 @@ All six nav anchors now exist: `#services`, `#gallery`, `#about`, `#faq`, `#cont
 - **Copyright year** is set at build time; a rebuild keeps it current.
 - **Not built, per brief:** Supabase, storage, auth, RLS, admin, CMS, email, Edge Functions, lightbox, gallery page, booking, pricing.
 - **Still open:** Prettier decision, GitHub remote.
+
+---
+---
+
+## Phase 7 — Supabase Backend Foundation & Enquiry Pipeline
+
+**Date:** Wednesday, 23 September 2026
+**Timezone:** Nepal Time, NPT (UTC+05:45)
+**Work window:** 22:26:14 → ~22:49 (commit)
+**Goal:** Connect the existing enquiry form to Supabase: server-side validation → Postgres, behind RLS. No admin, no email.
+**Result:** Commit `feat: connect enquiry pipeline to Supabase` (not pushed)
+
+### Supabase setup (decision made with you)
+
+- **No `.env.local` existed, so there were no credentials.** None were invented.
+- Asked you: hosted project, local Docker stack, or build only. **You chose the local Supabase stack.**
+- `bunx supabase init` created `supabase/config.toml` (no secrets) and `supabase/.gitignore` (`.temp`, `.branches` ignored).
+- Started a **trimmed stack**: only `db` (Postgres 17), `rest` (PostgREST) and `kong` (gateway), with 11 services excluded. Ports 54321/54322 were free, and **your 10 existing containers kept running untouched**.
+- `.env.local` (git-ignored, confirmed with `git check-ignore`) holds the local API URL and the CLI-generated **publishable** key, read from the gateway config without printing it. The secret key is never written anywhere.
+- **The hosted project is not connected yet** (see Remaining): `supabase link` + `supabase db push` + two Vercel env vars.
+
+### Timeline
+
+| Time (NPT) | Step |
+| --- | --- |
+| 22:26:14 | Inspection: tree clean at `fd4064c`; no `.env.local`; Docker running with 10 of your containers; CLI 2.117 via `bunx` |
+| ~22:27 | Asked about the connection strategy → local stack |
+| 22:29 | `supabase init`; ports checked; `migration new create_enquiries` |
+| ~22:31 | Migration written; `supabase start` (trimmed) → **migration applied** |
+| ~22:34 | `.env.local` written; **public API probed**: RLS/grants/constraints (11 cases); probe row deleted |
+| ~22:36 | `isSupabaseConfigured()`; schema/types kept in `enquiry.ts`; `submitEnquiry` moved to a `"use server"` module; form + section + FAQ wired |
+| ~22:37 | Lint caught `react-hooks/refs` (ref read in the submit handler) → honeypot read from the submitted `FormData` |
+| ~22:38 | Browser E2E valid submit → row verified in Postgres |
+| ~22:39 | Direct server-action calls bypassing the browser (10 payloads) |
+| ~22:40 | Outage test (REST container stopped) → generic error, 0 rows, 1 request |
+| ~22:42 | Test rows deleted; production build; secret scan |
+| ~22:43 | Production server with captured logs: 7-width audit, E2E, bypass, outage, log content check |
+| ~22:45 | Phase 6 accessibility/interaction suite re-run against the live form; rows cleaned |
+| ~22:47 | README + `.env.example`; this entry; commit |
+
+### Migration / schema: `supabase/migrations/20260923164440_create_enquiries.sql`
+
+| Column | Type | Rule |
+| --- | --- | --- |
+| `id` | `uuid` | PK, `gen_random_uuid()` |
+| `name` | `text` | not null; trimmed length 1–100 |
+| `email` | `text` | not null; ≤254; basic `x@y.z` pattern |
+| `phone` | `text` | nullable; ≤30 |
+| `event_type` | `text` | nullable; ≤100 |
+| `event_date` | `date` | nullable |
+| `venue` | `text` | nullable; ≤200 |
+| `message` | `text` | not null; trimmed length 1–2000 |
+| `status` | `text` | not null, default `'new'`; CHECK in (`new`, `contacted`, `quoted`, `booked`, `completed`, `archived`) |
+| `created_at` / `updated_at` | `timestamptz` | not null, default `now()`; `updated_at` maintained by the `set_updated_at()` trigger (`search_path = ''`) |
+
+- **Indexes, for the future admin only:**
+  - `(created_at desc)` for "newest first"
+  - `(status, created_at desc)` for "filter by status, newest first"
+- **Status as a CHECK constraint, not an enum:** it rejects invalid values just the same, and is easier to extend later with a migration.
+- **"Event date not in the past" stays in Zod only:** a `current_date` CHECK would make valid historical rows fail on dump/restore.
+- **Not modelled (deferred):** budget, guest count, pricing, assignee, quote, notes, booking.
+
+### RLS / security
+
+1. `enable row level security`, with **one policy**: `"Public can submit new enquiries"`, `for insert to anon, authenticated with check (status = 'new')`. There are no select, update or delete policies.
+2. `revoke all on public.enquiries from anon, authenticated`, then `grant insert (name, email, phone, event_type, event_date, venue, message)`. Column-level: public roles **can't set** `id`, `status` or timestamps, and have **no SELECT privilege**, which also stops `return=representation` read-backs.
+3. `authenticated` is included only for insert, so a future logged-in admin browsing the public site can still submit. Authenticated users get **no** other access; the admin model comes later.
+4. The app **never uses the secret / service_role key.** Inserts run through the existing server client with the publishable key (public role), so RLS is always in force.
+
+**Verified against the running database using the public key over the REST API (the same capability a browser has):**
+
+| Attempt | Result |
+| --- | --- |
+| SELECT all | 401 `permission denied` |
+| INSERT valid (minimal) | **201** |
+| INSERT + return representation | 401, and the insert rolled back (no row) |
+| INSERT with `status=booked` / chosen `id` / `created_at` | 401 each |
+| PATCH / DELETE | 401 each |
+| Bad email / blank name / 3,000-character message | 400 CHECK violation each |
+
+### Server submission architecture
+
+- **`src/lib/enquiry.ts`** (shared, client-safe): `enquirySchema`, `EnquiryInput`, `Enquiry`, `EnquiryResult` (`sent` = stored, `unavailable` = no database configured, `error`). The old `enquiriesEnabled` constant and the stub `submitEnquiry` were removed from here.
+- **`src/lib/submit-enquiry.ts`** (`"use server"`): the same single `submitEnquiry` integration point, now real. A `"use server"` module may only export async functions, so the schema stays in the shared file. Steps:
+  1. **Honeypot** (`hp_field`): filled → a quiet `sent`, nothing stored.
+  2. `isSupabaseConfigured()`: false → `unavailable`.
+  3. **Zod `safeParse` again.** Invalid → generic error; logs field **names** only.
+  4. **Explicit mapping:** `eventType → event_type`, `eventDate → event_date`, blank optional fields → `NULL`.
+  5. `createClient()` (existing server client) → `.insert(row)` (return=minimal).
+  6. Database error → logs `{ code, message }`, returns a generic error. A thrown error does the same.
+  7. **`sent` only after the insert succeeds.**
+- **`src/lib/supabase/env.ts`:** the one targeted addition is `isSupabaseConfigured()`, which doesn't throw. No new clients.
+- **`EnquiryForm`:**
+  - takes `enabled` from the server (replacing the constant)
+  - calls the server action and wraps it in try/catch, so a network failure gives `error`, never success
+  - reads the honeypot from the submitted `FormData`
+  - success copy: "Thank you. We've received your enquiry." (**no promise of a reply**, because nobody is notified yet)
+- **`Enquiry` section:** `<EnquiryForm enabled={isSupabaseConfigured()} />`.
+- **FAQ "How do I make an enquiry?":**
+  - configured: "You can send us an enquiry online using the form on this page, or call us on 0426 071 109. You can also find us on Instagram, Facebook and TikTok." with a "Send an enquiry" link
+  - otherwise: the previous phone answer
+  - No response-time promises.
+- **No API route, Express or Axios.** A Next.js server action is the whole transport.
+- **Duplicates:** there's no deduplication by email, phone or date (people may legitimately enquire twice). One interaction sends one request: the button is disabled while submitting (verified: 1 POST per submit, even when the database is down).
+
+### Validation (three layers)
+
+1. **Client:** Zod through React Hook Form, as in Phase 6. All behaviour was re-verified.
+2. **Server:** the same Zod schema re-validates every call. **Verified by bypassing the browser** and POSTing directly to the server action (action ID taken from the client bundle):
+
+   | Payload | Result | Rows |
+   | --- | --- | --- |
+   | invalid email | generic error | +0 |
+   | blank name | generic error | +0 |
+   | missing message | generic error | +0 |
+   | invalid phone `12ab` | generic error | +0 |
+   | past date `2020-01-01` | generic error | +0 |
+   | 2,500-char message | generic error | +0 |
+   | string instead of object | generic error | +0 |
+   | object with missing fields | generic error | +0 |
+   | honeypot filled | `sent` (silent) | **+0** |
+   | extra keys `status:"booked"`, `id`, `created_at` | `sent` | +1, **stored as `new`, DB-generated id, created now** (Zod stripped the extras) |
+
+3. **Database:** CHECK constraints (verified by the direct REST probes above).
+
+### End-to-end test (real browser → server → Postgres)
+
+**Valid submission** (390px mobile, keyboard Enter submit; name padded with spaces, venue left blank):
+
+- UI: "Sending… (disabled)", then **"Thank you."** with focus moved to it, and "We've received your enquiry."
+- Row checked **directly in Postgres** (psql as postgres in the db container):
+
+  | Field | Value |
+  | --- | --- |
+  | `id` | generated |
+  | `name` | stored **trimmed** as `[E2E valid test]` |
+  | email / phone / event type | stored as entered |
+  | `event_date` | 30 days ahead |
+  | `venue` | **NULL** |
+  | `status` | **`new`** |
+  | timestamps | set, with `updated_at = created_at` |
+
+**Failure path** (REST container stopped to simulate an outage):
+
+- "Sending…" for about 5–7 seconds (supabase-js retries), then "Something went wrong and your enquiry wasn't sent. Please try again, or call us on 0426 071 109."
+- No success view, **0 rows**, visitor input kept, **1 POST** for one submit.
+- REST restarted afterwards (200).
+
+**Test data:** every probe, E2E, tamper and suite row was deleted. The database ended at **0 rows**.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| `bun run typecheck` / `lint` | ✅ exit 0 (after the `react-hooks/refs` fix) |
+| `bun run build` | ✅ all routes static (built with the local Supabase env, so the online form is live in that build) |
+| Secret scan `.next/static` | ✅ 0 files with `sb_secret_`, 0 with the actual local secret value, 0 with `service_role`. Even the publishable key is absent (the browser never talks to Supabase) |
+| Server HTML | ✅ no `sb_secret`; no enquiry data; no offline notice; online FAQ wording; all 6 anchors |
+| Production 7-width audit | ✅ no overflow, no console errors, no failed requests |
+| Production E2E valid / bypass / outage | ✅ success, rejected, generic error (same as dev) |
+| **Server log content** (production, captured) | ✅ `[enquiry] rejected invalid payload { fields: [ 'eventDate' ] }`, `[enquiry] insert failed { code, message }`. **0** occurrences of the test names, emails, message text or any key |
+| Accessibility regression (Phase 6 suite, live form) | ✅ labels, `aria-required`, `aria-invalid`, `aria-describedby`, `role="alert"`, first-error focus, 16px inputs, success-heading focus, FAQ keyboard, mobile bar and menu anchors, reduced motion |
+
+### Issues found / fixed
+
+1. **Lint `react-hooks/refs`:** reading a ref inside the submit handler passed to `handleSubmit` during render. Fixed by reading the honeypot from the submitted form's `FormData`, so no ref is needed.
+2. **Local key discovery:** `supabase status` omits API keys when auth is excluded. The key was read from the gateway's config. The first attempt returned empty because Git Bash rewrote the container path; re-run inside `sh -c`.
+3. **Success copy:** it had promised "We will be in touch". With no email or admin yet, nobody is notified, so it now says only that the enquiry was received.
+4. **Test harness notes (not site bugs):**
+   - Chrome reports request headers in lowercase (`next-action`); the first request count read 0.
+   - The Phase 6 suite expected the old "unavailable" state after a valid submit; updated for the live success state.
+   - The same LCP console warning appears only after scripted scrolling (clean loads show none, per Phase 6).
+
+### Remaining / deferred
+
+- **Business risk to decide before going live:** with email and admin deferred, **nobody is notified of new enquiries**. They're only visible in the Supabase dashboard. Either keep production unconfigured (the form shows the honest phone fallback) until notifications exist, or have someone check the dashboard.
+- **Connect the hosted project:** `supabase login` → `supabase link --project-ref …` → `supabase db push`, then set `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in Vercel **before** building.
+- **Next phases:** email notification (Resend, via server action or Edge Function; server-only secret) and the admin portal (auth + role-checked RLS policies for select/update; status changes).
+- **Outage latency:** about 5–7 seconds before the error appears (client retries). Acceptable for now; could shorten with a fetch timeout later.
+- **Rate limiting / CAPTCHA:** not added. Honeypot + validation + constraints only; revisit if spam appears.
+- **Local stack is still running** (3 containers). Stop with `bunx supabase stop`. While it's stopped, the dev form shows the error state because `.env.local` is still set.
+- **Still open:** business email, client content (photos, services, categories, testimonials, founder story, process, video), Prettier decision, GitHub remote.

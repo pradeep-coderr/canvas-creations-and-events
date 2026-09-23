@@ -1,3 +1,4 @@
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { site, type NavLink } from "./site";
 
 /**
@@ -18,13 +19,19 @@ export interface FaqItem {
 
 const { phone, address } = site.contact;
 
+// Online enquiries are live only when this deployment has a database.
+const enquiriesOnline = isSupabaseConfigured();
+
 export const faqs: FaqItem[] = [
   {
     id: "how-to-enquire",
     question: "How do I make an enquiry?",
-    // Update once the online enquiry form is connected to a backend.
-    answer: `The quickest way to reach us right now is by phone on ${phone.display}. You can also find us on Instagram, Facebook and TikTok.`,
-    action: { label: `Call ${phone.display}`, href: phone.href },
+    answer: enquiriesOnline
+      ? `You can send us an enquiry online using the form on this page, or call us on ${phone.display}. You can also find us on Instagram, Facebook and TikTok.`
+      : `The quickest way to reach us right now is by phone on ${phone.display}. You can also find us on Instagram, Facebook and TikTok.`,
+    action: enquiriesOnline
+      ? { label: "Send an enquiry", href: "/#enquire" }
+      : { label: `Call ${phone.display}`, href: phone.href },
     order: 1,
   },
   {
