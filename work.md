@@ -1717,3 +1717,61 @@ The brief assumed Phase 9 was uncommitted (the Phase 9 entry above says "Not com
 - **Full CSP with nonces** (would make pages dynamic) and **HSTS on the custom domain**: later.
 - **A proper Open Graph image** from real photography; a web app manifest if wanted.
 - **Hosted:** keep public sign-up off; one real enquiry ("Fly Man") is in the database.
+
+---
+
+## Phase 11 — Progressive Web App
+
+**Date:** Thursday 24 September 2026 · **Timezone:** NPT (UTC+05:45) · **Work window:** ~00:10 → ~00:35
+**Result:** Commit `feat: make the public site installable` (not pushed). **Nothing was deployed.**
+
+### What was built
+
+| File | Purpose |
+| --- | --- |
+| `src/app/manifest.ts` (new) | Native Next.js manifest → `/manifest.webmanifest` (static). `id`/`start_url`/`scope` `/`, `standalone` (+ `display_override` standalone → minimal-ui), `en-AU`, theme + background `#ffffff` (the header colour, so the standalone title bar blends in) |
+| `public/icons/icon-192.png` (new) | Real CC monogram, transparent, `any` |
+| `public/icons/maskable-192.png`, `maskable-512.png` (new) | Monogram at 77% on white. Furthest artwork pixel at 76.3% of the radius, inside the 80% safe zone. Checked visually under circle, 80%-circle and rounded-square masks |
+| `src/app/icon.png` (existing) | Reused as the 512 `any` icon. **Not** declared maskable: its artwork reaches 99% of the edge |
+| `public/sw.js` (new) | A small hand-written worker; no Workbox or next-pwa. Strategies are in the README |
+| `src/components/pwa/service-worker-registration.tsx` (new) | Production-only registration (`scope: "/"`, `updateViaCache: "none"`), rendered from the public `(site)` layout only |
+| `next.config.ts` | Headers for `/sw.js`: JS content type, `no-cache, no-store, must-revalidate`, `default-src 'self'` CSP |
+| `src/app/layout.tsx` | `viewport.themeColor: #ffffff` |
+| `src/components/sections/enquiry-form.tsx` | New `offline` status: checked before submitting (`navigator.onLine`) and when a submit throws while offline. Values are kept; nothing is queued or stored |
+
+### Decisions
+
+- **No install button.** The browser's own install UI is used. A custom `beforeinstallprompt` button would be Chromium-only and easy to get wrong.
+- **No `skipWaiting`.** A new worker waits until tabs close, so a visitor filling in the form is never switched mid-session. `clients.claim()` runs on activation so the first install controls the page straight away.
+- **No background sync or offline queue** for enquiries, which would mean storing personal data on the device. The form is online-only with a clear message.
+- **Admin boundary:** the worker returns early for `/admin` and `/admin/*` (the browser handles them normally, with nothing cached), and it isn't registered from admin pages. Once registered it controls the whole origin, so the early return is the real guarantee.
+- **Standalone CSS:** none needed. There's no browser chrome to replace, the sticky header works unchanged, and the mobile quick-contact bar already pads with `env(safe-area-inset-bottom)`; `viewport-fit=cover` isn't set, so content is never under notches.
+
+### Verification (production build, `NEXT_PUBLIC_SITE_URL=https://www.example.com`, local Supabase, headless Chrome 153 over CDP)
+
+| Check | Result |
+| --- | --- |
+| Manifest | 200 `application/manifest+json`; Chrome `Page.getAppManifest`: **no errors**; the 4 icon URLs return 200 `image/png` |
+| Installability | `Page.getInstallabilityErrors` → **`[]` (installable)**; `Page.getAppId` → `http://localhost:3057/` (recommended id `/`) |
+| Service worker | scope `/`, script `/sw.js`, **activated**, page **controlled** on the first visit |
+| Caches after the first visit | `cc-pages-v1` (1: `/`), `cc-static-v1` (19) |
+| Repeat visit | 23/27 responses served by the worker; DOMContentLoaded 136 ms → **36 ms** (localhost) |
+| Admin (logged in as a temp local admin, detail page of a seeded "Private Person" enquiry) | **0 of 3** admin responses from the worker; caches contain **0** `/admin`, **0** Supabase and **0** `_rsc` entries; **0** cached bodies contain the enquiry's name/email/message or an auth token |
+| Offline `/` | loads from cache: h1, fonts, all 6 section anchors, 0 broken visible images (2 failed requests are non-cached lazy images) |
+| Offline enquiry | offline message shown, **no POST sent**, values kept, no localStorage or IndexedDB used |
+| Offline `/admin/login` | browser's own offline error (**not** served by the worker, nothing cached) |
+| Offline unknown public page | the worker's "You're offline" page (noindex, 503) |
+| Back online | homepage from network, still controlled; a valid enquiry → "Thank you." and stored |
+| Storage used | ~4.4 MB (mostly the static JS/CSS and a few images) |
+| Real install via CDP `PWA.install` | **Not possible here:** Chrome 153 headless doesn't expose the `PWA` domain (`'PWA.install' wasn't found`, on both page and browser targets). **I didn't do a headful install**, as it would add an app to this machine's Start menu |
+| `display-mode: standalone` emulation | CDP media emulation doesn't support `display-mode` (it didn't match). The layout was checked at 390px mobile instead (no overflow, menu focus trap, bar at the bottom edge) |
+| iOS / Safari | **Not tested** (no device). iOS uses `apple-icon.png` and the manifest name; offline behaviour depends on Safari's service worker support |
+| Regression | robots/sitemap/headers unchanged (no `X-Powered-By`; admin `X-Robots-Tag`; `/design-system` 404); metadata suite (canonical, OG, JSON-LD, admin noindex, no private data in `<head>`); header scroll state at 390 and 1440; 7 widths with no overflow or console errors; date picker + admin Select; Phase 3 (a11y/keyboard/reduced motion) and Phase 6 (CTAs, FAQ, form validation, mobile bar) suites. **All pass** (the Phase 6 preview checks need `/design-system`, which is dev-only by design) |
+
+The Phase 3/6 suites ran against the local production server (local Supabase), **not** your dev server with the hosted project, so no hosted row or real notification email was created. All local test data (enquiries and the temp admin) and temp files were deleted; the prod server on 3057 was stopped; your dev server was not touched.
+
+### Remaining / deferred
+
+- **Install it for real once deployed:** Chrome/Edge desktop (address-bar install icon), Android Chrome (Add to Home screen), iOS Safari (Share → Add to Home Screen). Check the icon shape and the standalone launch.
+- Real client photography will make the offline homepage cache larger; the media cap (60) keeps it bounded.
+- If the enquiry form is ever needed offline, that's a deliberate product decision (on-device storage of personal data).

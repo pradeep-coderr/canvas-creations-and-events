@@ -20,7 +20,8 @@ import {
 import { submitEnquiry } from "@/lib/submit-enquiry";
 import { cn } from "@/lib/utils";
 
-type Status = "idle" | "submitting" | EnquiryResult["status"];
+// "offline" is client-only: the browser has no connection, so nothing was sent.
+type Status = "idle" | "submitting" | "offline" | EnquiryResult["status"];
 
 const emptyForm: EnquiryInput = {
   name: "",
@@ -98,6 +99,12 @@ export function EnquiryForm({
     // Read the honeypot from the submitted form (not part of the schema).
     const form = event?.target instanceof HTMLFormElement ? event.target : null;
     const honeypot = form ? String(new FormData(form).get("hp_field") ?? "") : "";
+    // Enquiries need a connection (server action → database). Offline, don't
+    // try, don't queue: say so and keep what they typed.
+    if (!preview && !navigator.onLine) {
+      setStatus("offline");
+      return;
+    }
     setStatus("submitting");
     try {
       const result = preview
@@ -110,7 +117,7 @@ export function EnquiryForm({
       setStatus(result.status);
     } catch {
       // The server action itself failed (e.g. network): nothing was confirmed.
-      setStatus("error");
+      setStatus(navigator.onLine ? "error" : "offline");
     }
   };
 
@@ -267,7 +274,7 @@ export function EnquiryForm({
       </div>
 
       {/* Announces the outcome of a submit attempt. */}
-      <div role="status" aria-live="polite" className={cn(status !== "unavailable" && status !== "error" && "sr-only")}>
+      <div role="status" aria-live="polite" className={cn(status !== "unavailable" && status !== "error" && status !== "offline" && "sr-only")}>
         {status === "unavailable" && (
           <p className="mt-8 flex items-start gap-3 bg-background p-5 text-sm">
             <Phone aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />
@@ -282,6 +289,12 @@ export function EnquiryForm({
               </a>
               . Your details are still in the form.
             </span>
+          </p>
+        )}
+        {status === "offline" && (
+          <p className="mt-8 bg-background p-5 text-sm">
+            You&apos;re offline, so your enquiry hasn&apos;t been sent. Your details are still
+            in the form — reconnect and press <strong>Send enquiry</strong> again.
           </p>
         )}
         {status === "error" && (

@@ -141,6 +141,27 @@ Private area for managing enquiries: list (newest first, filter by status with c
 
 `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, a restrictive `Permissions-Policy`, `X-Frame-Options: DENY` plus a CSP of only `frame-ancestors 'none'`, and no `X-Powered-By`. A full script/style CSP is **not** set: it would need per-request nonces and dynamic rendering of the static pages. HSTS is provided by Vercel on its domains; add your own only once the custom domain is HTTPS-only.
 
+## Progressive Web App
+
+The public site can be installed ("Install app" in Chrome/Edge, "Add to Home Screen" on Android and iOS). No PWA package is used.
+
+- **Manifest:** `src/app/manifest.ts` → `/manifest.webmanifest`.
+  - Name "Canvas Creations and Events", short name "Canvas Creations".
+  - `start_url` and `scope` `/`, `display: standalone`, white theme and background (matching the header).
+- **Icons:** the real CC monogram.
+  - `public/icons/icon-192.png` and `src/app/icon.png` (512) are `any`.
+  - `public/icons/maskable-{192,512}.png` are the monogram at 77% on white, inside the 80% maskable safe zone.
+  - Regenerate them from `public/images/logo/canvas-creations-monogram.png` if the logo changes.
+- **Service worker:** `public/sw.js`, registered only in production and only from the public layout.
+  - The homepage HTML is network-first, with the cached copy used offline.
+  - `/_next/static/*` is cache-first (hashed files).
+  - Local images and icons are stale-while-revalidate, capped at 60 entries.
+  - Other public pages show a small "You're offline" page when there's no connection.
+  - It **never** handles `/admin`, non-GET requests (form submissions), other origins (Supabase, social links) or RSC requests.
+- **Enquiry form offline:** nothing is queued or stored. The form keeps what was typed and shows "You're offline, so your enquiry hasn't been sent…"; the visitor presses Send again once reconnected.
+- **Updating:** a new `sw.js` is picked up on the next visit (served with `no-cache`) and takes over once all tabs are closed. Bump `VERSION` in `sw.js` when the caching rules change, so old caches are deleted.
+- **Development:** `bun dev` never registers the worker. To test it, use `bun run build && bun start`. To reset: DevTools → Application → Service workers → Unregister, then Storage → Clear site data.
+
 ## Scripts
 
 | Command             | Purpose                         |

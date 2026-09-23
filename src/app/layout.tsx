@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
 import { MotionProvider } from "@/components/motion/motion-provider";
 import { site } from "@/data/site";
@@ -25,6 +25,12 @@ export const metadata: Metadata = {
   metadataBase: getSiteUrl(),
   applicationName: site.name,
   title: site.name,
+};
+
+// Browser UI colour (e.g. Android address bar, installed-app title bar):
+// --cc-white, matching the header and the manifest theme_color.
+export const viewport: Viewport = {
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

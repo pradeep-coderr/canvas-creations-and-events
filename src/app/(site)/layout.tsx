@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { MobileCtaBar } from "@/components/layout/mobile-cta-bar";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
+import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 import { site } from "@/data/site";
 
 const title = `${site.name} | ${site.slogan}`;
@@ -43,6 +44,7 @@ export default function SiteLayout({ children }: LayoutProps<"/">) {
       {children}
       <SiteFooter />
       <MobileCtaBar />
+      <ServiceWorkerRegistration />
     </>
   );
 }
