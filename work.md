@@ -1336,3 +1336,174 @@ All six nav anchors now exist: `#services`, `#gallery`, `#about`, `#faq`, `#cont
 - **Rate limiting / CAPTCHA:** not added. Honeypot + validation + constraints only; revisit if spam appears.
 - **Local stack is still running** (3 containers). Stop with `bunx supabase stop`. While it's stopped, the dev form shows the error state because `.env.local` is still set.
 - **Still open:** business email, client content (photos, services, categories, testimonials, founder story, process, video), Prettier decision, GitHub remote.
+
+### Phase 7 addendum: hosted Supabase connected (2026-09-23)
+
+- You replaced `.env.local` with the hosted project's values. Verified without printing them: only `NEXT_PUBLIC_SUPABASE_URL` (a hosted `…supabase.co` URL) and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (a publishable key). **No secret or service_role key.** Still git-ignored.
+- You ran `supabase login`, `supabase link --project-ref vxupiukrnlnwchvdxcte` and a dry run (1 pending migration). I ran `supabase db push`, which applied `20260923164440_create_enquiries.sql`. `migration list` shows local = remote.
+- **Hosted schema confirmed** (`db query --linked`): RLS enabled; 1 policy, `Public can submit new enquiries [INSERT to anon,authenticated]`; public table grants: none; anon INSERT columns: exactly the 7 visitor fields; 0 rows.
+- **Hosted public-key probes:** SELECT, insert-with-read-back, `status=booked`, a chosen `id`, UPDATE and DELETE → all **401 permission denied**. Bad email → 400 CHECK. No rows written.
+- **Hosted end-to-end test:** a real browser submit through the dev server → "Thank you." (focused), 1 POST. The hosted row count went 0 → 1 while the local stack stayed at 0. The row was verified (trimmed name, correct mapping, venue NULL, status `new`, timestamps set) and then **deleted**. The hosted table is back to 0 rows.
+- **Security advisor** (`db advisors --linked`): 2 WARNs about the **pre-existing** `public.rls_auto_enable()`, Supabase's "auto-enable RLS on new tables" event-trigger function (`ensure_rls` on `ddl_command_end`). It isn't from this repo. It's `SECURITY DEFINER` and executable by anon/authenticated through RPC, but it returns `event_trigger`, so Postgres won't run it as a normal function. Low practical risk. Left unchanged pending your decision; the optional hardening is `revoke execute on function public.rls_auto_enable() from anon, authenticated, public;` as a migration.
+- **Still true:** nobody is notified of new enquiries (no email or admin yet). Vercel still needs the two env vars set before building for production.
+
+---
+---
+
+## Phase 8 — Resend Email Notifications
+
+**Date:** Wednesday, 23 September 2026
+**Timezone:** Nepal Time, NPT (UTC+05:45)
+**Work window:** 23:04:57 → ~23:20 (commit)
+**Goal:** After an enquiry is stored, send an internal notification email through Resend. The database stays the source of truth. No admin, auth, customer emails or inbox.
+**Result:** Commit `feat: add enquiry email notifications` (not pushed). This commit also includes the uncommitted Phase 7 addendum above.
+
+### Inspection findings
+
+- **Current signatures:**
+  - `submitEnquiry(input: unknown, honeypot?: unknown): Promise<EnquiryResult>` in `src/lib/submit-enquiry.ts` (`"use server"`)
+  - `EnquiryResult = sent | unavailable | error`
+  - The form is at `src/components/sections/enquiry-form.tsx` (there is no `components/forms` folder).
+- **`.env.local`** contains only the two hosted Supabase public variables. **No Resend credentials exist**, so no real email could be sent in this session, and none were invented.
+- **The insert returned no id.** Public roles have no SELECT privilege, so `INSERT … RETURNING` is impossible, and the notification needs the id.
+
+### Email architecture
+
+The server action is still the only public entry point. Steps, in order:
+
+1. honeypot
+2. Supabase configured?
+3. Zod re-validation
+4. **generate the id** (`crypto.randomUUID()`)
+5. insert (id included)
+6. log `stored <id>`
+7. `sendEnquiryNotification(id, enquiry)`
+8. return `{ status: "sent", notified }`
+
+**How the enquiry gets its id.** I compared three options and chose the third:
+
+| Option | Verdict |
+| --- | --- |
+| A `SECURITY DEFINER` RPC | Rejected: bypasses RLS, adds a public RPC surface, advisor WARN |
+| A SELECT policy for `RETURNING` | Rejected: would expose rows |
+| **The server generates the UUID** + an additive `GRANT INSERT (id)` | **Chosen** |
+
+- The id is the row's real primary key. RLS, the single insert-only policy and "no public reads" are unchanged, and public roles still can't set `status` or timestamps. The DB default `gen_random_uuid()` remains for any other insert.
+- New migration: `supabase/migrations/20260923172126_allow_enquiry_id_on_insert.sql`.
+
+**Modules** (`src/lib/email/`, each starting with `import "server-only"`, which fails the build if imported into client code):
+
+| File | Role |
+| --- | --- |
+| `config.ts` | `getEmailConfig()`: the **only** reader of the email env variables. Returns `null` when not configured; never throws. |
+| `enquiry-notification.ts` | `buildEnquiryNotification({ id, enquiry, receivedAt })` → `{ subject, html, text }`. Pure template. |
+| `send-enquiry-notification.ts` | `sendEnquiryNotification(id, enquiry)` → `"sent" \| "not-configured" \| "failed"`. Never throws. |
+
+**Resend usage:** `new Resend(apiKey)` → `resend.emails.send(payload, { idempotencyKey })`, from `resend@6.28.1` (added with `bun add resend`). Checked against the installed package's types: `CreateEmailRequestOptions` extends `IdempotentRequest`, which sends the `Idempotency-Key` header. Errors return as `{ data, error }` with named codes. There's no API route, browser integration or extra email framework.
+
+### Environment variables (server-only)
+
+| Variable | Purpose |
+| --- | --- |
+| `RESEND_API_KEY` | API key. Never `NEXT_PUBLIC_`. |
+| `RESEND_FROM_EMAIL` | Sender; must be valid for the Resend account/domain |
+| `ENQUIRY_NOTIFICATION_EMAIL` | Recipient(s), comma-separated |
+
+- `.env.example` has names and explanations only. `.gitignore` already covers `.env*` except `.env.example`.
+- **Nothing in `src/data/site.ts` changed. No business email was invented.**
+
+### Email template
+
+- **Subject:** `New enquiry from <name>`. The name is reduced to one line (control characters and newlines collapsed).
+- **HTML:** table layout with inline styles; brand colours mirrored from the tokens (email clients can't read CSS variables); Georgia for the heading, Arial for the body; no images or external assets.
+  - Brand eyebrow "Canvas Creations and Events", then an `<h1>` "New enquiry"
+  - Reference id, plus "Received" (formatted in the `Australia/Adelaide` timezone)
+  - "Details" `<h2>` with a `<th scope="row">` table: Name, Email (mailto), then only if provided: Phone (tel), Event type, Event date (e.g. "Monday 2 November 2026"), Venue
+  - "Message" `<h2>` with a blockquote (`white-space: pre-wrap`)
+  - A note to reply to the enquirer directly
+- **Plain-text part** with the same content.
+- **Escaping:** every value goes through `escapeHtml` (`& < > " '`), including hrefs. No field outside the schema, and no price, availability or response promises.
+- **Addresses:** `from` and `to` come only from configuration. `replyTo` is the **server-validated** email (Zod `z.email()`, no CR/LF possible). The visitor can't influence the sender or recipient.
+
+### Failure semantics (exactly what the visitor sees)
+
+| Situation | Stored? | Email attempts | Result | Visitor sees |
+| --- | --- | --- | --- | --- |
+| Stored + Resend OK | ✅ | 1 | `sent`, `notified: true` | "Thank you. We've received your enquiry." |
+| Stored + Resend fails / rejects / times out | ✅ (not rolled back, `status = new`) | 1–2 | `sent`, `notified: false` | the same + "If it's urgent, please also call us on 0426 071 109." |
+| Stored + email not configured | ✅ | 0 | `sent`, `notified: false` | the same as the row above |
+| Database unavailable / insert error | ❌ | **0** | `error` | "Something went wrong and your enquiry wasn't sent. Please try again, or call us…" |
+| Invalid payload (server) | ❌ | 0 | `error` | generic "Some details weren't valid…" |
+| Honeypot | ❌ | 0 | `sent`, `notified: false` | (bot) quiet success |
+| No Supabase config | ❌ | 0 | `unavailable` | the Phase 6/7 honest phone message |
+
+- **Result model change:** `sent` gained `notified: boolean`; nothing else changed.
+- **The frontend never claims a notification was sent.** It only adds the call line when `notified` is false, and never mentions email, Resend, the database or notifications.
+- **A Resend timeout** (8 seconds) counts as a failure. The enquiry is already stored, so the visitor still gets the thank-you.
+
+### Idempotency
+
+- **Key:** `enquiry-notification/<enquiry id>`.
+- The payload, including the "Received" timestamp, is **built once** per notification, and every attempt sends the identical payload with the same key. Resend deduplicates identical keyed requests, so a retry can't create a second email. A different payload under the same key is rejected by Resend (`invalid_idempotent_request`).
+- **Retry policy:** one retry after 500ms, only for `application_error`, `internal_server_error`, `rate_limit_exceeded`, `concurrent_idempotent_requests`, a thrown exception or a timeout. No retry for validation or authentication errors.
+- **Duplicate form submissions remain allowed.** Each submission is a new row with a new id and a new key, so legitimate separate enquiries are never merged.
+- **No queue.** If both attempts fail, the enquiry stays `new` in the database (visible in the Supabase dashboard); there's no automatic later resend (deferred).
+
+### Security
+
+- The Resend key is read only in `src/lib/email/config.ts` (server-only). It never uses `NEXT_PUBLIC_`, and is never logged or rendered.
+- **Logs (verified):** `[enquiry] stored <id>`, `notification sent <id> { emailId, attempt }`, `notification failed <id> { attempt, code, message }`, `notification skipped <id> (email not configured)`, `insert failed { code, message }`, `rejected invalid payload { fields }`. **No** name, email, message, raw payload or key.
+- **No service-role key** anywhere; inserts still go through the public role under RLS.
+
+### Tests performed (actual results)
+
+**Local verification method.** No real Resend credentials exist, so nothing was ever emailed.
+
+- A **throwaway mock of the Resend REST API** in my scratchpad (not in the repo) recorded every request. The official SDK was pointed at it by setting its own `RESEND_BASE_URL` variable in the **test process only**. It simulated success, a persistent 500, fail-once and a 422, and applied Resend's documented idempotency rule.
+- The test build targeted the **local** Supabase stack through process-env overrides (hosted untouched). It used a dummy key and `example.com` addresses, and ran on port 3057 (my server, stopped afterwards).
+
+| # | Test | Result |
+| --- | --- | --- |
+| 1 | Valid submission with HTML/script in name and message | UI "Thank you." (focused), no call line, 1 POST. **Row stored raw, `status = new`.** Mock got **1** request: key `enquiry-notification/<the row id>`, from/to from config, `replyTo` = visitor email. HTML: no raw `<script>`, `<b>` or `onerror`; all escaped (`&lt;script&gt;`, `&amp;`). Text part complete; date formatted. Log: `stored`, `notification sent … attempt 1` |
+| 2 | Resend persistent 500 | UI thank-you **+ call line**; **row stored, `new`**; 2 attempts, **1 idempotency key, identical payloads**; 2 × `notification failed` |
+| 3 | Resend fails once, then OK | Plain thank-you; 2 attempts, same key and payload; `notification sent … attempt 2` |
+| 4 | Resend 422 (non-retryable) | Thank-you + call line; **1 attempt only**; row stored |
+| 5 | Honeypot (direct action call) | `{"status":"sent","notified":false}`, **0 rows, 0 Resend requests** |
+| 6 | Server validation (browser bypassed): bad email, missing name, bad phone, past date, 2,500-char message | All generic error; **0 rows, 0 Resend requests** |
+| 7 | Database outage (local REST stopped) | Generic error after about 5s; **no false success; 0 rows; 0 Resend requests**; 1 POST; log `insert failed { code, message }` |
+| 8 | Email not configured (same build, variables unset) | Thank-you + call line; **row stored, `new`**; 0 Resend requests; `notification skipped <id> (email not configured)` |
+| — | Server log scan across all tests | **0** names, emails, message text or key |
+| — | Client bundle scan (test build and final build) | **0** files with a key, `RESEND_*` variable names, `api.resend.com`, idempotency code, `sb_secret_` or `service_role`; server HTML clean |
+
+**Hosted project** (you approved the push):
+
+- `db push --dry-run` listed only `20260923172126`, then it was pushed; local and remote history match.
+- Hosted state: RLS on, 1 policy, no public table grants, anon INSERT columns = the 7 visitor fields + `id`.
+- Public-key SELECT, UPDATE, DELETE and `status=booked` → all **401**.
+- Real browser end-to-end through your dev server → hosted: thank-you + call line (your `.env.local` has no Resend variables), row `new`, then **deleted**.
+
+**Local and hosted test data:** all test rows deleted (local 0, hosted 0).
+
+### Verification (final)
+
+| Check | Result |
+| --- | --- |
+| `bun install --frozen-lockfile` | ✅ no changes |
+| `bun run typecheck` / `lint` | ✅ exit 0 |
+| `bun run build` | ✅ all routes static |
+| 7-width audit (production build) | ✅ no overflow, all 6 anchors, 1 h1, no skipped headings, no console errors, **no failed requests**. (375px showed 2 lazy images not yet loaded on the cold first load, the known effect from Phases 5–6; 0 at every other width) |
+| Interaction/a11y suite (dev → hosted) | ✅ all CTAs and anchors; FAQ keyboard (online answer); first-error focus, `aria-invalid`, `aria-describedby`, `role="alert"`, 16px; live submit → thank-you focused; preview; mobile bar and menu; reduced motion. The suite's hosted row was deleted |
+
+### Issues found / fixed
+
+1. **No id available after insert** (public roles can't read), so a notification couldn't be referenced or deduplicated. Fixed with a server-generated UUID + an additive `GRANT INSERT (id)` migration, applied locally and (with your approval) to hosted.
+2. **The hosted database would have rejected the new inserts** until that grant existed (your dev server points at hosted). Pushed and verified.
+3. **Test harness notes:** the known scripted-scroll LCP warning, and cold-cache lazy images at the first audited width. Neither is a site bug.
+
+### Remaining / deferred
+
+- **Production email isn't live.** No Resend credentials or verified sender were supplied, so **real delivery through Resend has not been tested.** To go live: verify a sending domain in Resend, set `RESEND_API_KEY`, `RESEND_FROM_EMAIL` and `ENQUIRY_NOTIFICATION_EMAIL` (in `.env.local` and on Vercel), then submit one real test enquiry and confirm delivery (and that a quick retry doesn't duplicate it).
+- **No automatic resend** if both attempts fail (the enquiry stays `new` in the database). A queue or admin "resend" is for later.
+- **The visitor waits for the email step:** usually well under a second; at most about 17s in the worst case (two 8-second timeouts plus the pause).
+- **Not built, per brief:** admin UI, auth, admin RLS, customer confirmation emails, quotes and bookings, CMS, inbox.
+- **Carried over:** the `rls_auto_enable()` advisor note, business email, client content, the Prettier decision, the GitHub remote. The local Supabase stack is still running (3 containers).

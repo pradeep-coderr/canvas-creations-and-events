@@ -34,7 +34,7 @@ const emptyForm: EnquiryInput = {
 // Simulated delivery for the /design-system preview only.
 async function previewSubmit(): Promise<EnquiryResult> {
   await new Promise((resolve) => setTimeout(resolve, 600));
-  return { status: "sent" };
+  return { status: "sent", notified: true };
 }
 
 interface FieldConfig {
@@ -72,6 +72,8 @@ export function EnquiryForm({
   preview?: boolean;
 }) {
   const [status, setStatus] = useState<Status>("idle");
+  // False when the enquiry was stored but the business wasn't notified.
+  const [notified, setNotified] = useState(true);
   const thanksRef = useRef<HTMLHeadingElement>(null);
   const {
     register,
@@ -99,8 +101,11 @@ export function EnquiryForm({
       const result = preview
         ? await previewSubmit()
         : await submitEnquiry(enquiry, honeypot);
+      if (result.status === "sent") {
+        setNotified(result.notified);
+        reset(emptyForm);
+      }
       setStatus(result.status);
-      if (result.status === "sent") reset(emptyForm);
     } catch {
       // The server action itself failed (e.g. network): nothing was confirmed.
       setStatus("error");
@@ -120,6 +125,18 @@ export function EnquiryForm({
         <p className="mt-4 text-muted-foreground">
           We&apos;ve received your enquiry.
         </p>
+        {!notified && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            If it&apos;s urgent, please also call us on{" "}
+            <a
+              href={site.contact.phone.href}
+              className="font-semibold whitespace-nowrap text-foreground underline decoration-highlight/70 underline-offset-4 hover:text-primary"
+            >
+              {site.contact.phone.display}
+            </a>
+            .
+          </p>
+        )}
         <Button variant="link" className="mt-8" onClick={() => setStatus("idle")}>
           Send another enquiry
         </Button>

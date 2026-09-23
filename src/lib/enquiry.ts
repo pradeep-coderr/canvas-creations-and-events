@@ -62,11 +62,14 @@ export type Enquiry = z.output<typeof enquirySchema>;
 
 /**
  * Outcome of `submitEnquiry` (src/lib/submit-enquiry.ts):
- *   sent        — the enquiry is stored in the database (not emailed yet)
+ *   sent        — the enquiry is stored in the database. `notified` is true
+ *                 only if Resend confirmed the internal notification email;
+ *                 false when email isn't configured or the send failed (the
+ *                 enquiry is still stored).
  *   unavailable — this deployment has no database configured
  *   error       — nothing was stored; safe, generic message for the visitor
  */
 export type EnquiryResult =
-  | { status: "sent" }
+  | { status: "sent"; notified: boolean }
   | { status: "unavailable" }
   | { status: "error"; message: string };

@@ -60,12 +60,28 @@ EnquiryForm (client) ── Zod validation ──▶ submitEnquiry() server acti
 
 - The success message appears **only after the database confirms the insert**. Errors show a generic message; details are logged server-side without visitor data.
 - Shared schema: `src/lib/enquiry.ts`. Database constraints mirror its limits.
-- **Email notifications are not implemented yet.** New enquiries are only visible in the Supabase dashboard (Table Editor → `enquiries`) until the admin portal or email step exists.
+- The server generates the enquiry id (`crypto.randomUUID()`), because public roles can't read rows back; it is the row's primary key and the email's idempotency key.
+
+## Email notifications (Resend)
+
+After an enquiry is **stored**, the same server action emails the business an internal "New enquiry" notification (HTML + plain text, reply-to = the enquirer). The database stays the source of truth: email problems never undo or reject a stored enquiry.
+
+| Variable | Server-only | Purpose |
+| --- | --- | --- |
+| `RESEND_API_KEY` | ✅ | Resend API key. **Never** prefix with `NEXT_PUBLIC_`. |
+| `RESEND_FROM_EMAIL` | ✅ | Sender, e.g. `Canvas Creations <enquiries@your-domain>`. **Must be valid for your Resend account** — a domain verified in Resend (or Resend's testing sender, which only delivers to your own account address). |
+| `ENQUIRY_NOTIFICATION_EMAIL` | ✅ | Where notifications go (comma-separate several). |
+
+- **All three missing → email is "not configured":** enquiries are still stored; the server logs `[enquiry] notification skipped <id> (email not configured)`; the visitor sees the normal thank-you plus "If it's urgent, please also call us on …". This is the default locally.
+- **Production (Vercel):** add the three variables to the project (Production environment), redeploy, then submit one real test enquiry and confirm it arrives. They are read at runtime, but set them before relying on notifications.
+- **Failure behaviour:** a failed or unconfigured send → the enquiry stays stored (`status = new`), the failure is logged with the enquiry id and Resend's error code only, and the visitor still gets the thank-you (plus the call-us line). One retry is made for transient Resend errors, using the idempotency key `enquiry-notification/<enquiry id>` so a retry can't send a second email.
+- Code: `src/lib/email/config.ts` (the only reader of these variables), `enquiry-notification.ts` (template; every value HTML-escaped), `send-enquiry-notification.ts` (Resend call). All are `server-only`.
+- Not implemented: confirmation emails to enquirers, email templates beyond this notification, inbox features.
 
 ### Security model (`enquiries`)
 
 - RLS enabled. One policy: public roles may **insert** rows with `status = 'new'`.
-- Table privileges revoked from `anon`/`authenticated`; they may insert **only** the seven visitor columns (not `id`, `status`, timestamps).
+- Table privileges revoked from `anon`/`authenticated`; they may insert **only** the seven visitor columns plus `id` (the server supplies a random UUID so it can reference the enquiry without read access) — never `status` or timestamps.
 - No public SELECT, UPDATE or DELETE. Admin access will be added later with explicit, role-checked policies.
 
 ## Scripts

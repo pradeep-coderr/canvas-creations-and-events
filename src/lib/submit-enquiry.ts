@@ -1,5 +1,6 @@
 "use server";
 
+import { sendEnquiryNotification } from "@/lib/email/send-enquiry-notification";
 import { enquirySchema, type Enquiry, type EnquiryResult } from "@/lib/enquiry";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -10,9 +11,10 @@ const FAILED: EnquiryResult = {
 };
 
 /** Explicit camelCase → snake_case mapping; blank optional fields become NULL. */
-function toRow(enquiry: Enquiry) {
+function toRow(id: string, enquiry: Enquiry) {
   const optional = (value: string) => (value === "" ? null : value);
   return {
+    id,
     name: enquiry.name,
     email: enquiry.email,
     phone: optional(enquiry.phone),
@@ -24,23 +26,25 @@ function toRow(enquiry: Enquiry) {
 }
 
 /**
- * Stores an enquiry. Runs on the server only (server action); the browser
- * never talks to the database directly.
+ * The single public entry point for enquiries (server action; the browser
+ * never talks to the database or to Resend directly).
  *
- * Trust boundary: everything arriving here is untrusted, so it is validated
- * again with the shared schema. The insert uses the public role, which RLS
- * limits to inserting new enquiries (no reads, updates or deletes).
- * "sent" is returned only after the database confirms the insert.
- * Email notification is not part of this step yet.
+ *   1. honeypot            → quiet "sent", nothing stored, nothing emailed
+ *   2. Supabase configured → otherwise "unavailable"
+ *   3. Zod re-validation   → the browser is never trusted
+ *   4. insert              → the database is the source of truth
+ *   5. notification email  → best effort; never undoes a stored enquiry
+ *
+ * The id is generated here (public roles can't read rows back, so the insert
+ * can't return it) and becomes the row's primary key and the notification's
+ * idempotency key.
  */
 export async function submitEnquiry(
   input: unknown,
   honeypot?: unknown,
 ): Promise<EnquiryResult> {
-  // Hidden field that people never see: bots that fill it get a quiet
-  // "sent" and nothing is stored.
   if (typeof honeypot === "string" && honeypot.trim() !== "") {
-    return { status: "sent" };
+    return { status: "sent", notified: false };
   }
 
   if (!isSupabaseConfigured()) return { status: "unavailable" };
@@ -56,19 +60,26 @@ export async function submitEnquiry(
     };
   }
 
+  const id = crypto.randomUUID();
   try {
     const supabase = await createClient();
-    const { error } = await supabase.from("enquiries").insert(toRow(parsed.data));
+    const { error } = await supabase.from("enquiries").insert(toRow(id, parsed.data));
     if (error) {
       // Log the database error for diagnosis, never the visitor's details.
       console.error("[enquiry] insert failed", { code: error.code, message: error.message });
       return FAILED;
     }
-    return { status: "sent" };
   } catch (error) {
     console.error("[enquiry] unexpected failure", {
       message: error instanceof Error ? error.message : String(error),
     });
     return FAILED;
   }
+
+  console.info(`[enquiry] stored ${id}`);
+
+  // Stored — from here on the visitor is told it was received, whatever
+  // happens to the email.
+  const outcome = await sendEnquiryNotification(id, parsed.data);
+  return { status: "sent", notified: outcome === "sent" };
 }
