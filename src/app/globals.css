@@ -66,6 +66,8 @@
   --input: color-mix(in srgb, var(--cc-muted) 80%, var(--cc-white));
   --ring: var(--cc-rose-ink);
   --radius: 0.625rem;
+  /* Sticky site header height; also offsets in-page anchor scrolling */
+  --header-height: 4.5rem;
 
   /* Brand-specific semantic tokens */
   --surface-ivory: var(--cc-ivory);
@@ -92,6 +94,13 @@
   --sidebar-accent-foreground: var(--cc-charcoal);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--cc-rose-ink);
+}
+
+/* Desktop header is taller (lg breakpoint) */
+@media (min-width: 64rem) {
+  :root {
+    --header-height: 6rem;
+  }
 }
 
 /* Dark editorial surface (charcoal), scoped — see header comment */
@@ -140,6 +149,26 @@
 
   /* Slow, elegant deceleration — mirrored in src/lib/motion.ts */
   --ease-elegant: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /*
+   * Load-time entrances for above-the-fold content. Pure CSS so content is
+   * visible without JavaScript and never waits for hydration. Always use
+   * with `motion-safe:` so reduced-motion users get static content.
+   */
+  --animate-rise: cc-rise 0.9s var(--ease-elegant) both;
+  --animate-fade: cc-fade 1.4s var(--ease-elegant) both;
+
+  @keyframes cc-rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+  }
+  @keyframes cc-fade {
+    from {
+      opacity: 0;
+    }
+  }
 }
 
 @theme inline {
@@ -213,6 +242,7 @@
   }
   html {
     @apply font-sans;
+    scroll-padding-top: var(--header-height);
   }
   body {
     @apply bg-background leading-relaxed text-foreground;

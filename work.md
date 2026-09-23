@@ -568,3 +568,125 @@ The SVG **wraps the PNG artwork, so it isn't a true vector.** The logo is photor
 | Embedded PNG in the SVG | ✅ valid signature and IEND chunk, 1,452,978 bytes |
 | `bun run build` | ✅ `/icon.png` and `/apple-icon.png` prerendered |
 | Your dev server | Left running (PID 4800 on port 3000); used for checks, not stopped |
+
+---
+---
+
+## Phase 3 — Site Shell, Navbar & Hero
+
+**Date:** Wednesday, 23 September 2026
+**Timezone:** Nepal Time, NPT (UTC+05:45)
+**Work window:** 21:21:33 → ~21:36 (commit)
+**Goal:** First production UI: site shell, header/navbar (desktop + mobile), homepage hero. Nothing further down the homepage.
+**Result:** Commit `feat: build site shell and hero` (not pushed)
+
+### Timeline
+
+| Time (NPT) | Step | Evidence |
+| --- | --- | --- |
+| 21:21:33 | Inspection: git clean at `465b620`; **no photography** in `public/images` (only logo assets); your dev server on port 3000 | `date`, `find` |
+| ~21:23 | `shadcn add sheet`: the CLI asked to overwrite `button.tsx`; I declined, and the file's hash was unchanged afterwards | `sha1sum -c` |
+| 21:24:31 | Sheet restyled (brand surface, no blur, slow easing, reduced motion, `cn` import) | `sheet.tsx` |
+| 21:25:28 | Navigation + enquiry CTA in `site.ts`; hero copy + image slot in `home.ts` | data files |
+| 21:25:47 | Header-height token, anchor scroll offset, hero keyframes | `globals.css` |
+| 21:26 – 21:28 | Header shell, mobile menu, site header, hero; skip link + header in root layout | components |
+| ~21:29 | Type check ✅, lint ✅; first 7-width audit | script output |
+| ~21:29 | Fix: deprecated `priority` → `loading="eager"` / `fetchPriority` (Next 16 docs) | `hero.tsx`, `site-header.tsx` |
+| ~21:30 | Fix: monogram white disc blended into ivory with `mix-blend-multiply` | `hero.tsx` |
+| 21:30:00 – 21:30:58 | Menu/keyboard/scroll/reduced-motion checks; screenshots | `p3-menu-390.png` … |
+| ~21:31 – 21:33 | Final type check/lint/build; production audit on port 3057 (my server, stopped afterwards) | command output |
+| ~21:35 | This entry; commit | `work.md` |
+
+### What was created
+
+| File | Type | Purpose |
+| --- | --- | --- |
+| `src/components/layout/site-header.tsx` | Server | Logo, desktop nav (`<nav aria-label="Main">`), Enquire CTA, mobile menu slot |
+| `src/components/layout/header-shell.tsx` | Client (tiny) | Sticky `<header>`; adds hairline + soft shadow after 8px of scroll (`useSyncExternalStore`, no resizing) |
+| `src/components/layout/mobile-menu.tsx` | Client | Radix Dialog (via shadcn Sheet) menu: labelled "Menu"/"Close" triggers, Cormorant links with gold hairlines, bottom-anchored CTA, phone, socials |
+| `src/components/sections/hero.tsx` | Server | Editorial split hero, image slot, CSS entrance animation |
+| `src/components/ui/sheet.tsx` | shadcn, restyled | Added via CLI (Button **not** overwritten) |
+| `src/data/home.ts` | Data | Hero eyebrow, description, secondary CTA, `image` slot (currently `null`) |
+
+### Files changed
+
+| File | Change |
+| --- | --- |
+| `src/data/site.ts` | `NavLink` type, `region`, `navigation` (6 items), `enquiry` CTA |
+| `src/app/globals.css` | `--header-height` (72px mobile / 96px from lg) + `scroll-padding-top`; `animate-rise` / `animate-fade` keyframes |
+| `src/app/layout.tsx` | Skip link, `<SiteHeader />` inside `MotionProvider` |
+| `src/app/page.tsx` | Placeholder replaced by `<main id="main"><Hero /></main>` |
+| `src/app/design-system/page.tsx` | `id="main"` for the skip link |
+
+No new packages. Sheet uses Radix Dialog from the existing `radix-ui` dependency.
+
+### Design decisions
+
+1. **Header: sticky, solid white, no transparent-over-hero.** A transparent header only helps over full-bleed photography, and there isn't any yet. At the top it sits flush with the hero; after scrolling it gains a hairline and a soft shadow. There's no resizing, no blur and no glassmorphism.
+2. **Logo:** the real full logo (`canvas-creations-logo-512.png`) at 72px on desktop and 52px on mobile, served through `next/image` (96w and 64w files). I used it rather than the monogram because the header should carry the complete brand mark.
+3. **Nav:** six links from `site.navigation`, Manrope 14px with slight tracking at 80% charcoal. On hover the text darkens and a gold hairline draws in from the left. No pills, no heavy borders.
+4. **Anchors, not routes:** the nav and CTAs point to `/#services`, `/#gallery`, `/#about`, `/#faq`, `/#contact`, `/#enquire`. These are sections still to come. The links stay on the homepage now and start working as the sections land. No broken routes were created.
+5. **Hero headline is the client's own slogan** ("Turning moments into *masterpieces*"), with "masterpieces" in Cormorant italic Rose Ink. It's their line, and it says exactly what the brief asked. Supporting copy makes no claims: no services, numbers, awards or years. "South Australia" (from the business brief) is added as screen-reader text after the eyebrow.
+6. **CTA hierarchy:** filled "Enquire Now", then the text link "Explore our work →", then "Prefer to talk? Call 0426 071 109" (real phone number from `site.ts`).
+7. **Layout:** a 7/5 asymmetric split on desktop. The image sits in an offset gold hairline frame, done with padding and no negative margins. On mobile everything stacks, the image comes after the CTAs, and the crop is shorter (4:3 on phones, 3:2 on tablets, 4:5 on desktop).
+8. **No photography, so no fake photography:** the image slot renders `ImageFrame` when `hero.image` is set (eager loading, high fetch priority, `sizes`, `position` for cropping). Until then it shows the real CC monogram on ivory. It's brand art, clearly not a photo, and not a watermark. `mix-blend-multiply` removes the monogram's white disc against the ivory.
+9. **Motion:** hero entrance uses **CSS** keyframes (`motion-safe:animate-rise`, staggered 0–320ms, plus a slow fade on the image), not Motion. Content is in the server HTML, doesn't wait for hydration, works without JavaScript, and is fully static with reduced motion. Menu items rise in a gentle stagger, and the panel slides and fades over 500ms with `ease-elegant`.
+
+### Responsive behaviour (measured)
+
+| Width | Header | H1 size / lines | Primary CTA top (fold) | Overflow |
+| --- | --- | --- | --- | --- |
+| 375 | 73px, menu | 44px / 2 | y=386 (fold 812) | none |
+| 390 | 73px, menu | 44px / 2 | y=386 (fold 844) | none |
+| 430 | 73px, menu | 44px / 2 | y=387 (fold 932) | none |
+| 768 | 73px, menu | 57.9px / 2 | y=453 (fold 1024) | none |
+| 1024 | 97px, full nav | 68.6px / 2 | y=495 (fold 768) | none |
+| 1280 | 97px, full nav | 79.4px / 2 | y=556 (fold 800) | none |
+| 1440 | 97px, full nav | 84px / 2 | y=561 (fold 900) | none |
+
+The primary CTA is above the fold at every size. The desktop nav appears from 1024px (`lg`), and the mobile menu is used below that.
+
+### Accessibility (tested, not assumed)
+
+| Check | Result |
+| --- | --- |
+| Landmarks | `<header>`, `<nav aria-label="Main">`, `<main id="main">`, hero `<section aria-labelledby="hero-title">` |
+| Headings | Exactly one `<h1>` (the slogan); no skipped levels |
+| Skip link | First Tab stop, becomes visible, targets `#main` |
+| Desktop Tab order | Skip link → logo → Home → Services → Gallery → About → FAQ → Contact → Enquire Now → Enquire Now (hero) → Explore our work → Call |
+| Focus visibility | 2px Rose Ink outline (`rgb(155, 96, 90)`) on nav links |
+| Mobile menu | Enter opens; `aria-expanded` changes to `true`; `aria-controls` matches the dialog id; dialog labelled "Menu"; focus moves inside (Close) and stays trapped over 16 Tabs; **Escape closes and returns focus to the trigger**; tapping a link closes the menu and navigates (`/#services`) |
+| Text labels | Menu/Close buttons show visible text, not icons alone; social links are text and announce "(opens in a new tab)" |
+| Logo | Link's accessible name comes from `alt="Canvas Creations and Events"`; decorative images use `alt=""` |
+| Contrast | All text uses Phase 2 tokens (Rose Ink 4.98:1, muted 5.23:1); gold only on hairlines |
+| Reduced motion | With `reduce`: h1 `animation-name: none`, opacity 1 immediately. Without it: `cc-rise` runs |
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| `bun run typecheck` | ✅ exit 0 |
+| `bun run lint` | ✅ exit 0 |
+| `bun run build` | ✅ all routes static |
+| Dev audit, 7 widths (your server on port 3000) | ✅ no overflow, no broken images, no console errors, warnings or hydration errors (after the LCP fix) |
+| Production audit, 7 widths (`next start` on port 3057) | ✅ no overflow, no console errors; images confirmed on a fresh load (see issues) |
+| Server-rendered HTML | ✅ h1, nav and skip link present; no inline `opacity:0` on content |
+
+### Issues found / fixed
+
+1. **shadcn tried to overwrite `button.tsx`** when adding Sheet. Declined; hash verified unchanged.
+2. **Deprecated `priority` prop:** Next 16 deprecates it. Replaced with `loading="eager"` (logo, placeholder) and `loading="eager"` + `fetchPriority="high"` (future hero photo). This also cleared the LCP warning at 768px.
+3. **Monogram "sticker" effect:** its white disc showed on ivory. Fixed with `mix-blend-multiply`; the asset itself is unchanged.
+4. **Unlayered vs layered CSS:** my first desktop `--header-height` override sat in `@layer base` and would have lost to the unlayered `:root`. Moved to top level before testing.
+5. **Test-harness problems, not site bugs (recorded so nobody chases them):**
+   - Enter didn't open the menu until the script sent a real `keyDown` with a character; the page was fine.
+   - The production "broken image" at desktop widths came from switching one tab from phone to desktop emulation. On fresh loads the logo (w=96) and monogram (w=384) load completely with no network failures.
+6. Removed `-mr-3` optical-alignment margins from the menu buttons to keep to the no-negative-margins rule.
+
+### Remaining / deferred
+
+- **Hero photography:** the biggest open item. Add a real event photo and set `hero.image` in `src/data/home.ts`; the layout, `sizes`, eager loading and cropping are already wired. The monogram panel is a stand-in only.
+- **Anchor targets:** `#services`, `#gallery`, `#about`, `#faq`, `#contact` and `#enquire` don't exist until those sections are built.
+- **No active-section highlighting in the nav** (needs scroll-spy once sections exist).
+- **Not built, per brief:** services, gallery, about/founder, process, testimonials, FAQ, enquiry form, contact, footer, Supabase, email.
+- **Still open:** business email, Supabase project, the Prettier decision, GitHub remote.

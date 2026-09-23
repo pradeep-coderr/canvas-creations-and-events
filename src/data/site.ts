@@ -11,13 +11,32 @@ export interface SocialLink {
   href: string;
 }
 
+export interface NavLink {
+  label: string;
+  href: string;
+}
+
 export const site = {
   name: "Canvas Creations and Events",
   shortName: "Canvas Creations",
   slogan: "Turning moments into masterpieces",
   description:
     "Premium event decoration and styling in South Australia.",
+  region: "South Australia",
   locale: "en-AU",
+
+  // Homepage section anchors. The sections arrive in later phases; until
+  // then these links stay on the homepage (no 404s).
+  navigation: [
+    { label: "Home", href: "/" },
+    { label: "Services", href: "/#services" },
+    { label: "Gallery", href: "/#gallery" },
+    { label: "About", href: "/#about" },
+    { label: "FAQ", href: "/#faq" },
+    { label: "Contact", href: "/#contact" },
+  ] satisfies NavLink[],
+
+  enquiry: { label: "Enquire Now", href: "/#enquire" } satisfies NavLink,
 
   contact: {
     phone: {
