@@ -293,3 +293,9 @@
     }
   }
 }
+
+/* CMS forms have a sticky save bar: keep focused fields scrolled clear of it
+   (WCAG 2.4.11 Focus Not Obscured). */
+html:has([data-cms-form]) {
+  scroll-padding-bottom: 9rem;
+}

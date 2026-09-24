@@ -9,9 +9,15 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { sortedFaqs, type FaqItem } from "@/data/faq";
-import { faqSection } from "@/data/home";
+import { faqSection, type FaqCopy } from "@/data/home";
 
-export function Faq({ faqs = sortedFaqs }: { faqs?: FaqItem[] }) {
+export function Faq({
+  faqs = sortedFaqs,
+  copy = faqSection,
+}: {
+  faqs?: FaqItem[];
+  copy?: FaqCopy;
+}) {
   // Nothing to answer yet: no empty heading.
   if (faqs.length === 0) return null;
 
@@ -20,8 +26,8 @@ export function Faq({ faqs = sortedFaqs }: { faqs?: FaqItem[] }) {
       <Container size="narrow">
         <SectionHeading
           id="faq-title"
-          eyebrow={faqSection.eyebrow}
-          title={faqSection.title}
+          eyebrow={copy.eyebrow}
+          title={copy.title}
         />
         <Reveal className="mt-12 sm:mt-14">
           {/* Radix Accordion: buttons with aria-expanded/controls, arrow-key

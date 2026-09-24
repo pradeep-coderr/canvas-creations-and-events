@@ -3,7 +3,37 @@ import { cache } from "react";
 import { sortedCategories, type Category } from "@/data/categories";
 import { sortedFaqs, type FaqItem } from "@/data/faq";
 import { galleryPreview, type GalleryItem } from "@/data/gallery";
-import { processSection, whyCanvas, type Principle, type ProcessStep } from "@/data/home";
+import {
+  about,
+  categoriesSection,
+  contactSection,
+  enquirySection,
+  faqSection,
+  gallerySection,
+  hero,
+  intro,
+  processSection,
+  servicesSection,
+  testimonialsSection,
+  videoStory,
+  whyCanvas,
+  type AboutCopy,
+  type CategoriesCopy,
+  type ContactCopy,
+  type EnquiryCopy,
+  type FaqCopy,
+  type GalleryCopy,
+  type HeroCopy,
+  type IntroCopy,
+  type Principle,
+  type ProcessCopy,
+  type ProcessStep,
+  type ServicesCopy,
+  type TestimonialsCopy,
+  type VideoContent,
+  type VideoStoryCopy,
+  type WhyCanvasCopy,
+} from "@/data/home";
 import { featuredServices, type Service } from "@/data/services";
 import { featuredTestimonials, type Testimonial } from "@/data/testimonials";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -236,9 +266,214 @@ export function getPrinciples(): Promise<Principle[]> {
   return getSteps("principles", whyCanvas.principles);
 }
 
-/** Every CMS collection the homepage shows, fetched in parallel. */
-export const getHomepageCollections = cache(async () => {
-  const [services, categories, gallery, testimonials, faqs, processSteps, principles] =
+// ---------------------------------------------------------------------------
+// Section copy (one-row tables). Links, behaviour and system messages stay
+// in code: the hero and About link targets, and the enquiry form's
+// "not set up yet" notice.
+// ---------------------------------------------------------------------------
+
+export interface HomeCopy {
+  hero: HeroCopy;
+  intro: IntroCopy;
+  services: ServicesCopy;
+  categories: CategoriesCopy;
+  gallery: GalleryCopy;
+  process: ProcessCopy;
+  whyCanvas: WhyCanvasCopy;
+  testimonials: TestimonialsCopy;
+  faq: FaqCopy;
+  enquiry: EnquiryCopy;
+  contact: ContactCopy;
+}
+
+const localHomeCopy: HomeCopy = {
+  hero,
+  intro,
+  services: servicesSection,
+  categories: categoriesSection,
+  gallery: gallerySection,
+  process: processSection,
+  whyCanvas,
+  testimonials: testimonialsSection,
+  faq: faqSection,
+  enquiry: enquirySection,
+  contact: contactSection,
+};
+
+interface HomeRow {
+  hero_eyebrow: string;
+  hero_description: string;
+  hero_secondary_cta_label: string;
+  hero_image: MediaRow | null;
+  intro_eyebrow: string;
+  intro_title: string;
+  intro_body: string;
+  services_eyebrow: string;
+  services_title: string;
+  services_description: string;
+  services_enquiry_title: string;
+  services_enquiry_text: string;
+  categories_eyebrow: string;
+  categories_title: string;
+  gallery_eyebrow: string;
+  gallery_title: string;
+  gallery_empty_title: string;
+  gallery_empty_text: string;
+  gallery_instagram_cta: string;
+  process_eyebrow: string;
+  process_title: string;
+  why_eyebrow: string;
+  why_title_lines: string[];
+  testimonials_eyebrow: string;
+  testimonials_title: string;
+  faq_eyebrow: string;
+  faq_title: string;
+  enquiry_eyebrow: string;
+  enquiry_title: string;
+  enquiry_description: string;
+  contact_eyebrow: string;
+  contact_title: string;
+  contact_description: string;
+}
+
+const editorialImage = (media: MediaRow | null) =>
+  media ? { src: cmsMediaUrl(media.storage_path), alt: media.alt ?? "" } : null;
+
+export function getHomeCopy(): Promise<HomeCopy> {
+  return fromCms(
+    "home content",
+    async (db) => {
+      const { data, error } = await db
+        .from("home_content")
+        .select("*, hero_image:media_assets!home_content_hero_image_fkey(storage_path, alt)")
+        .eq("id", true)
+        .single();
+      if (error) throw error;
+      const r = data as unknown as HomeRow;
+      return {
+        hero: {
+          eyebrow: r.hero_eyebrow,
+          description: r.hero_description,
+          secondaryCta: { label: r.hero_secondary_cta_label, href: hero.secondaryCta.href },
+          image: editorialImage(r.hero_image),
+        },
+        intro: { eyebrow: r.intro_eyebrow, title: r.intro_title, body: r.intro_body },
+        services: {
+          eyebrow: r.services_eyebrow,
+          title: r.services_title,
+          description: r.services_description,
+          enquiry: { title: r.services_enquiry_title, text: r.services_enquiry_text },
+        },
+        categories: { eyebrow: r.categories_eyebrow, title: r.categories_title },
+        gallery: {
+          eyebrow: r.gallery_eyebrow,
+          title: r.gallery_title,
+          emptyTitle: r.gallery_empty_title,
+          emptyText: r.gallery_empty_text,
+          instagramCta: r.gallery_instagram_cta,
+        },
+        process: { eyebrow: r.process_eyebrow, title: r.process_title },
+        whyCanvas: { eyebrow: r.why_eyebrow, titleLines: r.why_title_lines },
+        testimonials: { eyebrow: r.testimonials_eyebrow, title: r.testimonials_title },
+        faq: { eyebrow: r.faq_eyebrow, title: r.faq_title },
+        enquiry: {
+          eyebrow: r.enquiry_eyebrow,
+          title: r.enquiry_title,
+          description: r.enquiry_description,
+          offlineNotice: enquirySection.offlineNotice,
+        },
+        contact: { eyebrow: r.contact_eyebrow, title: r.contact_title, description: r.contact_description },
+      };
+    },
+    localHomeCopy,
+  );
+}
+
+export function getAboutCopy(): Promise<AboutCopy> {
+  return fromCms(
+    "about content",
+    async (db) => {
+      const { data, error } = await db
+        .from("about_content")
+        .select(
+          "eyebrow, title, body, founder_name, founder_role, cta_label, image:media_assets!about_content_image_fkey(storage_path, alt)",
+        )
+        .eq("id", true)
+        .single();
+      if (error) throw error;
+      const r = data as unknown as {
+        eyebrow: string;
+        title: string;
+        body: string[];
+        founder_name: string | null;
+        founder_role: string | null;
+        cta_label: string;
+        image: MediaRow | null;
+      };
+      return {
+        eyebrow: r.eyebrow,
+        title: r.title,
+        body: r.body,
+        image: editorialImage(r.image),
+        cta: { label: r.cta_label, href: about.cta.href },
+        founder: r.founder_name ? { name: r.founder_name, role: r.founder_role ?? undefined } : null,
+      };
+    },
+    about,
+  );
+}
+
+export interface VideoSection {
+  copy: VideoStoryCopy;
+  video: VideoContent | null;
+}
+
+export function getVideoSection(): Promise<VideoSection> {
+  return fromCms<VideoSection>(
+    "video section",
+    async (db) => {
+      const { data, error } = await db
+        .from("video_story")
+        .select(
+          "eyebrow, title, empty_text, tiktok_cta, provider, video_title, caption, file:media_assets!video_story_video_fkey(storage_path), poster:media_assets!video_story_poster_fkey(storage_path)",
+        )
+        .eq("id", true)
+        .single();
+      if (error) throw error;
+      const r = data as unknown as {
+        eyebrow: string;
+        title: string;
+        empty_text: string;
+        tiktok_cta: string;
+        provider: "upload" | "youtube" | "vimeo" | null;
+        video_title: string | null;
+        caption: string | null;
+        file: { storage_path: string } | null;
+        poster: { storage_path: string } | null;
+      };
+      // Only uploaded files can be played for now. YouTube/Vimeo links are
+      // stored but not rendered yet, so the section keeps its empty state.
+      const video =
+        r.provider === "upload" && r.file && r.poster && r.video_title
+          ? {
+              src: cmsMediaUrl(r.file.storage_path),
+              poster: cmsMediaUrl(r.poster.storage_path),
+              title: r.video_title,
+              caption: r.caption ?? undefined,
+            }
+          : null;
+      return {
+        copy: { eyebrow: r.eyebrow, title: r.title, emptyText: r.empty_text, tiktokCta: r.tiktok_cta },
+        video,
+      };
+    },
+    { copy: videoStory, video: videoStory.video },
+  );
+}
+
+/** Everything the homepage shows from the CMS, fetched in parallel. */
+export const getHomepageContent = cache(async () => {
+  const [services, categories, gallery, testimonials, faqs, processSteps, principles, copy, aboutCopy, video] =
     await Promise.all([
       getFeaturedServices(),
       getCategories(),
@@ -247,6 +482,9 @@ export const getHomepageCollections = cache(async () => {
       getFaqs(),
       getProcessSteps(),
       getPrinciples(),
+      getHomeCopy(),
+      getAboutCopy(),
+      getVideoSection(),
     ]);
-  return { services, categories, gallery, testimonials, faqs, processSteps, principles };
+  return { services, categories, gallery, testimonials, faqs, processSteps, principles, copy, about: aboutCopy, video };
 });

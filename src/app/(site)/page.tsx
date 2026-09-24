@@ -12,20 +12,21 @@ import { Services } from "@/components/sections/services";
 import { Testimonials } from "@/components/sections/testimonials";
 import { VideoStory } from "@/components/sections/video-story";
 import { WhyCanvas } from "@/components/sections/why-canvas";
-import { getHomepageCollections } from "@/lib/content/public";
+import { getHomepageContent } from "@/lib/content/public";
 import { localBusinessJsonLd, serializeJsonLd } from "@/lib/structured-data";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
-// Statically rendered with CMS content fetched at build time, then
-// regenerated at most hourly. Admin content saves should also call
-// revalidatePath("/") so edits appear straight away.
+// Statically rendered with CMS content, regenerated at most hourly. Admin
+// content saves expire the `cms-content` cache tag (updateTag), so edits
+// appear on the next request without waiting for this window.
 export const revalidate = 3600;
 
 export default async function Home() {
-  const content = await getHomepageCollections();
+  const content = await getHomepageContent();
+  const { copy } = content;
 
   return (
     <main id="main">
@@ -34,20 +35,20 @@ export default async function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(localBusinessJsonLd()) }}
       />
-      <Hero />
-      <Intro />
-      <Services services={content.services} />
-      <CategoryStrip categories={content.categories} />
-      <GalleryPreview items={content.gallery} />
-      <AboutFounder />
-      <Process steps={content.processSteps} />
+      <Hero copy={copy.hero} />
+      <Intro copy={copy.intro} />
+      <Services services={content.services} copy={copy.services} />
+      <CategoryStrip categories={content.categories} copy={copy.categories} />
+      <GalleryPreview items={content.gallery} copy={copy.gallery} />
+      <AboutFounder copy={content.about} />
+      <Process steps={content.processSteps} copy={copy.process} />
       {/* Trust right after "how we work"; renders nothing until real testimonials exist. */}
-      <Testimonials testimonials={content.testimonials} />
-      <WhyCanvas principles={content.principles} />
-      <VideoStory />
-      <Faq faqs={content.faqs} />
-      <Enquiry />
-      <Contact />
+      <Testimonials testimonials={content.testimonials} copy={copy.testimonials} />
+      <WhyCanvas principles={content.principles} copy={copy.whyCanvas} />
+      <VideoStory video={content.video.video} copy={content.video.copy} />
+      <Faq faqs={content.faqs} copy={copy.faq} />
+      <Enquiry copy={copy.enquiry} />
+      <Contact copy={copy.contact} />
     </main>
   );
 }

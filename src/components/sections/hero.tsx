@@ -4,13 +4,13 @@ import { Container } from "@/components/layout/container";
 import { ImageFrame } from "@/components/shared/image-frame";
 import { Button } from "@/components/ui/button";
 import { SiteLink } from "@/components/shared/site-link";
-import { hero } from "@/data/home";
+import { hero, type HeroCopy } from "@/data/home";
 import { site } from "@/data/site";
 
 // Mobile/tablet use a shorter crop so the image doesn't dominate the scroll.
 const frameRatio = "aspect-[4/3] sm:aspect-[3/2] lg:aspect-[4/5]";
 
-export function Hero() {
+export function Hero({ copy = hero }: { copy?: HeroCopy }) {
   // Emphasise the slogan's final word ("masterpieces") in italic rose.
   const splitAt = site.slogan.lastIndexOf(" ");
   const sloganLead = site.slogan.slice(0, splitAt);
@@ -22,7 +22,7 @@ export function Hero() {
         <div className="lg:col-span-7">
           <p className="flex items-center gap-4 text-eyebrow font-semibold text-emphasis uppercase motion-safe:animate-rise">
             <span aria-hidden="true" className="h-px w-10 bg-highlight" />
-            {hero.eyebrow}
+            {copy.eyebrow}
             <span className="sr-only"> in {site.region}</span>
           </p>
 
@@ -39,7 +39,7 @@ export function Hero() {
             className="mt-6 max-w-lg text-lead text-muted-foreground motion-safe:animate-rise sm:mt-8"
             style={{ animationDelay: "160ms" }}
           >
-            {hero.description}
+            {copy.description}
           </p>
 
           <div
@@ -50,8 +50,8 @@ export function Hero() {
               <SiteLink href={site.enquiry.href}>{site.enquiry.label}</SiteLink>
             </Button>
             <Button asChild variant="link" className="self-center sm:self-auto">
-              <SiteLink href={hero.secondaryCta.href}>
-                {hero.secondaryCta.label}
+              <SiteLink href={copy.secondaryCta.href}>
+                {copy.secondaryCta.label}
                 <ArrowRight data-icon="inline-end" />
               </SiteLink>
             </Button>
@@ -80,16 +80,16 @@ export function Hero() {
             aria-hidden="true"
             className="absolute inset-0 top-3 left-3 border border-highlight/60 sm:top-5 sm:left-5"
           />
-          {hero.image ? (
+          {copy.image ? (
             <ImageFrame
-              src={hero.image.src}
-              alt={hero.image.alt}
+              src={copy.image.src}
+              alt={copy.image.alt}
               ratio="portrait"
               loading="eager"
               fetchPriority="high"
               sizes="(min-width: 1280px) 460px, (min-width: 1024px) 38vw, 100vw"
               className={frameRatio}
-              imageClassName={hero.image.position}
+              imageClassName={copy.image.position}
             />
           ) : (
             // Placeholder until client photography exists: the real monogram

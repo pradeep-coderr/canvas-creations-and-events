@@ -2,7 +2,7 @@ import { Container } from "@/components/layout/container";
 import { Section } from "@/components/layout/section";
 import { Reveal } from "@/components/motion/reveal";
 import { SectionHeading } from "@/components/shared/section-heading";
-import { contactSection } from "@/data/home";
+import { contactSection, type ContactCopy } from "@/data/home";
 import { site } from "@/data/site";
 
 const { phone, address } = site.contact;
@@ -11,15 +11,15 @@ const linkClass =
   "underline decoration-highlight/70 decoration-1 underline-offset-[6px] transition-colors hover:text-primary hover:decoration-primary";
 
 /** Direct contact details. Only verified information from site.ts. */
-export function Contact() {
+export function Contact({ copy = contactSection }: { copy?: ContactCopy }) {
   return (
     <Section id="contact" aria-labelledby="contact-title">
       <Container className="grid gap-12 lg:grid-cols-12 lg:gap-16">
         <SectionHeading
           id="contact-title"
-          eyebrow={contactSection.eyebrow}
-          title={contactSection.title}
-          description={contactSection.description}
+          eyebrow={copy.eyebrow}
+          title={copy.title}
+          description={copy.description}
           align="start"
           className="lg:col-span-6"
         />

@@ -7,7 +7,7 @@ import { ImageFrame } from "@/components/shared/image-frame";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { Button } from "@/components/ui/button";
 import { galleryPreview, type GalleryItem } from "@/data/gallery";
-import { gallerySection } from "@/data/home";
+import { gallerySection, type GalleryCopy } from "@/data/home";
 import { site } from "@/data/site";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +36,13 @@ function ExternalLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function GalleryPreview({ items = galleryPreview }: { items?: GalleryItem[] }) {
+export function GalleryPreview({
+  items = galleryPreview,
+  copy = gallerySection,
+}: {
+  items?: GalleryItem[];
+  copy?: GalleryCopy;
+}) {
   const hasImages = items.length > 0;
 
   return (
@@ -46,14 +52,14 @@ export function GalleryPreview({ items = galleryPreview }: { items?: GalleryItem
           <div className="flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
             <SectionHeading
               id="gallery-title"
-              eyebrow={gallerySection.eyebrow}
-              title={gallerySection.title}
+              eyebrow={copy.eyebrow}
+              title={copy.title}
               align="start"
             />
             {instagram && (
               <Button asChild variant="link" className="self-start sm:self-auto">
                 <a href={instagram.href} target="_blank" rel="noopener noreferrer">
-                  <ExternalLabel>{gallerySection.instagramCta}</ExternalLabel>
+                  <ExternalLabel>{copy.instagramCta}</ExternalLabel>
                   <ArrowUpRight data-icon="inline-end" />
                 </a>
               </Button>
@@ -100,16 +106,16 @@ export function GalleryPreview({ items = galleryPreview }: { items?: GalleryItem
         <Container size="narrow" className="text-center">
           <SectionHeading
             id="gallery-title"
-            eyebrow={gallerySection.eyebrow}
-            title={gallerySection.emptyTitle}
-            description={gallerySection.emptyText}
+            eyebrow={copy.eyebrow}
+            title={copy.emptyTitle}
+            description={copy.emptyText}
           />
           <DecorativeDivider className="mt-12" />
           <div className="mt-12 flex flex-col items-center gap-6 sm:flex-row sm:justify-center sm:gap-10">
             {instagram && (
               <Button asChild variant="secondary" size="lg">
                 <a href={instagram.href} target="_blank" rel="noopener noreferrer">
-                  <ExternalLabel>{gallerySection.instagramCta}</ExternalLabel>
+                  <ExternalLabel>{copy.instagramCta}</ExternalLabel>
                   <ArrowUpRight data-icon="inline-end" />
                 </a>
               </Button>

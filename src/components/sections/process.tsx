@@ -2,10 +2,16 @@ import { Container } from "@/components/layout/container";
 import { Section } from "@/components/layout/section";
 import { Reveal } from "@/components/motion/reveal";
 import { SectionHeading } from "@/components/shared/section-heading";
-import { processSection, type ProcessStep } from "@/data/home";
+import { processSection, type ProcessCopy, type ProcessStep } from "@/data/home";
 
 /** How working with the studio unfolds: a numbered editorial sequence. */
-export function Process({ steps = processSection.steps }: { steps?: ProcessStep[] }) {
+export function Process({
+  steps = processSection.steps,
+  copy = processSection,
+}: {
+  steps?: ProcessStep[];
+  copy?: ProcessCopy;
+}) {
   if (steps.length === 0) return null;
 
   return (
@@ -13,8 +19,8 @@ export function Process({ steps = processSection.steps }: { steps?: ProcessStep[
       <Container>
         <SectionHeading
           id="process-title"
-          eyebrow={processSection.eyebrow}
-          title={processSection.title}
+          eyebrow={copy.eyebrow}
+          title={copy.title}
           align="start"
         />
 

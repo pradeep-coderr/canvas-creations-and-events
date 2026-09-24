@@ -7,10 +7,10 @@ import { ImageFrame } from "@/components/shared/image-frame";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { SiteLink } from "@/components/shared/site-link";
 import { Button } from "@/components/ui/button";
-import { about } from "@/data/home";
+import { about, type AboutCopy } from "@/data/home";
 
 /** The human side of the brand: portrait slot beside the studio's story. */
-export function AboutFounder() {
+export function AboutFounder({ copy = about }: { copy?: AboutCopy }) {
   return (
     <Section id="about" aria-labelledby="about-title">
       <Container className="grid items-center gap-12 lg:grid-cols-12 lg:gap-16 xl:gap-24">
@@ -18,31 +18,38 @@ export function AboutFounder() {
         <Reveal className="lg:col-span-6 lg:col-start-7">
           <SectionHeading
             id="about-title"
-            eyebrow={about.eyebrow}
-            title={about.title}
+            eyebrow={copy.eyebrow}
+            title={copy.title}
             align="start"
           />
           <div className="mt-8 max-w-xl space-y-5 text-lead text-muted-foreground">
-            {about.body.map((paragraph) => (
+            {copy.body.map((paragraph) => (
               <p key={paragraph}>{paragraph}</p>
             ))}
           </div>
+          {/* Only once the client has added a real name (never invented). */}
+          {copy.founder && (
+            <p className="mt-6 text-sm">
+              <span className="font-semibold">{copy.founder.name}</span>
+              {copy.founder.role && <span className="text-muted-foreground">, {copy.founder.role}</span>}
+            </p>
+          )}
           <Button asChild variant="link" className="mt-10">
-            <SiteLink href={about.cta.href}>
-              {about.cta.label}
+            <SiteLink href={copy.cta.href}>
+              {copy.cta.label}
               <ArrowRight data-icon="inline-end" />
             </SiteLink>
           </Button>
         </Reveal>
 
         <Reveal className="lg:order-first lg:col-span-5">
-          {about.image ? (
+          {copy.image ? (
             <ImageFrame
-              src={about.image.src}
-              alt={about.image.alt}
+              src={copy.image.src}
+              alt={copy.image.alt}
               ratio="portrait"
               sizes="(min-width: 1280px) 460px, (min-width: 1024px) 38vw, 100vw"
-              imageClassName={about.image.position}
+              imageClassName={copy.image.position}
               className="aspect-4/3 sm:aspect-3/2 lg:aspect-4/5"
             />
           ) : (

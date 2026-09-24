@@ -1991,3 +1991,158 @@ All local test rows, the three local test users and the temp files were deleted;
 - **Media:** create the `cms-media` bucket with Storage policies (public read, admin write), an upload flow writing `media_assets`, and dimensions. Local `next/image` from `127.0.0.1` is blocked by Next's local-IP guard, so test media against hosted or configure it deliberately.
 - **Video embeds:** extend `VideoStory` to render YouTube/Vimeo (privacy-enhanced) when chosen.
 - **Hosted admin-session RLS check** after the admin screens exist (as the real admin).
+
+---
+
+## Phase 14 — Admin CMS UI & Content Management
+
+**Date:** Thursday 24 September 2026 · **Timezone:** NPT (UTC+05:45) · **Finished:** ~18:45
+**Result:** Commit `feat: build admin cms` (the hash is in the final report; a commit can't contain its own hash). Not pushed. **No database changes this phase:** the Phase 13 schema and RLS were used as-is, so nothing was pushed to hosted.
+
+### Routes created (all under the existing `requireAdmin()` portal layout)
+
+| Route | What it does |
+| --- | --- |
+| `/admin/content` | Overview: published/draft/total per list, and the state of the homepage, About (founder added or not) and video (none / uploaded / YouTube or Vimeo saved but not shown) |
+| `/admin/content/[collection]` | List for `services`, `categories`, `gallery`, `testimonials`, `faqs`, `process`, `principles`: order, Published/Draft and Featured badges, move up/down, Publish/Unpublish, Edit, Delete (dialog). Unknown keys → 404 |
+| `/admin/content/[collection]/new` | Create form (starts as a draft, at the end of the list) |
+| `/admin/content/[collection]/[id]` | Edit form (non-UUID or missing id → 404) |
+| `/admin/content/home`, `/about`, `/video` | Editors for the one-row tables (static segments win over `[collection]`) |
+
+`/admin` is still the enquiries dashboard, so the PWA `start_url` and shortcuts are unchanged.
+
+### Admin navigation
+
+- The portal header now has a second row, "Enquiries | Content" (`src/components/admin/admin-nav.tsx`).
+  - The current section is marked with `aria-current="page"`, an underline and bolder text, not colour alone.
+  - Tabs are 44px.
+- The wordmark reads "Admin" (was "Enquiries").
+- Sign out is 44px (was 36) and still a form posting to the same `signOut` action.
+- Pages have a 44px "← Content" / "← Services" back link (important in an installed iOS app).
+
+### Architecture
+
+| Part | Files |
+| --- | --- |
+| DB-mirroring validation | `src/lib/cms/fields.ts`: `line` (1–200, one line), `text` (1–2000), `slug`, `optionalHref` (same regex as `cms_href`), `sortOrder` (int ≥ 0), optional/required ids. Values are trimmed; optional "" → NULL |
+| Collections | `src/lib/cms/collections.ts`: per collection its table, labels, Zod schema, `toRow`/`toValues`, list columns, human-readable label. The FAQ schema mirrors `faqs_action_check` |
+| Singletons | `src/lib/cms/singletons.ts`: home (column map, 1–3 "Why Canvas" title lines), about (paragraphs separated by a blank line, 1–6, each ≤2000), video (none/upload/youtube/vimeo with the same host rules as `video_story_video_check`; fields that don't belong to the chosen type are saved as NULL) |
+| DB error messages | `src/lib/cms/errors.ts`: duplicate slug, photo still used by the gallery, missing photo/category, check failures, permission, row gone. It names what the database rejected instead of a generic failure |
+| Admin reads | `src/lib/admin/cms.ts` (server-only, session client so RLS applies) |
+| Mutations | `src/app/admin/(portal)/content/actions.ts`: `saveCollectionItem`, `setItemPublished`, `moveItem`, `deleteItem`, `saveHomeContent`, `saveAboutContent`, `saveVideoStory` |
+| UI | `src/components/admin/`: `cms-form.tsx` (shared form shell), `cms-fields.tsx`, `collection-forms.tsx` (one typed form per collection), `singleton-forms.tsx`, `collection-list.tsx`, `confirm-dialog.tsx`, badges, back link, nav |
+| shadcn | Added `alert-dialog` and `checkbox` (CLI). Imports switched to `@/lib/utils`, animations gated with `motion-safe:`, dialog restyled to the site's tokens. `button.tsx` deliberately **not** overwritten |
+
+- **Every action:**
+  - Calls `requireAdmin()` first.
+  - Validates the collection key against the registry (never a table name from the browser) and ids as UUIDs.
+  - Re-parses values with the same Zod schema as the form.
+  - Writes with the signed-in cookie client, so RLS enforces admin-only writes a second time.
+  - No service-role key anywhere.
+- **Results:** `{ ok, message, id? }` or `{ ok: false, error, fieldErrors?, needsConfirmation? }`.
+- **Forms:** React Hook Form + zodResolver.
+  - On a client or server error, the fields are highlighted, the first invalid field is focused, and an alert region shows the message.
+  - Entered values are kept on failure.
+  - On success the form stays populated with a polite status message.
+  - Create → the new item's edit page with "Service created."
+- **Ordering:** a numeric Order field, plus ↑/↓ in the list. A move swaps with the neighbour, then renumbers the list 1…n (only changed rows are written), so ties can't make the order ambiguous. Drag-and-drop wasn't added.
+- **Published vs Featured:** separate, clearly labelled checkboxes ("Published on the website" / "Featured on the homepage — only appears if it's also published"). The list shows both as text badges.
+
+### Public site: section copy is now read from the CMS
+
+- Phase 13 left `home_content`, `about_content` and `video_story` unread, so their editors would have changed nothing. Every section now takes an optional `copy` prop, defaulting to the old local object.
+- `src/lib/content/public.ts` adds `getHomeCopy`, `getAboutCopy` and `getVideoSection` (same `fromCms` fallback rules, same `cms-content` tag). `getHomepageContent()` fetches all ten sources in parallel.
+- **Stays in code:** link targets (hero second button, About link), the slogan headline, and the enquiry "not set up" notice.
+- **Video:** only an uploaded file with a poster is rendered. YouTube/Vimeo are stored and shown in the admin as "saved, not shown on the website yet".
+- **Founder:** `AboutFounder` shows "Name, Role" under the text **only when a name has been entered** (currently NULL, so nothing is shown and nothing is invented).
+- The rendered homepage is unchanged: the same text, and the same page heights at all 7 widths as Phase 11/13.
+
+### Cache invalidation
+
+- Actions call **`updateTag(CMS_CONTENT_TAG)`**, not `revalidateTag(tag, "max")`.
+  - In Next 16, `revalidateTag` with the recommended profile serves **stale** content on the next request while regenerating.
+  - `updateTag` (Server Actions only) expires immediately, so the next request renders fresh data.
+- They also call `revalidatePath("/admin/content", "layout")` for the admin screens. No site-wide purge.
+- **Verified with real requests:** after each save, a plain `fetch("/")` returned the new content (`x-nextjs-cache: MISS`), well inside the 1-hour window:
+  - create
+  - reorder (categories and process)
+  - unpublish
+  - delete
+  - republish
+  - homepage text
+  - About founder
+  - video
+
+### FAQ safeguard
+
+- When an admin unpublishes or deletes the **last published FAQ**, a dialog explains that the FAQ section will disappear and the menu's FAQ link will go nowhere. It requires "Unpublish and hide FAQ section" / "Delete and hide FAQ section". The same applies to saving the edit form with "Published" unticked.
+- The **server** checks it too (`needsConfirmation: "last-faq"` unless confirmed), so it can't be bypassed by a stale page.
+- If someone else unpublishes FAQs meanwhile, the dialog asks again explicitly.
+
+### Media limitations (honest)
+
+- There is no Storage bucket or upload flow yet (deferred in Phase 13), and `media_assets` is empty.
+  - Photo pickers are disabled with "Photo uploads aren't set up yet…".
+  - The Gallery "Add" button is disabled with that explanation; `/gallery/new` shows the explanation instead of a form.
+  - "Uploaded video file" isn't offered until video and poster media exist.
+- No fake picker, placeholder URLs or external image URLs.
+- The pickers already list real `media_assets` rows (by alt text) when they exist, and a gallery item can only point at an image (composite FK).
+
+### Issues found and fixed during testing
+
+1. **Focus lost after moving an item to the top/bottom:** the arrow that was pressed becomes disabled. Focus now moves to the item's other arrow.
+2. **Dialogs returned focus to `<body>`:** Radix returns focus to its `Trigger`, and these dialogs are opened from code. `ConfirmDialog` now takes `returnFocus`: the opening button, or the list heading after a delete.
+3. **Disabled buttons dropped keyboard focus while saving:** list buttons and the form's Save now stay focusable (`aria-disabled`, with repeat presses ignored).
+4. **The sticky Save bar hid focused fields near the bottom of the screen (WCAG 2.4.11):** `html:has([data-cms-form]) { scroll-padding-bottom: 9rem }`. Checked by tabbing through every field of the Home, About and FAQ editors at 375×667, 390×844 and 1280×800 (84/54/54 focus stops, none obscured). A negative control **without** the padding reported obscured fields, so the check is real.
+5. **The shadcn CLI prompted to overwrite `button.tsx`:** declined. The generated files were aligned with the project conventions.
+6. **Test-harness issues** (not app bugs): the CDP Enter key needed a proper `keyDown` with text; `querySelector("form")` matched the header's sign-out form; a smooth-scroll measurement was read mid-animation; duplicate "Picker Test" rows from an interrupted run broke one older suite's lookup (rows cleaned, suite re-run and passing).
+
+### Tests actually run
+
+**Local production build** (local Supabase, temporary local admin + non-admin, `NEXT_PUBLIC_SITE_URL=https://www.example.com`):
+
+- **`cms14.mjs`, 78/78 pass**, real browser (headless Chrome over CDP):
+  - **Navigation:** nav current state, 44px tabs, admin manifest on CMS pages, enquiries list intact.
+  - **Overview:** the counts.
+  - **Categories:** empty state; create ×2 with slug suggestion → edit page with "Category created."; public shows them in order; move up (keyboard Enter, focus kept, public order changed, DB renumbered); unpublish (Draft badge, gone publicly); delete dialog (opens with the item's name, focus inside, Tab trapped, Escape closes and returns focus, confirm deletes, focus to the heading); public strip absent when empty.
+  - **Services validation:** empty submit → errors, focus on first field, `aria-invalid` + `aria-describedby`; bad slug caught in the browser; duplicate slug → the database's rejection explained, values kept, nothing inserted.
+  - **FAQs:** unpublish two; the last one's delete dialog warns; unpublish asks; cancel keeps it; edit-form save asks (server-enforced); confirm → the FAQ section disappears publicly; republish all → back in the original order.
+  - **Process:** reorder → public order changes → restored.
+  - **Home:** loads existing values, no `id` field, required-field error + focus, edit → public changes → restored.
+  - **About:** founder shown when added, gone (NULL) when cleared, paragraphs preserved.
+  - **Video:** no provider fields for "No video"; upload not offered without media; YouTube URL/title fields; non-YouTube URL rejected; valid link saved; public keeps the empty state; back to none clears the fields.
+  - **Gallery:** Add disabled with the explanation; no form on `/new`.
+  - **Checkbox:** 16px box with a 40×32 hit area, and the label toggles it.
+  - **Responsive:** 7 widths × 7 admin pages with no overflow, no clipped elements, no targets under 24px; the dialog fits at 375 and 1280.
+  - **Sign out:** → login; the CMS then redirects to login.
+  - **Console:** no errors or warnings.
+- **`focus14.mjs`:** the focus-not-obscured check above (plus its negative control).
+- **`action14.mjs`, 17/17 pass: server actions called directly over HTTP**, bypassing the UI:
+  - With **no session** and with a **signed-in non-admin** (a real Supabase SSR session cookie), all five mutations were refused (redirect to `/admin/login`), and the database was unchanged.
+  - Positive control: the same requests as an admin work.
+  - An unknown collection key, and invalid values sent straight to the action, are rejected server-side.
+- **`rls13.mjs` (database RLS, Phase 13 suite), 141/141 pass:** anon, non-admin and admin on every CMS table.
+- **Regression**, all pass, no console errors:
+  - Public: 7-width audit (identical page heights), keyboard/menu/reduced-motion suite, CTA/FAQ/form suite, header state.
+  - Metadata: admin noindex, no private data in `<head>`, 404s.
+  - Date picker + admin status Select.
+  - Admin PWA: manifest/installable, shortcuts, mobile enquiries, no admin responses from the worker, no admin/private data in caches, offline, sign-out/expired session.
+  - Public PWA: offline homepage, offline form.
+- **Leak check:** the service-role/secret key and the string `service_role` are in no client chunk. The public HTML has no table/column names, cache tag, `/admin/content` or action ids. No CMS action code is in the public page's chunks.
+- **Final gate:** `bun install --frozen-lockfile`, typecheck, lint, build and `git diff --check` all pass.
+
+**Hosted:**
+- `hosted13.mjs`, **19/19** anonymous checks (published-only reads, singletons readable, anon writes 42501, enquiries/admin_users closed).
+- The production build with the **normal hosted env** loaded all ten content sources from hosted (**0** fallback logs). Served locally on a spare port, it rendered every section's copy from the hosted singletons, the empty sections stayed absent, and all `/admin/content*` routes redirected to login.
+- **Not done on hosted:** admin-session CMS writes. I don't have the real admin's password and didn't create hosted users, so the admin/non-admin write paths were verified **locally only**.
+- Your dev server (:3000) wasn't running at the end, so it wasn't used.
+
+**Cleanup:** local test users, enquiries, and CMS test rows were deleted; the local database is back to the seed content. Test servers were stopped and temp files removed. **Hosted content was not modified.**
+
+### Remaining / deferred
+
+- **Media:** the `cms-media` Storage bucket with policies (public read, admin write), an upload flow creating `media_assets` (alt text required), editing alt text, deleting unused media. The pickers are ready for it.
+- **Public YouTube/Vimeo rendering** (privacy-enhanced embed, click-to-load).
+- **Hosted admin-session check** of the CMS by the real admin once deployed.
+- **Enquiry status form (Phase 9):** its button is still `disabled` while saving, so keyboard focus drops to the page. It should get the same `aria-disabled` treatment; left unchanged to keep this phase's scope.
+- Not built, as the brief asked: revision history, scheduling, roles, audit log, bulk actions, drag-and-drop.

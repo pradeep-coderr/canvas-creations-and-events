@@ -104,7 +104,7 @@ Private area for managing enquiries: list (newest first, filter by status with c
 
 ## CMS content model (Supabase)
 
-Editable website content lives in Supabase and is edited from `/admin`. There is no separate CMS. The schema and the admin content screens are built in stages: **the schema exists now; the admin screens come next.**
+Editable website content lives in Supabase and is edited from **`/admin/content`** in the same admin app (the "Content" tab next to "Enquiries"). There is no separate CMS.
 
 - **Migrations:** `supabase/migrations/…_create_cms_content.sql` (schema, RLS) and `…_seed_cms_content.sql` (a verbatim copy of the copy already on the site; nothing invented).
 - **Collections:** `services`, `categories`, `gallery_items` (→ `categories`, → `media_assets`), `testimonials`, `faqs`, `process_steps`, `principles`.
@@ -121,13 +121,30 @@ Editable website content lives in Supabase and is edited from `/admin`. There is
   - Only admins (`admin_users`, checked by `private.is_admin()`) can read drafts or insert, update or delete anything.
   - Enquiry rules are unchanged.
 - **How the site reads it:** `src/lib/content/public.ts` (server-only) queries with a cookie-less anon client (`src/lib/supabase/public.ts`) and maps rows to the existing types in `src/data/*`. Components receive plain props and never touch Supabase.
-  - Wired so far: services, categories, gallery preview, testimonials, FAQs, process steps, principles. Section copy is still read from `src/data/home.ts`.
+  - Everything is wired: the seven collections plus the homepage, About and video copy. Link targets, the hero headline (the slogan) and the enquiry form messages stay in code.
   - **Empty is a real answer:** unpublishing everything hides those sections cleanly.
   - `src/data/*` is used only when no database is configured, or a query fails (logged as `[content] … could not be loaded`).
 - **Caching:** the homepage stays static.
   - Content is fetched at build time and cached in the Next.js data cache under the tag `cms-content`, with a 1-hour `revalidate`.
-  - **Any code that changes content must call `revalidateTag("cms-content")`** (constant `CMS_CONTENT_TAG`) so the site updates immediately.
+  - Every CMS server action calls `updateTag(CMS_CONTENT_TAG)` after a successful change, so the next homepage request renders fresh content (verified end to end). Any new code that changes content must do the same.
   - Editing directly in the Supabase dashboard shows up within an hour.
+
+### Using the CMS (`/admin/content`)
+
+- **Overview:** counts of published and draft items per list, and the state of the homepage, About and video sections.
+- **Lists** (services, categories, gallery, testimonials, FAQs, process, Why Canvas):
+  - Add and edit on their own pages.
+  - Publish/Unpublish, move up/down, and delete (with a confirmation dialog) from the list.
+  - New items start as **drafts**. **Published** (visible on the website) and **Featured** (chosen for the homepage) are separate settings.
+- **Homepage text, About, Video:** one editor each for the existing row, grouped by section. There's nothing to create or delete.
+- **FAQ safeguard:** unpublishing or deleting the **last published FAQ** asks for explicit confirmation, because the FAQ section (and the menu's FAQ link target) would disappear. This is enforced on the server too.
+- **Photos and video files:** there are no uploads yet, so the photo pickers explain that and adding gallery items is disabled. YouTube/Vimeo links can be saved, but the public site doesn't play them yet.
+- **Code:**
+  - Pages: `src/app/admin/(portal)/content/`.
+  - Server actions: `…/content/actions.ts`. Each one checks `requireAdmin()`, re-validates, writes with the signed-in session so RLS applies, then calls `updateTag`.
+  - Forms and list: `src/components/admin/`.
+  - Schemas mirroring the database rules: `src/lib/cms/`.
+  - Admin reads: `src/lib/admin/cms.ts`.
 
 ## Production & deployment (Vercel)
 

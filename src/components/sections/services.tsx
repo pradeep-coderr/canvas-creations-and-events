@@ -5,7 +5,7 @@ import { Reveal } from "@/components/motion/reveal";
 import { ImageFrame } from "@/components/shared/image-frame";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { SiteLink } from "@/components/shared/site-link";
-import { servicesSection } from "@/data/home";
+import { servicesSection, type ServicesCopy } from "@/data/home";
 import { featuredServices, type Service } from "@/data/services";
 import { site } from "@/data/site";
 
@@ -59,7 +59,13 @@ function ServiceRow({ service, number }: { service: Service; number?: string }) 
   );
 }
 
-export function Services({ services = featuredServices }: { services?: Service[] }) {
+export function Services({
+  services = featuredServices,
+  copy = servicesSection,
+}: {
+  services?: Service[];
+  copy?: ServicesCopy;
+}) {
   const numbered = services.length > 1;
 
   return (
@@ -67,9 +73,9 @@ export function Services({ services = featuredServices }: { services?: Service[]
       <Container className="grid gap-12 lg:grid-cols-12 lg:gap-16">
         <SectionHeading
           id="services-title"
-          eyebrow={servicesSection.eyebrow}
-          title={servicesSection.title}
-          description={servicesSection.description}
+          eyebrow={copy.eyebrow}
+          title={copy.title}
+          description={copy.description}
           align="start"
           className="lg:sticky lg:top-[calc(var(--header-height)+3rem)] lg:col-span-5 lg:self-start"
         />
@@ -98,10 +104,10 @@ export function Services({ services = featuredServices }: { services?: Service[]
             >
               <span>
                 <span className="block font-display text-display-md font-medium italic transition-colors duration-500 group-hover:text-primary">
-                  {servicesSection.enquiry.title}
+                  {copy.enquiry.title}
                 </span>
                 <span className="mt-2 block text-muted-foreground">
-                  {servicesSection.enquiry.text}
+                  {copy.enquiry.text}
                 </span>
               </span>
               <RowArrow />

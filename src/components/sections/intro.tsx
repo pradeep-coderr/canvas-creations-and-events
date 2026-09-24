@@ -3,10 +3,10 @@ import { Section } from "@/components/layout/section";
 import { Reveal } from "@/components/motion/reveal";
 import { DecorativeDivider } from "@/components/shared/decorative-divider";
 import { SectionHeading } from "@/components/shared/section-heading";
-import { intro } from "@/data/home";
+import { intro, type IntroCopy } from "@/data/home";
 
 /** A calm editorial pause after the hero: who the studio is, in brief. */
-export function Intro() {
+export function Intro({ copy = intro }: { copy?: IntroCopy }) {
   return (
     <Section
       id="intro"
@@ -18,9 +18,9 @@ export function Intro() {
         <Reveal>
           <SectionHeading
             id="intro-title"
-            eyebrow={intro.eyebrow}
-            title={intro.title}
-            description={intro.body}
+            eyebrow={copy.eyebrow}
+            title={copy.title}
+            description={copy.body}
             className="max-w-3xl [&_p:last-child]:max-w-2xl"
           />
         </Reveal>

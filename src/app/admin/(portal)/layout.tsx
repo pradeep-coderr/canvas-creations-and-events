@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { AdminNav } from "@/components/admin/admin-nav";
 import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/lib/admin/session";
@@ -24,7 +25,7 @@ export default async function AdminPortalLayout({ children }: LayoutProps<"/admi
               className="size-10"
             />
             <span className="font-display text-xl font-medium">
-              Enquiries <span className="sr-only">— {site.name} admin</span>
+              Admin <span className="sr-only">— {site.name}</span>
             </span>
           </Link>
           <div className="flex items-center gap-4">
@@ -32,11 +33,15 @@ export default async function AdminPortalLayout({ children }: LayoutProps<"/admi
               <span className="hidden text-sm text-muted-foreground sm:inline">{admin.email}</span>
             )}
             <form action={signOut}>
-              <Button type="submit" variant="outline" size="sm">
+              <Button type="submit" variant="outline">
                 Sign out
               </Button>
             </form>
           </div>
+        </Container>
+        {/* Sections of the admin app; the active tab's underline sits on the header border. */}
+        <Container className="-mb-px">
+          <AdminNav />
         </Container>
       </header>
       <main id="main" className="flex-1 py-10 sm:py-14">

@@ -13,11 +13,11 @@ export interface EditorialImage {
  * Homepage copy. Only facts we actually know — no invented claims, numbers
  * or services.
  *
- * CMS: process steps and principles are read from the `process_steps` and
- * `principles` tables (src/lib/content/public.ts); the section copy has been
- * copied into `home_content`, `about_content` and `video_story` but is still
- * read from here until the admin content screens exist. Everything here is
- * also the built-in fallback when no database is configured.
+ * CMS: the live copy comes from `home_content`, `about_content`,
+ * `video_story`, `process_steps` and `principles` (edited at /admin/content,
+ * read by src/lib/content/public.ts). Everything here is the built-in
+ * fallback when no database is configured or it can't be reached, and the
+ * source of the link targets and system messages that stay in code.
  */
 export const hero = {
   eyebrow: "Event styling & décor",
@@ -67,6 +67,12 @@ export const gallerySection = {
  * been supplied. Replace with the client's own words when available.
  */
 
+/** The founder's name as the client wants it shown, with an optional role. */
+export interface FounderCredit {
+  name: string;
+  role?: string;
+}
+
 export const about = {
   eyebrow: "About",
   title: "A personal approach to every celebration.",
@@ -77,6 +83,8 @@ export const about = {
   ],
   // Founder or studio portrait: real photography only (public/images/founder/).
   image: null as EditorialImage | null,
+  // Shown under the text once the client provides a real name.
+  founder: null as FounderCredit | null,
   cta: { label: "Tell us about your celebration", href: "/#enquire" } satisfies NavLink,
 };
 
@@ -197,3 +205,22 @@ export const contactSection = {
   title: "Let's make something memorable.",
   description: "Prefer to talk it through? Give us a call, or follow along online.",
 };
+
+/*
+ * Section copy types. The public sections take these as props (defaulting
+ * to the values above), so the same components render the CMS copy from
+ * src/lib/content/public.ts.
+ */
+export type HeroCopy = typeof hero;
+export type IntroCopy = typeof intro;
+export type ServicesCopy = typeof servicesSection;
+export type CategoriesCopy = typeof categoriesSection;
+export type GalleryCopy = typeof gallerySection;
+export type AboutCopy = typeof about;
+export type ProcessCopy = Pick<typeof processSection, "eyebrow" | "title">;
+export type WhyCanvasCopy = Pick<typeof whyCanvas, "eyebrow" | "titleLines">;
+export type VideoStoryCopy = Omit<typeof videoStory, "video">;
+export type TestimonialsCopy = typeof testimonialsSection;
+export type FaqCopy = typeof faqSection;
+export type EnquiryCopy = typeof enquirySection;
+export type ContactCopy = typeof contactSection;

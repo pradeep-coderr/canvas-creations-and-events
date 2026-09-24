@@ -2,7 +2,7 @@ import { Container } from "@/components/layout/container";
 import { Section } from "@/components/layout/section";
 import { Reveal } from "@/components/motion/reveal";
 import { Eyebrow } from "@/components/shared/eyebrow";
-import { testimonialsSection } from "@/data/home";
+import { testimonialsSection, type TestimonialsCopy } from "@/data/home";
 import { featuredTestimonials, type Testimonial } from "@/data/testimonials";
 
 function Credit({ testimonial }: { testimonial: Testimonial }) {
@@ -22,8 +22,10 @@ function Credit({ testimonial }: { testimonial: Testimonial }) {
  */
 export function Testimonials({
   testimonials = featuredTestimonials,
+  copy = testimonialsSection,
 }: {
   testimonials?: Testimonial[];
+  copy?: TestimonialsCopy;
 }) {
   if (testimonials.length === 0) return null;
   const [lead, ...rest] = testimonials;
@@ -31,9 +33,9 @@ export function Testimonials({
   return (
     <Section aria-labelledby="testimonials-title">
       <Container size="narrow" className="text-center">
-        <Eyebrow>{testimonialsSection.eyebrow}</Eyebrow>
+        <Eyebrow>{copy.eyebrow}</Eyebrow>
         <h2 id="testimonials-title" className="sr-only">
-          {testimonialsSection.title}
+          {copy.title}
         </h2>
 
         <Reveal>
