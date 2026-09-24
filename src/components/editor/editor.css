@@ -1,0 +1,265 @@
+/*
+ * Visual editor chrome. Imported only by the editor (never on the public
+ * site). Built from the site's own tokens, so affordances also adapt inside
+ * dark-toned sections: champagne hairlines, rose-ink for unsaved changes.
+ */
+
+:root {
+  --editor-bar: 4rem;
+}
+
+/* ---------------------------------------------------------------- toolbar */
+
+.cc-toolbar {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 50;
+  background: var(--background);
+  border-bottom: 1px solid color-mix(in srgb, var(--highlight) 45%, var(--border));
+  box-shadow: 0 1px 12px color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+.cc-toolbar-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: var(--editor-bar);
+  padding-inline: 1rem;
+  max-width: 90rem;
+  margin-inline: auto;
+}
+
+.cc-toolbar-alert:not(:empty) {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--destructive);
+  background: var(--background);
+  border-top: 1px solid var(--border);
+}
+
+/* The page sits under the toolbar; its sticky header docks below it. */
+.cc-canvas {
+  padding-top: var(--editor-bar);
+}
+
+.cc-canvas header.sticky {
+  top: var(--editor-bar);
+}
+
+/* ---------------------------------------------------------------- editable text */
+
+.cc-editable {
+  all: unset;
+  position: relative;
+  cursor: text;
+  border-radius: 2px;
+  outline: 1px dashed transparent;
+  outline-offset: 5px;
+  transition: outline-color 0.2s, background-color 0.2s;
+}
+
+.cc-editable:hover {
+  outline-color: var(--highlight);
+  background-color: color-mix(in srgb, var(--highlight-soft) 22%, transparent);
+}
+
+.cc-editable:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 5px;
+}
+
+.cc-editable[data-unsaved] {
+  outline: 1px solid var(--primary);
+  background-color: color-mix(in srgb, var(--primary) 7%, transparent);
+}
+
+.cc-editable[data-invalid] {
+  outline: 2px solid var(--destructive);
+}
+
+.cc-editable-badge {
+  position: absolute;
+  top: -0.9rem;
+  right: -0.9rem;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 9999px;
+  background: var(--background);
+  color: var(--emphasis);
+  border: 1px solid var(--highlight);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--foreground) 12%, transparent);
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+
+.cc-editable-badge svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.cc-editable:hover .cc-editable-badge,
+.cc-editable:focus-visible .cc-editable-badge,
+.cc-editable[data-unsaved] .cc-editable-badge {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------------------------------------------------------------- inline editor */
+
+.cc-editing {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+
+.cc-edit-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--background) 92%, var(--highlight-soft));
+  border: 1px solid var(--highlight);
+  border-radius: 4px;
+  padding: 0.25em 0.4em;
+  field-sizing: content;
+  resize: vertical;
+}
+
+textarea.cc-edit-input {
+  min-height: 4lh;
+}
+
+.cc-edit-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.cc-edit-input[aria-invalid="true"] {
+  border-color: var(--destructive);
+}
+
+.cc-edit-hint,
+.cc-edit-error,
+.cc-edit-tip {
+  display: block;
+  margin-top: 0.4rem;
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+}
+
+.cc-edit-error {
+  font-weight: 500;
+  color: var(--destructive);
+}
+
+.cc-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  font-style: normal;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.cc-edit-tip {
+  margin-top: 0;
+  font-size: 0.75rem;
+}
+
+/* ---------------------------------------------------------------- sections */
+
+.cc-section {
+  position: relative;
+}
+
+.cc-section-bar {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  z-index: 20;
+}
+
+.cc-section:hover > section,
+.cc-section:focus-within > section {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--highlight) 55%, transparent);
+}
+
+.cc-section-button {
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+/* ---------------------------------------------------------------- collection items */
+
+.cc-item {
+  position: relative;
+  border-radius: 4px;
+  outline: 1px dashed color-mix(in srgb, var(--highlight) 55%, transparent);
+  /* Inside the item, so neighbouring items don't overlap. */
+  outline-offset: -1px;
+}
+
+.cc-item[data-hidden-on-site] > :not(.cc-item-bar):not(.cc-item-form) {
+  opacity: 0.55;
+}
+
+.cc-item-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  font-style: normal;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.cc-item-note {
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-style: normal;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  margin-right: auto;
+}
+
+.cc-item-button {
+  height: 2.75rem;
+}
+
+.cc-item-form,
+.cc-add {
+  margin-top: 1rem;
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  font-style: normal;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: left;
+}
+
+.cc-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}

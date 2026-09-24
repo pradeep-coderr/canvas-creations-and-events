@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { galleryPreview, type GalleryItem } from "@/data/gallery";
 import { gallerySection, type GalleryCopy } from "@/data/home";
 import { site } from "@/data/site";
+import { SlotItem, type ItemSlots } from "./item-slots";
 import { cn } from "@/lib/utils";
 
 // Editorial layout for up to five images: one large lead image beside two
@@ -39,9 +40,11 @@ function ExternalLabel({ children }: { children: React.ReactNode }) {
 export function GalleryPreview({
   items = galleryPreview,
   copy = gallerySection,
+  itemSlots,
 }: {
   items?: GalleryItem[];
   copy?: GalleryCopy;
+  itemSlots?: ItemSlots<GalleryItem>;
 }) {
   const hasImages = items.length > 0;
 
@@ -78,6 +81,7 @@ export function GalleryPreview({
                   data-gallery-index={i}
                   className={cn(slot.item, fullWidthOnMobile && "col-span-2")}
                 >
+                  <SlotItem slots={itemSlots} item={item}>
                   <Reveal className="h-full">
                     <figure className="h-full">
                       <ImageFrame
@@ -96,10 +100,12 @@ export function GalleryPreview({
                       )}
                     </figure>
                   </Reveal>
+                  </SlotItem>
                 </li>
               );
             })}
           </ul>
+          {itemSlots?.after}
         </Container>
       ) : (
         // Deliberate empty state: no placeholder frames pretending to be work.
@@ -137,6 +143,7 @@ export function GalleryPreview({
                 ))}
             </ul>
           </div>
+          {itemSlots?.after}
         </Container>
       )}
     </Section>

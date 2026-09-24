@@ -8,6 +8,7 @@ import { SiteLink } from "@/components/shared/site-link";
 import { servicesSection, type ServicesCopy } from "@/data/home";
 import { featuredServices, type Service } from "@/data/services";
 import { site } from "@/data/site";
+import { SlotItem, type ItemSlots } from "./item-slots";
 
 // Round arrow affordance shared by linked rows; visible without hover so
 // touch users can see the row is a link.
@@ -62,9 +63,11 @@ function ServiceRow({ service, number }: { service: Service; number?: string }) 
 export function Services({
   services = featuredServices,
   copy = servicesSection,
+  itemSlots,
 }: {
   services?: Service[];
   copy?: ServicesCopy;
+  itemSlots?: ItemSlots<Service>;
 }) {
   const numbered = services.length > 1;
 
@@ -86,16 +89,19 @@ export function Services({
             <ol>
               {services.map((service, i) => (
                 <li key={service.id} className="border-b border-foreground/15">
-                  <Reveal>
-                    <ServiceRow
-                      service={service}
-                      number={numbered ? String(i + 1).padStart(2, "0") : undefined}
-                    />
-                  </Reveal>
+                  <SlotItem slots={itemSlots} item={service}>
+                    <Reveal>
+                      <ServiceRow
+                        service={service}
+                        number={numbered ? String(i + 1).padStart(2, "0") : undefined}
+                      />
+                    </Reveal>
+                  </SlotItem>
                 </li>
               ))}
             </ol>
           )}
+          {itemSlots?.after}
 
           <Reveal>
             <SiteLink

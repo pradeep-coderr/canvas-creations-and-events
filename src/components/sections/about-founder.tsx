@@ -23,8 +23,8 @@ export function AboutFounder({ copy = about }: { copy?: AboutCopy }) {
             align="start"
           />
           <div className="mt-8 max-w-xl space-y-5 text-lead text-muted-foreground">
-            {copy.body.map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
+            {copy.body.map((paragraph, i) => (
+              <p key={i}>{paragraph}</p>
             ))}
           </div>
           {/* Only once the client has added a real name (never invented). */}

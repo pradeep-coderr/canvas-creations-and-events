@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import { MobileCtaBar } from "@/components/layout/mobile-cta-bar";
-import { SiteFooter } from "@/components/layout/site-footer";
-import { SiteHeader } from "@/components/layout/site-header";
+import { SiteFrame } from "@/components/layout/site-frame";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 import { site } from "@/data/site";
 
@@ -40,10 +38,7 @@ export const metadata: Metadata = {
 export default function SiteLayout({ children }: LayoutProps<"/">) {
   return (
     <>
-      <SiteHeader />
-      {children}
-      <SiteFooter />
-      <MobileCtaBar />
+      <SiteFrame>{children}</SiteFrame>
       <ServiceWorkerRegistration />
     </>
   );

@@ -24,7 +24,7 @@ import { CMS_CONTENT_TAG } from "@/lib/supabase/public";
  *
  * After a successful change: updateTag(CMS_CONTENT_TAG) expires the public
  * content cache immediately (the next homepage request renders fresh data),
- * and the admin content pages are refreshed.
+ * and the admin content pages and visual editor are refreshed.
  */
 
 export type CmsResult =
@@ -42,6 +42,7 @@ const uuid = z.uuid();
 function contentChanged() {
   updateTag(CMS_CONTENT_TAG);
   revalidatePath("/admin/content", "layout");
+  revalidatePath("/admin/editor");
 }
 
 function fieldErrors(error: z.ZodError): Record<string, string> {

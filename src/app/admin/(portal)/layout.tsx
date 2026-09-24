@@ -40,8 +40,12 @@ export default async function AdminPortalLayout({ children }: LayoutProps<"/admi
           </div>
         </Container>
         {/* Sections of the admin app; the active tab's underline sits on the header border. */}
-        <Container className="-mb-px">
+        <Container className="-mb-px flex items-center justify-between gap-2">
           <AdminNav />
+          {/* The main way to change the website: edit it where it appears. */}
+          <Button asChild className="mb-1 px-4">
+            <Link href="/admin/editor">Edit website</Link>
+          </Button>
         </Container>
       </header>
       <main id="main" className="flex-1 py-10 sm:py-14">

@@ -129,6 +129,28 @@ Editable website content lives in Supabase and is edited from **`/admin/content`
   - Every CMS server action calls `updateTag(CMS_CONTENT_TAG)` after a successful change, so the next homepage request renders fresh content (verified end to end). Any new code that changes content must do the same.
   - Editing directly in the Supabase dashboard shows up within an hour.
 
+### Visual website editor (`/admin/editor`): the main way to edit
+
+The **Edit website** button in the admin header opens the real homepage (same sections, header and footer) with editing controls:
+
+- **Text:** hover or Tab to any editable text and press it. An input opens in place, in the same typography, with **Save** / **Cancel**.
+  - Enter saves one-line text (Ctrl+Enter for longer text).
+  - Esc closes but keeps the change as an **unsaved** draft (marked on the page and counted in the toolbar).
+- **Edit section** (each section): every text of that section, including text inside links and buttons (button labels, the Instagram/TikTok link text), photos, and the video settings. Changes show live on the page; **Save section** stores them.
+- **Lists** (services, FAQs, process, Why Canvas, categories, testimonials, gallery): each item has **Edit** (its form opens in place) and a **⋯** menu (move up/down, publish/unpublish, delete). **Add …** sits under each list.
+  - Drafts and items not shown on the homepage are labelled and dimmed.
+  - The last-published-FAQ safeguard applies here too.
+- **Toolbar:** unsaved count, **Save** (everything unsaved), **Preview** (exactly what visitors see: no controls, drafts hidden) and **Exit**, which asks before leaving with unsaved changes. The browser also warns on reload or close.
+- **While editing:** links scroll instead of navigating, and the enquiry form doesn't send.
+- **Not editable here, deliberately:** the hero headline (the slogan), navigation, phone and social links, link targets, the enquiry form's own labels (code, see Phase 13). There are no photo uploads yet.
+- **How it's built:**
+  - The public page and the editor render the same `HomeSections` (`src/components/home/home-sections.tsx`).
+  - The editor passes editable text as the sections' copy props and item/"Add" slots (`ItemSlots`). The public page passes plain strings and nothing else, so `/` ships no editor code.
+  - Every save uses the Phase 14 server actions (`requireAdmin`, RLS, `updateTag(CMS_CONTENT_TAG)`).
+  - Code: `src/app/admin/editor/`, `src/components/editor/`, `src/lib/editor/fields.ts` (which page spot maps to which CMS field), `src/lib/admin/editor-content.ts`.
+
+`/admin/content` stays available for advanced management.
+
 ### Using the CMS (`/admin/content`)
 
 - **Overview:** counts of published and draft items per list, and the state of the homepage, About and video sections.

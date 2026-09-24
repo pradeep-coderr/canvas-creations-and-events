@@ -3,16 +3,19 @@ import { Section } from "@/components/layout/section";
 import { Reveal } from "@/components/motion/reveal";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { processSection, type ProcessCopy, type ProcessStep } from "@/data/home";
+import { SlotItem, type ItemSlots } from "./item-slots";
 
 /** How working with the studio unfolds: a numbered editorial sequence. */
 export function Process({
   steps = processSection.steps,
   copy = processSection,
+  itemSlots,
 }: {
   steps?: ProcessStep[];
   copy?: ProcessCopy;
+  itemSlots?: ItemSlots<ProcessStep>;
 }) {
-  if (steps.length === 0) return null;
+  if (steps.length === 0 && !itemSlots?.after) return null;
 
   return (
     <Section tone="ivory" aria-labelledby="process-title">
@@ -27,6 +30,7 @@ export function Process({
         <ol className="mt-14 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:mt-20 lg:grid-cols-4 lg:gap-x-8">
           {steps.map((step, i) => (
             <li key={step.id}>
+              <SlotItem slots={itemSlots} item={step}>
               <Reveal className="border-t border-foreground/15 pt-6">
                 {/* The <ol> already conveys order to assistive tech. */}
                 <span
@@ -42,9 +46,11 @@ export function Process({
                   {step.description}
                 </p>
               </Reveal>
+              </SlotItem>
             </li>
           ))}
         </ol>
+        {itemSlots?.after}
       </Container>
     </Section>
   );

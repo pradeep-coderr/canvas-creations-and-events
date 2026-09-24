@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { deleteItem, moveItem, setItemPublished, type CmsResult } from "@/app/admin/(portal)/content/actions";
+import type { CmsResult } from "@/app/admin/(portal)/content/actions";
 import { collections, type CollectionKey } from "@/lib/cms/collections";
-import { ConfirmDialog } from "./confirm-dialog";
 import { FeaturedBadge, VisibilityBadge } from "./content-badges";
+import { useItemActions } from "./use-item-actions";
 
 export interface ListItem {
   id: string;
@@ -18,8 +18,6 @@ export interface ListItem {
 }
 
 type Status = { kind: "success" | "error"; text: string } | null;
-// `confirmed`: the server asked for the last-FAQ confirmation and the admin is re-confirming.
-type Pending = { type: "delete" | "unpublish"; item: ListItem; confirmed?: boolean } | null;
 
 /**
  * A collection in display order, with the everyday actions: reorder,
@@ -38,17 +36,17 @@ export function CollectionList({
 }) {
   const { singular, plural, title } = collections[collection];
   const [status, setStatus] = useState<Status>(null);
-  const [isPending, startTransition] = useTransition();
-  const [confirm, setConfirm] = useState<Pending>(null);
   // "up:<id>" / "down:<id>": the arrow to refocus once the re-ordered list renders.
   const focusAfter = useRef<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
-  // Where focus goes when a dialog closes: the button that opened it, or the
-  // heading after a delete (that button no longer exists).
-  const returnFocus = useRef<HTMLElement | null>(null);
 
-  const publishedFaqs = collection === "faqs" ? items.filter((i) => i.published).length : 0;
-  const isLastPublishedFaq = (item: ListItem) => collection === "faqs" && item.published && publishedFaqs === 1;
+  const { isPending, move, togglePublish, requestDelete, dialog } = useItemActions({
+    collection,
+    publishedFaqs: items.filter((i) => i.published).length,
+    onResult: (result: CmsResult) =>
+      setStatus(result.ok ? { kind: "success", text: result.message } : { kind: "error", text: result.error }),
+    afterDeleteFocus: () => headingRef.current,
+  });
 
   // Keep keyboard focus on the moved item's arrow after the list re-renders.
   useEffect(() => {
@@ -62,65 +60,12 @@ export function CollectionList({
     target?.focus();
   }, [items]);
 
-  const report = (result: CmsResult) =>
-    setStatus(result.ok ? { kind: "success", text: result.message } : { kind: "error", text: result.error });
-
-  // Buttons stay enabled while an action runs (disabling them would drop
-  // keyboard focus); a second action is simply ignored until it finishes.
-  const run = (action: () => Promise<CmsResult>, after?: (r: CmsResult) => void) =>
-    !isPending &&
-    startTransition(async () => {
-      try {
-        const result = await action();
-        report(result);
-        after?.(result);
-      } catch {
-        setStatus({ kind: "error", text: "Couldn't reach the server, so nothing changed. Try again." });
-      }
-    });
-
-  const move = (item: ListItem, dir: "up" | "down") => {
+  const moveWithFocus = (item: ListItem, dir: "up" | "down") => {
     if (isPending) return;
     focusAfter.current = `${dir}:${item.id}`;
-    run(
-      () => moveItem(collection, item.id, dir),
-      (r) => {
-        if (!r.ok) focusAfter.current = null;
-      },
-    );
-  };
-
-  const togglePublish = (item: ListItem, button: HTMLElement) => {
-    if (item.published && isLastPublishedFaq(item)) {
-      returnFocus.current = button;
-      setConfirm({ type: "unpublish", item });
-      return;
-    }
-    run(() => setItemPublished(collection, item.id, !item.published));
-  };
-
-  // Used by the dialogs: returns an error to keep the dialog open.
-  const confirmAction = async (): Promise<string | void> => {
-    if (!confirm) return;
-    const { type, item } = confirm;
-    const lastFaq = confirm.confirmed === true || isLastPublishedFaq(item);
-    let result: CmsResult;
-    try {
-      result =
-        type === "delete"
-          ? await deleteItem(collection, item.id, lastFaq)
-          : await setItemPublished(collection, item.id, false, true);
-    } catch {
-      return "Couldn't reach the server, so nothing changed. Try again.";
-    }
-    if (!result.ok && result.needsConfirmation) {
-      // Someone else unpublished the other FAQs meanwhile: ask again, explicitly.
-      setConfirm({ ...confirm, confirmed: true });
-      return "This is now the only published FAQ. Press the button again to confirm removing the FAQ section.";
-    }
-    if (!result.ok) return result.error;
-    report(result);
-    if (type === "delete") returnFocus.current = headingRef.current;
+    move(item, dir, (r) => {
+      if (!r.ok) focusAfter.current = null;
+    });
   };
 
   const addButton = addDisabledReason ? (
@@ -136,9 +81,6 @@ export function CollectionList({
       </Link>
     </Button>
   );
-
-  const dialogItem = confirm?.item;
-  const dialogLastFaq = confirm ? confirm.confirmed === true || isLastPublishedFaq(confirm.item) : false;
 
   return (
     <>
@@ -163,9 +105,7 @@ export function CollectionList({
       </div>
 
       {items.length === 0 ? (
-        <p className="mt-4 bg-background p-8 text-center text-muted-foreground">
-          No {plural} yet.
-        </p>
+        <p className="mt-4 bg-background p-8 text-center text-muted-foreground">No {plural} yet.</p>
       ) : (
         <ol className="mt-4 divide-y divide-border border-y border-border bg-background" aria-busy={isPending}>
           {items.map((item, i) => (
@@ -186,7 +126,7 @@ export function CollectionList({
                   size="icon"
                   aria-label={`Move “${item.label}” up`}
                   disabled={i === 0}
-                  onClick={() => move(item, "up")}
+                  onClick={() => moveWithFocus(item, "up")}
                 >
                   <ArrowUp aria-hidden="true" />
                 </Button>
@@ -196,7 +136,7 @@ export function CollectionList({
                   size="icon"
                   aria-label={`Move “${item.label}” down`}
                   disabled={i === items.length - 1}
-                  onClick={() => move(item, "down")}
+                  onClick={() => moveWithFocus(item, "down")}
                 >
                   <ArrowDown aria-hidden="true" />
                 </Button>
@@ -213,11 +153,7 @@ export function CollectionList({
                   variant="destructive"
                   size="icon"
                   aria-label={`Delete “${item.label}”`}
-                  onClick={(e) => {
-                    if (isPending) return;
-                    returnFocus.current = e.currentTarget;
-                    setConfirm({ type: "delete", item });
-                  }}
+                  onClick={(e) => requestDelete(item, e.currentTarget)}
                 >
                   <Trash2 aria-hidden="true" />
                 </Button>
@@ -227,40 +163,7 @@ export function CollectionList({
         </ol>
       )}
 
-      <ConfirmDialog
-        open={!!confirm}
-        onOpenChange={(open) => !open && setConfirm(null)}
-        title={
-          confirm?.type === "unpublish"
-            ? "Hide the FAQ section?"
-            : `Delete this ${singular}?`
-        }
-        description={
-          <>
-            {confirm?.type === "delete" && (
-              <p>
-                “{dialogItem?.label}” will be permanently deleted. This can&apos;t be undone.
-              </p>
-            )}
-            {dialogLastFaq && (
-              <p className="font-medium text-foreground">
-                It&apos;s the only published FAQ, so the FAQ section will disappear from the website, and the FAQ
-                link in the site menu will go nowhere until another FAQ is published.
-              </p>
-            )}
-          </>
-        }
-        confirmLabel={
-          confirm?.type === "unpublish"
-            ? "Unpublish and hide FAQ section"
-            : dialogLastFaq
-              ? "Delete and hide FAQ section"
-              : `Delete ${singular}`
-        }
-        destructive
-        onConfirm={confirmAction}
-        returnFocus={returnFocus}
-      />
+      {dialog}
     </>
   );
 }

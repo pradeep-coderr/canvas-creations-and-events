@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, type DefaultValues, type FieldValues, type Path, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +10,16 @@ import type { CmsResult } from "@/app/admin/(portal)/content/actions";
 import { ConfirmDialog } from "./confirm-dialog";
 
 type Status = { kind: "success" | "error"; text: string } | null;
+
+/** Options for using a CMS form inside another screen (the visual editor). */
+export interface InlineFormOptions {
+  /** No sticky save bar; adds a Cancel button when onCancel is given. */
+  inline?: boolean;
+  onSaved?: (result: Extract<CmsResult, { ok: true }>) => void;
+  onCancel?: () => void;
+  /** Reports unsaved changes, with a way to submit the form from outside. */
+  onDirtyChange?: (dirty: boolean, submit: () => void) => void;
+}
 
 /**
  * Form shell shared by every CMS editor: client validation (same Zod schema
@@ -26,7 +36,11 @@ export function CmsForm<TIn extends FieldValues, TOut>({
   initialMessage,
   createdUrl,
   children,
-}: {
+  inline = false,
+  onSaved,
+  onCancel,
+  onDirtyChange,
+}: InlineFormOptions & {
   schema: z.ZodType<TOut, TIn>;
   defaultValues: TIn;
   save: (values: TIn, confirmLastFaq: boolean) => Promise<CmsResult>;
@@ -41,11 +55,17 @@ export function CmsForm<TIn extends FieldValues, TOut>({
   const [status, setStatus] = useState<Status>(initialMessage ? { kind: "success", text: initialMessage } : null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const submitRef = useRef<HTMLButtonElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const form = useForm<TIn, unknown, TOut>({
     resolver: zodResolver(schema as never),
     defaultValues: defaultValues as DefaultValues<TIn>,
     mode: "onTouched",
   });
+
+  const { isDirty } = form.formState;
+  useEffect(() => {
+    onDirtyChange?.(isDirty, () => formRef.current?.requestSubmit());
+  }, [isDirty, onDirtyChange]);
 
   const submit = async (confirmLastFaq: boolean): Promise<string | void> => {
     // The server validates the raw values again with the same schema.
@@ -63,6 +83,7 @@ export function CmsForm<TIn extends FieldValues, TOut>({
       setStatus({ kind: "success", text: result.message });
       form.reset(values);
       if (createdUrl && result.id) router.replace(createdUrl(result.id) as never);
+      onSaved?.(result);
       return;
     }
     if (result.needsConfirmation === "last-faq" && !confirmLastFaq) {
@@ -82,7 +103,8 @@ export function CmsForm<TIn extends FieldValues, TOut>({
 
   return (
     <form
-      data-cms-form
+      ref={formRef}
+      data-cms-form={inline ? undefined : ""}
       noValidate
       onSubmit={(event) => {
         // Ignore repeat presses while saving. The button isn't disabled:
@@ -96,8 +118,14 @@ export function CmsForm<TIn extends FieldValues, TOut>({
     >
       <div className="grid gap-6">{children(form)}</div>
 
-      {/* Always reachable on long forms. */}
-      <div className="sticky bottom-0 z-10 mt-6 flex flex-col gap-3 border-t border-border bg-background px-6 py-4 sm:flex-row sm:items-center sm:gap-6 sm:px-8">
+      {/* Always reachable on long forms (inline forms are short: no sticky bar). */}
+      <div
+        className={
+          inline
+            ? "mt-4 flex flex-col gap-3 border-t border-border bg-background px-6 py-4 sm:flex-row sm:items-center sm:gap-4 sm:px-8"
+            : "sticky bottom-0 z-10 mt-6 flex flex-col gap-3 border-t border-border bg-background px-6 py-4 sm:flex-row sm:items-center sm:gap-6 sm:px-8"
+        }
+      >
         <Button
           ref={submitRef}
           type="submit"
@@ -106,6 +134,11 @@ export function CmsForm<TIn extends FieldValues, TOut>({
         >
           {form.formState.isSubmitting ? "Saving…" : submitLabel}
         </Button>
+        {onCancel && (
+          <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={onCancel}>
+            Cancel
+          </Button>
+        )}
         <div className="min-h-5 text-sm">
           <p role="status" aria-live="polite">
             {status?.kind === "success" && <span className="text-muted-foreground">{status.text}</span>}

@@ -10,16 +10,19 @@ import {
 } from "@/components/ui/accordion";
 import { sortedFaqs, type FaqItem } from "@/data/faq";
 import { faqSection, type FaqCopy } from "@/data/home";
+import { SlotItem, type ItemSlots } from "./item-slots";
 
 export function Faq({
   faqs = sortedFaqs,
   copy = faqSection,
+  itemSlots,
 }: {
   faqs?: FaqItem[];
   copy?: FaqCopy;
+  itemSlots?: ItemSlots<FaqItem>;
 }) {
   // Nothing to answer yet: no empty heading.
-  if (faqs.length === 0) return null;
+  if (faqs.length === 0 && !itemSlots?.after) return null;
 
   return (
     <Section id="faq" tone="ivory" aria-labelledby="faq-title">
@@ -34,7 +37,8 @@ export function Faq({
               navigation between questions, one open at a time. */}
           <Accordion type="single" collapsible className="border-t border-foreground/15">
             {faqs.map((faq) => (
-              <AccordionItem key={faq.id} value={faq.id}>
+              <SlotItem key={faq.id} slots={itemSlots} item={faq}>
+              <AccordionItem value={faq.id}>
                 <AccordionTrigger>{faq.question}</AccordionTrigger>
                 <AccordionContent>
                   <p>{faq.answer}</p>
@@ -45,9 +49,11 @@ export function Faq({
                   )}
                 </AccordionContent>
               </AccordionItem>
+              </SlotItem>
             ))}
           </Accordion>
         </Reveal>
+        {itemSlots?.after}
       </Container>
     </Section>
   );

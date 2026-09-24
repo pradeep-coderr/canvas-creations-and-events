@@ -21,7 +21,7 @@ import {
   TextField,
   type CmsFormApi,
 } from "./cms-fields";
-import { CmsForm } from "./cms-form";
+import { CmsForm, type InlineFormOptions } from "./cms-form";
 
 /*
  * One form per collection. Fields are content-specific; submitting, errors
@@ -29,14 +29,19 @@ import { CmsForm } from "./cms-form";
  * saveCollectionItem server action (admin-checked, RLS-enforced).
  */
 
-interface ItemFormProps<K extends CollectionKey> {
+export interface ItemFormProps<K extends CollectionKey> {
   /** null when creating. */
   id: string | null;
   defaultValues: CollectionValues<K>;
   initialMessage?: string;
+  /** Used by the visual editor to show the form in place. */
+  inlineOptions?: InlineFormOptions;
 }
 
-function formProps<K extends CollectionKey>(key: K, { id, defaultValues, initialMessage }: ItemFormProps<K>) {
+function formProps<K extends CollectionKey>(
+  key: K,
+  { id, defaultValues, initialMessage, inlineOptions }: ItemFormProps<K>,
+) {
   const { singular } = collections[key];
   return {
     schema: collectionSchema(key),
@@ -45,7 +50,10 @@ function formProps<K extends CollectionKey>(key: K, { id, defaultValues, initial
     submitLabel: id ? "Save changes" : `Create ${singular}`,
     save: (values: CollectionValues<K>, confirmLastFaq: boolean) =>
       saveCollectionItem(key, id, values, confirmLastFaq),
-    createdUrl: id ? undefined : (newId: string) => `/admin/content/${key}/${newId}?created=1`,
+    // In the editor a new item simply appears in place; on its own page the
+    // form continues on the new item's edit page.
+    createdUrl: id || inlineOptions ? undefined : (newId: string) => `/admin/content/${key}/${newId}?created=1`,
+    ...inlineOptions,
   };
 }
 

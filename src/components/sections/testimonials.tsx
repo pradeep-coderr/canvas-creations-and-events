@@ -4,6 +4,7 @@ import { Reveal } from "@/components/motion/reveal";
 import { Eyebrow } from "@/components/shared/eyebrow";
 import { testimonialsSection, type TestimonialsCopy } from "@/data/home";
 import { featuredTestimonials, type Testimonial } from "@/data/testimonials";
+import { SlotItem, type ItemSlots } from "./item-slots";
 
 function Credit({ testimonial }: { testimonial: Testimonial }) {
   return (
@@ -23,11 +24,13 @@ function Credit({ testimonial }: { testimonial: Testimonial }) {
 export function Testimonials({
   testimonials = featuredTestimonials,
   copy = testimonialsSection,
+  itemSlots,
 }: {
   testimonials?: Testimonial[];
   copy?: TestimonialsCopy;
+  itemSlots?: ItemSlots<Testimonial>;
 }) {
-  if (testimonials.length === 0) return null;
+  if (testimonials.length === 0 && !itemSlots?.after) return null;
   const [lead, ...rest] = testimonials;
 
   return (
@@ -38,30 +41,37 @@ export function Testimonials({
           {copy.title}
         </h2>
 
-        <Reveal>
-          <figure className="mt-8">
-            <blockquote className="font-display text-display-md text-foreground italic">
-              <p>“{lead.quote}”</p>
-            </blockquote>
-            <Credit testimonial={lead} />
-          </figure>
-        </Reveal>
+        {lead && (
+          <SlotItem slots={itemSlots} item={lead}>
+            <Reveal>
+              <figure className="mt-8">
+                <blockquote className="font-display text-display-md text-foreground italic">
+                  <p>“{lead.quote}”</p>
+                </blockquote>
+                <Credit testimonial={lead} />
+              </figure>
+            </Reveal>
+          </SlotItem>
+        )}
       </Container>
 
       {rest.length > 0 && (
         <Container className="mt-16 grid gap-12 border-t border-foreground/15 pt-12 sm:grid-cols-2 sm:gap-16">
           {rest.map((t) => (
-            <Reveal key={t.id}>
-              <figure>
-                <blockquote className="font-display text-display-sm text-foreground/90 italic">
-                  <p>“{t.quote}”</p>
-                </blockquote>
-                <Credit testimonial={t} />
-              </figure>
-            </Reveal>
+            <SlotItem key={t.id} slots={itemSlots} item={t}>
+              <Reveal>
+                <figure>
+                  <blockquote className="font-display text-display-sm text-foreground/90 italic">
+                    <p>“{t.quote}”</p>
+                  </blockquote>
+                  <Credit testimonial={t} />
+                </figure>
+              </Reveal>
+            </SlotItem>
           ))}
         </Container>
       )}
+      {itemSlots?.after && <Container size="narrow">{itemSlots.after}</Container>}
     </Section>
   );
 }

@@ -4,6 +4,7 @@ import { Reveal } from "@/components/motion/reveal";
 import { Eyebrow } from "@/components/shared/eyebrow";
 import { sortedCategories, type Category } from "@/data/categories";
 import { categoriesSection, type CategoriesCopy } from "@/data/home";
+import { SlotItem, type ItemSlots } from "./item-slots";
 
 /**
  * Typographic list of the kinds of celebrations the studio styles. Renders
@@ -14,11 +15,13 @@ import { categoriesSection, type CategoriesCopy } from "@/data/home";
 export function CategoryStrip({
   categories = sortedCategories,
   copy = categoriesSection,
+  itemSlots,
 }: {
   categories?: Category[];
   copy?: CategoriesCopy;
+  itemSlots?: ItemSlots<Category>;
 }) {
-  if (categories.length === 0) return null;
+  if (categories.length === 0 && !itemSlots?.after) return null;
 
   return (
     <Section aria-labelledby="categories-title" className="py-16 sm:py-20 lg:py-24">
@@ -39,11 +42,14 @@ export function CategoryStrip({
                 key={category.id}
                 className="font-display text-display-sm text-foreground/90 italic"
               >
-                {category.label}
+                <SlotItem slots={itemSlots} item={category}>
+                  {category.label}
+                </SlotItem>
               </li>
             ))}
           </ul>
         </Reveal>
+        {itemSlots?.after}
       </Container>
     </Section>
   );

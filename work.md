@@ -2146,3 +2146,154 @@ All local test rows, the three local test users and the temp files were deleted;
 - **Hosted admin-session check** of the CMS by the real admin once deployed.
 - **Enquiry status form (Phase 9):** its button is still `disabled` while saving, so keyboard focus drops to the page. It should get the same `aria-disabled` treatment; left unchanged to keep this phase's scope.
 - Not built, as the brief asked: revision history, scheduling, roles, audit log, bulk actions, drag-and-drop.
+
+---
+
+## Phase 15 — Visual Website Editor / Inline CMS
+
+**Date:** Thursday 24 September 2026 · **Timezone:** NPT (UTC+05:45) · **Finished:** ~20:25
+**Result:** Commit `feat: add visual website editor` (the hash is in the final report; a commit can't contain its own hash). Not pushed. **No database changes.** The Phase 13 schema and Phase 14 server actions are used as-is (one added line: the actions also revalidate `/admin/editor`).
+
+### What the client does now
+
+```text
+/admin → "Edit website" (header) → /admin/editor → the real homepage with editing controls
+  hover/Tab to text → press → input in place → Save  → existing CMS action → Supabase → updateTag → public "/"
+```
+
+`/admin/content` (Phase 14) stays as the advanced/fallback interface; both edit the same rows through the same actions.
+
+### Architecture: one page composition, two uses
+
+- **`src/components/home/home-sections.tsx` (new):** `HomeSections` renders the 13 homepage sections in order.
+  - The public page (`src/app/(site)/page.tsx`) and the editor both use it, so they can't drift apart.
+  - `SiteFrame` (header + footer + mobile bar) is shared the same way; the public layout still adds the service-worker registration, and the editor doesn't.
+- **Copy as nodes:**
+  - The section copy types became `Renderable<…>`: text may be any React node, while `href`/`src`/`alt` stay strings.
+  - The public page passes the CMS strings, exactly as before.
+  - The editor passes `<EditableText>` client nodes. Section components needed **no editor logic** (only two string `key`s became index keys).
+- **Collection slots:** the seven collection sections take one optional prop, `itemSlots` (`src/components/sections/item-slots.tsx`):
+  - an `Item` wrapper per item (the editor's controls);
+  - an `after` node (the editor's "Add …").
+  - The public page never passes it. A section with no items still renders when `after` is given, so items can be added.
+- **Why no `?edit=1`, contenteditable or overlays:**
+  - The editor is a separate server-protected route.
+  - Text is edited in controlled inputs.
+  - Editor code lives only in that route's bundle.
+  - **Verified:** the public `/` HTML and its 18 JS/CSS files contain no editor markup, code or styles; the editor's own assets do (positive control).
+
+### Routes and entry point
+
+- **`/admin/editor` (new):** `requireAdmin()` in the page, under the existing `/admin` layout, so it's noindex, uses the admin manifest, stays inside the admin PWA scope, and the service worker ignores it.
+- **"Edit website":** a 44px primary button in the admin header row, next to the Enquiries | Content tabs, on every admin page including `/admin`.
+
+### Editable fields: `src/lib/editor/fields.ts` (typed registry)
+
+Every page spot maps to an existing CMS field (the form-value names from `src/lib/cms/singletons.ts`) with a friendly label. Field validation comes from the Phase 14 schemas' shapes, so the editor can't be looser than `/admin/content`.
+
+| Section | Inline on the page | In "Edit section" only |
+| --- | --- | --- |
+| Hero | label, text | second-button text, photo |
+| Introduction | label, heading, text | — |
+| Services | label, heading, text | enquiry-prompt heading/text (the whole prompt is a link) |
+| Categories / Process / FAQ | label, heading | — |
+| Gallery | label, heading, empty-state heading/text | Instagram link text |
+| Why Canvas | label, heading lines (1–3) | — |
+| Testimonials | label | heading (visually hidden, screen-reader only) |
+| About | label, heading, story (paragraphs), founder name/role (once saved) | link text, founder name/role, photo |
+| Video | label, heading, empty-state text | TikTok link text, video type/URL/title/caption |
+| Enquiry / Contact | label, heading, text | — |
+
+**Not editable (code, per Phase 13), explained in the panels:** the hero headline (business slogan), navigation labels and targets, phone and social links, link destinations, the enquiry form's own labels. The brief's "navigation labels" test was done on the CMS-backed **link texts** (hero second button): the text changed and the destination `/#gallery` stayed the same.
+
+**Collections in place:** services, categories, gallery, testimonials, FAQs, process, Why Canvas.
+- Each item has **Edit** (the item's Phase 14 form, opened in place) and a **⋯** menu: move up/down, publish/unpublish, delete.
+- **Add …** sits under each list.
+- Drafts and items not on the homepage (not featured, or over the 3-testimonial/5-photo limits) are labelled and dimmed.
+
+### Components (`src/components/editor/`)
+
+| File | Role |
+| --- | --- |
+| `editor-context.tsx` | Drafts, saving, unsaved count, preview mode, status. Saves go **one call per record** (home/about/video) through `saveHomeContent`/`saveAboutContent`/`saveVideoStory`, merging all drafts of that record, so two open edits can't overwrite each other. Server field errors are shown on the right field |
+| `editable-text.tsx` | `EditableText`: a real `<button>` showing the text. Hover/focus shows a champagne hairline and a pencil. Press → an input/textarea in the same place and typography, with Save/Cancel; Enter / Ctrl+Enter saves, Esc keeps an unsaved draft. `LiveText` shows text that sits inside links (edited in the panel) |
+| `editor-section.tsx` | `EditorSection`: an "Edit section" button per section (icon-only with a spoken label on phones) opening a side panel with that section's fields, photo and video settings. Hides sections a visitor wouldn't see in preview |
+| `editor-item.tsx` | `EditorItem`, `AddItem`: item controls; the Phase 14 forms shown inline |
+| `editor-shell.tsx` | Toolbar ("Editing website", unsaved count or last result, Preview, Save, Exit), leave dialog, `beforeunload`, and the canvas where links scroll instead of navigating and the enquiry form doesn't send |
+| `editor.css` | Editor styles from the site's tokens (adapts in dark sections), imported only by the editor |
+
+**Phase 14 code reused, not duplicated:**
+- `useItemActions` (new, `src/components/admin/use-item-actions.tsx`) now holds the publish/move/delete logic, the confirmation dialog and the last-FAQ safeguard for **both** `/admin/content` lists (refactored onto it, suite re-run: 78/78) and the editor.
+- `CmsForm` gained optional inline options (`inline`, `onSaved`, `onCancel`, `onDirtyChange`), and the collection forms pass them through. Full-page behaviour is unchanged.
+- shadcn `dropdown-menu` was added (CLI; `@/lib/utils` import, motion-safe animations, `button.tsx` not overwritten).
+
+### Save model, unsaved changes, preview, cache
+
+- **Nothing auto-saves.**
+  - Inline and panel edits are drafts (shown live and marked) until Save: inline Save, "Save section", or the toolbar Save (everything, including open item forms).
+  - Cancel discards explicitly; Esc/close keeps the draft.
+  - Leaving via Exit with changes opens a dialog: Keep editing / Leave without saving / Save and leave. Reload or close triggers the browser's own warning. No `window.confirm`.
+- **Preview:** all editor controls removed (0 `data-editor-control` elements), drafts and not-shown items hidden, sections a visitor wouldn't see hidden. The page text matches the public page. "Back to editing" restores everything.
+- **Cache:** the existing actions call `updateTag(CMS_CONTENT_TAG)` (and now also `revalidatePath("/admin/editor")` so the editor refreshes). A plain request to `/` after each save returned the new content, well inside the 1-hour window: hero text, intro heading, link text, service title, FAQ order, draft FAQ not public.
+
+### Issues found and fixed during testing
+
+1. **Gallery empty state didn't show the editor's "Add" slot:** the honest "photo uploads aren't set up" message was missing there. It's now rendered in both gallery branches.
+2. **Section panel returned focus to `<body>`:** it's opened from code with no Radix Trigger. It now returns focus to its "Edit section" button.
+3. **At 375px the toolbar title was squeezed and "Edit section" covered the hero label:** Preview and Edit section become 44px icon buttons with spoken labels on phones, and the title truncates.
+4. **Neighbouring items' dashed outlines overlapped:** the outline is now inside the item.
+5. **Deprecated `React.FormEvent` type:** replaced with `SyntheticEvent`.
+
+### Tests actually run
+
+**Local production build** (local Supabase, temporary local admin + non-admin):
+
+**`editor15.mjs`, 68/68 pass**, headless Chrome over CDP, no console errors:
+
+| Area | What was checked |
+| --- | --- |
+| Auth | anonymous → login; admin lands on `/admin`; "Edit website" link (44px) opens `/admin/editor`; real header, footer and all sections present; noindex + admin manifest; no service worker registered from the editor |
+| Hero text | hover shows pencil + outline; click opens a focused textarea in place; no contenteditable anywhere; Save → "Hero text saved.", focus back on the text; public `/` shows it; DB updated; Ctrl+Enter restores |
+| Keyboard-only | Tab from the toolbar reaches the intro heading; Enter opens; Enter saves (focus returns); empty heading rejected in place with an alert, DB unchanged |
+| Unsaved changes | Esc keeps a marked draft; toolbar "1 unsaved change"; Exit → dialog (focus inside); Keep editing keeps it (focus back on Exit); Leave without saving → `/admin`, DB unchanged; toolbar Save saves drafts |
+| Section panel | opens; typing shows live on the page; Save section → public link text changed, `href="/#gallery"` unchanged; opens by keyboard, focus trapped (12 Tabs), Esc closes, focus back on its button |
+| Services | Edit opens the Phase 14 form in place with current values; save → public updated; focus returns to Edit; Cancel closes, focus back |
+| FAQs | ⋯ menu by keyboard; move down/up → public order changes/restores; unpublish two (Draft labels in place); the last one → safeguard dialog, Cancel keeps it; republish; Add FAQ creates a draft in place, not public; delete dialog names it, focus moves to "Add FAQ" |
+| Preview | 0 editor controls, 0 editables, draft hidden, "Previewing website"; text matches the public page; back to editing restores |
+| Inert | header link stays in the editor (scrolls); the enquiry form doesn't create an enquiry |
+| Gallery | Add disabled with the honest explanation |
+| Responsive | at 375/390/430/768/1024/1280/1440: no horizontal overflow, no clipped controls, all controls ≥44px, toolbar title visible, and an inline editor, the section panel and an item menu each fit the screen |
+
+**Other suites:**
+- **`iso15.mjs` (7/7):** anonymous and **signed-in non-admin** (a real Supabase session cookie) → `/admin/editor` redirects to login with no editor HTML; admin gets 200, noindex, `no-store`; public `/` has no editor markers, stays ISR (`s-maxage=3600`), and none of its 18 JS/CSS assets contain editor code or CSS.
+- **`action14.mjs` (17/17):** every CMS mutation called directly as no-session / non-admin is refused, database unchanged; the admin control works.
+- **`rls13.mjs` (141/141):** database RLS unchanged.
+- **`cms14.mjs` (78/78):** the Phase 14 `/admin/content` UI on the refactored hook.
+- **Regression**, all pass:
+  - Public 7-width audit (page heights identical to before).
+  - Keyboard/menu/reduced-motion suite; CTA/FAQ/form/mobile-bar suite; header state.
+  - Metadata (admin noindex, no private data, 404s).
+  - Date picker + admin status Select.
+  - Admin PWA (installable, shortcuts, mobile admin, worker boundary, offline, sign-out).
+  - Public PWA (offline homepage and form, caches free of admin/private data).
+  - Headers, robots.txt and sitemap unchanged.
+- **Final gate** with the normal hosted env: `bun install --frozen-lockfile`, typecheck, lint, build and `git diff --check` all pass.
+
+**Hosted:**
+- The build loaded every CMS source from hosted (0 fallback logs).
+- Served locally on a spare port: `/` renders from hosted with no editor markers, and `/admin/editor` redirects to login.
+- `hosted13.mjs`: 18/19. The one "failure" is its **seed-count assumption**: hosted now has **3 published services** (see below). All security checks passed.
+- **Not done on hosted:** editor saves as the real admin (no password; no hosted test users created). The editor's write paths were verified **locally only**.
+
+⚠️ **Hosted content changed outside this phase:** two extra published, featured services were created on hosted at ~14:35 UTC today: a second **"Event styling & decoration"** and **"Event styling & decoration456"**. They look like manual CMS testing. They're live on any build using the hosted database. **Not touched by me.** Delete or unpublish them in the editor (⋯ → Delete) or `/admin/content/services` if they were tests.
+
+**Cleanup:** local test users, enquiries and all test edits removed or restored (the local DB equals the seed). Test servers stopped; temp files removed. Your dev server (:3000) wasn't used by my tests and wasn't touched.
+
+### Remaining / deferred
+
+- **Media:** uploads, a library and alt-text editing (the pickers and "Add photo" explain it isn't set up yet).
+- **YouTube/Vimeo playback** on the public site (the editor saves the link and says it isn't shown yet).
+- **Preview detail:** drafts are hidden in preview, but numbering and the testimonial lead slot are computed from the full editor list, so preview can differ from the public page if a draft sits between published items.
+- **Leaving:** browser back to another admin page within the app isn't intercepted; Exit, reload and close are.
+- **Enquiry status form (Phase 9):** still disables its button while saving (focus drops).
+- **Hosted admin-session check** of the editor by the real admin once deployed.

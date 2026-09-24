@@ -206,21 +206,34 @@ export const contactSection = {
   description: "Prefer to talk it through? Give us a call, or follow along online.",
 };
 
+/**
+ * Copy as the sections render it. Text may be any React node: the public
+ * site passes plain strings (CMS or the values above), the admin visual
+ * editor passes editable text. Links, image sources and alt text stay plain.
+ */
+export type Renderable<T> = T extends string
+  ? React.ReactNode
+  : T extends readonly (infer U)[]
+    ? Renderable<U>[]
+    : T extends object
+      ? { [K in keyof T]: K extends "href" | "src" | "alt" | "position" | "poster" ? T[K] : Renderable<T[K]> }
+      : T;
+
 /*
  * Section copy types. The public sections take these as props (defaulting
  * to the values above), so the same components render the CMS copy from
  * src/lib/content/public.ts.
  */
-export type HeroCopy = typeof hero;
-export type IntroCopy = typeof intro;
-export type ServicesCopy = typeof servicesSection;
-export type CategoriesCopy = typeof categoriesSection;
-export type GalleryCopy = typeof gallerySection;
-export type AboutCopy = typeof about;
-export type ProcessCopy = Pick<typeof processSection, "eyebrow" | "title">;
-export type WhyCanvasCopy = Pick<typeof whyCanvas, "eyebrow" | "titleLines">;
-export type VideoStoryCopy = Omit<typeof videoStory, "video">;
-export type TestimonialsCopy = typeof testimonialsSection;
-export type FaqCopy = typeof faqSection;
-export type EnquiryCopy = typeof enquirySection;
-export type ContactCopy = typeof contactSection;
+export type HeroCopy = Renderable<typeof hero>;
+export type IntroCopy = Renderable<typeof intro>;
+export type ServicesCopy = Renderable<typeof servicesSection>;
+export type CategoriesCopy = Renderable<typeof categoriesSection>;
+export type GalleryCopy = Renderable<typeof gallerySection>;
+export type AboutCopy = Renderable<typeof about>;
+export type ProcessCopy = Renderable<Pick<typeof processSection, "eyebrow" | "title">>;
+export type WhyCanvasCopy = Renderable<Pick<typeof whyCanvas, "eyebrow" | "titleLines">>;
+export type VideoStoryCopy = Renderable<Omit<typeof videoStory, "video">>;
+export type TestimonialsCopy = Renderable<typeof testimonialsSection>;
+export type FaqCopy = Renderable<typeof faqSection>;
+export type EnquiryCopy = Renderable<typeof enquirySection>;
+export type ContactCopy = Renderable<typeof contactSection>;
