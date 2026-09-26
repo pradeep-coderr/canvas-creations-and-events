@@ -24,12 +24,13 @@ export function AboutFounder({
         {/* Text first in the DOM (reading order); the image leads visually on desktop. */}
         <Reveal className="lg:col-span-6 lg:col-start-7">
           <SectionHeading
+          styleKeys={{ eyebrow: "about.eyebrow", title: "about.title" }}
             id="about-title"
             eyebrow={copy.eyebrow}
             title={copy.title}
             align="start"
           />
-          <div className="mt-8 max-w-xl space-y-5 text-lead text-muted-foreground">
+          <div data-sk="about.body" className="mt-8 max-w-xl space-y-5 text-lead text-muted-foreground">
             {copy.body.map((paragraph, i) => (
               <p key={i}>{paragraph}</p>
             ))}
@@ -37,8 +38,12 @@ export function AboutFounder({
           {/* Only once the client has added a real name (never invented). */}
           {copy.founder && (
             <p className="mt-6 text-sm">
-              <span className="font-semibold">{copy.founder.name}</span>
-              {copy.founder.role && <span className="text-muted-foreground">, {copy.founder.role}</span>}
+              <span data-sk="about.founderName" className="font-semibold">{copy.founder.name}</span>
+              {copy.founder.role && (
+                <span className="text-muted-foreground">
+                  , <span data-sk="about.founderRole">{copy.founder.role}</span>
+                </span>
+              )}
             </p>
           )}
           <Button asChild variant="link" className="mt-10">

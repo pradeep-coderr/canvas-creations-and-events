@@ -25,6 +25,7 @@ export function WhyCanvas({
     <Section tone="dark" aria-labelledby="why-title">
       <Container>
         <SectionHeading
+          styleKeys={{ eyebrow: "home.whyEyebrow", title: "home.whyTitleLines" }}
           id="why-title"
           eyebrow={copy.eyebrow}
           title={copy.titleLines.map((line, i) => (

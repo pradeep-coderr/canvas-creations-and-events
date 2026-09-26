@@ -75,6 +75,7 @@ export function Services({
     <Section id="services" tone="ivory" aria-labelledby="services-title">
       <Container className="grid gap-12 lg:grid-cols-12 lg:gap-16">
         <SectionHeading
+          styleKeys={{ eyebrow: "home.servicesEyebrow", title: "home.servicesTitle", description: "home.servicesDescription" }}
           id="services-title"
           eyebrow={copy.eyebrow}
           title={copy.title}

@@ -2,13 +2,13 @@ import Image from "next/image";
 import { Eyebrow } from "@/components/shared/eyebrow";
 import { SiteLink } from "@/components/shared/site-link";
 import { site } from "@/data/site";
+import type { SiteCopy } from "@/lib/cms/site-settings";
 import { Container } from "./container";
-
-const { phone, address } = site.contact;
 
 const linkClass = "transition-colors hover:text-primary";
 
-export function SiteFooter() {
+export function SiteFooter({ settings }: { settings: SiteCopy }) {
+  const { phone, address } = settings;
   // Evaluated at build time for static pages; a yearly rebuild keeps it current.
   const year = new Date().getFullYear();
 
@@ -24,15 +24,15 @@ export function SiteFooter() {
             sizes="80px"
             className="size-20"
           />
-          <p className="mt-6 max-w-xs font-display text-display-sm text-foreground/90 italic">
-            {site.slogan}
+          <p data-sk="site.footerTagline" className="mt-6 max-w-xs font-display text-display-sm text-foreground/90 italic">
+            {settings.footerTagline}
           </p>
         </div>
 
         <nav aria-label="Footer" className="lg:col-span-3 lg:col-start-6">
-          <Eyebrow>Explore</Eyebrow>
+          <Eyebrow data-sk="site.footerExploreHeading">{settings.footerHeadings.explore}</Eyebrow>
           <ul className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-1">
-            {[...site.navigation, site.enquiry].map((item) => (
+            {[...settings.navigation, settings.enquiry].map((item) => (
               <li key={item.href}>
                 <SiteLink href={item.href} className={linkClass}>
                   {item.label}
@@ -44,7 +44,7 @@ export function SiteFooter() {
 
         <div className="space-y-10 lg:col-span-4">
           <div>
-            <Eyebrow>Contact</Eyebrow>
+            <Eyebrow data-sk="site.footerContactHeading">{settings.footerHeadings.contact}</Eyebrow>
             <address className="mt-5 space-y-3 text-sm not-italic">
               <p>
                 <a href={phone.href} className={linkClass}>
@@ -57,9 +57,9 @@ export function SiteFooter() {
             </address>
           </div>
           <div>
-            <Eyebrow>Follow</Eyebrow>
+            <Eyebrow data-sk="site.footerFollowHeading">{settings.footerHeadings.follow}</Eyebrow>
             <ul className="mt-5 flex flex-wrap gap-x-6 gap-y-3 text-sm">
-              {site.socials.map((social) => (
+              {settings.socials.map((social) => (
                 <li key={social.platform}>
                   <a
                     href={social.href}

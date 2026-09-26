@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Pencil } from "lucide-react";
+import { Paintbrush, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { paragraphsFromText } from "@/lib/cms/singletons";
 import { fieldDef, validateField, type EditorScope } from "@/lib/editor/fields";
+import { isStyleKey } from "@/lib/styles/schema";
 import { cn } from "@/lib/utils";
 import { useEditor } from "./editor-context";
+import { TextStyleControls } from "./style-controls";
 
 /*
  * Page text that can be edited where it appears. It is never contenteditable:
@@ -50,6 +52,8 @@ export function EditableText({ scope, field }: { scope: EditorScope; field: stri
   const serverError = editor.error(scope, field);
   const [open, setOpen] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [styling, setStyling] = useState(false);
+  const styleKey = `${scope}.${field}`;
   const triggerRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const returnFocus = useRef(false);
@@ -113,7 +117,12 @@ export function EditableText({ scope, field }: { scope: EditorScope; field: stri
         onClick={() => setOpen(true)}
       >
         <span className="sr-only">Edit {label}: </span>
-        <Display kind={kind} value={value} />
+        {def?.optional && !String(value ?? "").trim() ? (
+          // Empty optional text: something to click (the website shows nothing).
+          <span className="cc-placeholder">Add {label.toLowerCase()}</span>
+        ) : (
+          <Display kind={kind} value={value} />
+        )}
         {draft && <span className="sr-only"> (unsaved change)</span>}
         <span aria-hidden="true" className="cc-editable-badge">
           <Pencil />
@@ -191,10 +200,24 @@ export function EditableText({ scope, field }: { scope: EditorScope; field: stri
         <Button type="button" size="sm" variant="outline" className="h-11" onClick={cancel}>
           Cancel
         </Button>
+        {isStyleKey(styleKey) && (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-11"
+            aria-expanded={styling}
+            onClick={() => setStyling((s) => !s)}
+          >
+            <Paintbrush data-icon="inline-start" aria-hidden="true" />
+            Style
+          </Button>
+        )}
         <span className="cc-edit-tip">
           {kind === "line" ? "Enter to save · " : "Ctrl+Enter to save · "}Esc keeps it as unsaved
         </span>
       </span>
+      {styling && isStyleKey(styleKey) && <TextStyleControls styleKey={styleKey} label={label} />}
     </span>
   );
 }

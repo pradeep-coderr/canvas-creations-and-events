@@ -2,11 +2,12 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { SiteLink } from "@/components/shared/site-link";
 import { site } from "@/data/site";
+import type { SiteCopy } from "@/lib/cms/site-settings";
 import { Container } from "./container";
 import { HeaderShell } from "./header-shell";
 import { MobileMenu } from "./mobile-menu";
 
-export function SiteHeader() {
+export function SiteHeader({ settings }: { settings: SiteCopy }) {
   return (
     <HeaderShell>
       <Container className="flex h-(--header-height) items-center justify-between gap-8">
@@ -24,7 +25,7 @@ export function SiteHeader() {
 
         <nav aria-label="Main" className="hidden lg:block">
           <ul className="flex items-center gap-9 xl:gap-11">
-            {site.navigation.map((item) => (
+            {settings.navigation.map((item) => (
               <li key={item.href}>
                 <SiteLink
                   href={item.href}
@@ -39,9 +40,9 @@ export function SiteHeader() {
 
         <div className="flex items-center">
           <Button asChild className="hidden lg:inline-flex">
-            <SiteLink href={site.enquiry.href}>{site.enquiry.label}</SiteLink>
+            <SiteLink href={settings.enquiry.href}>{settings.enquiry.label}</SiteLink>
           </Button>
-          <MobileMenu />
+          <MobileMenu settings={settings} />
         </div>
       </Container>
     </HeaderShell>

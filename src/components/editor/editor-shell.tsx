@@ -13,7 +13,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { textStylesCss } from "@/lib/styles/schema";
 import { EditorProvider, useEditor, type EditorData } from "./editor-context";
+import { ChromePanelButton } from "./editor-section";
 import "./editor.css";
 
 /*
@@ -79,6 +81,7 @@ function Toolbar() {
           </p>
         </div>
         {/* Icon-only on phones (with a spoken label), text from sm up. */}
+        {!preview && <ChromePanelButton />}
         <Button
           type="button"
           variant="outline"
@@ -171,9 +174,16 @@ function Canvas({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Text style presets, live: the saved ones plus any just chosen. */
+function LiveStyles() {
+  const { styles } = useEditor();
+  return <style>{textStylesCss(styles.text)}</style>;
+}
+
 export function EditorShell({ data, children }: { data: EditorData; children: React.ReactNode }) {
   return (
     <EditorProvider data={data}>
+      <LiveStyles />
       <Toolbar />
       <Canvas>{children}</Canvas>
     </EditorProvider>

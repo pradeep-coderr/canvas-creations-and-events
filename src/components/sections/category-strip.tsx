@@ -26,9 +26,10 @@ export function CategoryStrip({
   return (
     <Section aria-labelledby="categories-title" className="py-16 sm:py-20 lg:py-24">
       <Container className="text-center">
-        <Eyebrow>{copy.eyebrow}</Eyebrow>
+        <Eyebrow data-sk="home.categoriesEyebrow">{copy.eyebrow}</Eyebrow>
         <h2
           id="categories-title"
+          data-sk="home.categoriesTitle"
           className="mt-4 font-display text-display-md font-title"
         >
           {copy.title}

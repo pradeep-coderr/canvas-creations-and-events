@@ -10,6 +10,7 @@ import { SiteFrame } from "@/components/layout/site-frame";
 import { SiteThemeStyle } from "@/components/theme/site-theme-style";
 import { about as localAbout, enquirySection, hero as localHero } from "@/data/home";
 import { loadEditorPage } from "@/lib/admin/editor-content";
+import { settingsFromValues, type SiteCopy } from "@/lib/cms/site-settings";
 import { requireAdmin } from "@/lib/admin/session";
 import type { CollectionKey } from "@/lib/cms/collections";
 import type { EditorScope } from "@/lib/editor/fields";
@@ -58,7 +59,50 @@ export default async function EditorPage() {
     );
   }
 
+  // Site details: text editable in place (or in a panel when it sits inside a
+  // link or a form label); links come from the saved values.
+  const saved = settingsFromValues(page.data.saved.site);
+  const navFields = ["navHome", "navServices", "navGallery", "navAbout", "navFaq", "navContact"];
+  const settings: SiteCopy = {
+    ...saved,
+    headline: { lead: t("site", "headlineLead"), emphasis: t("site", "headlineEmphasis") },
+    footerTagline: t("site", "footerTagline"),
+    navigation: saved.navigation.map((item, i) => ({ href: item.href, label: live("site", navFields[i]) })),
+    enquiry: { href: saved.enquiry.href, label: live("site", "enquireLabel") },
+    mobileEnquireLabel: live("site", "mobileEnquireLabel"),
+    mobileCallLabel: live("site", "mobileCallLabel"),
+    menuLabel: live("site", "menuLabel"),
+    callPrompt: t("site", "callPrompt"),
+    footerHeadings: {
+      explore: t("site", "footerExploreHeading"),
+      contact: t("site", "footerContactHeading"),
+      follow: t("site", "footerFollowHeading"),
+    },
+    basedInLabel: t("site", "basedInLabel"),
+    phone: { href: saved.phone.href, display: live("site", "phoneDisplay") },
+    address: {
+      street: t("site", "addressStreet"),
+      locality: t("site", "addressLocality"),
+      region: t("site", "addressRegion"),
+      postcode: t("site", "addressPostcode"),
+    },
+    form: {
+      name: live("site", "formNameLabel"),
+      email: live("site", "formEmailLabel"),
+      phone: live("site", "formPhoneLabel"),
+      eventType: live("site", "formEventTypeLabel"),
+      eventDate: live("site", "formEventDateLabel"),
+      venue: live("site", "formVenueLabel"),
+      message: live("site", "formMessageLabel"),
+      submit: live("site", "formSubmitLabel"),
+      optional: live("site", "formOptionalLabel"),
+      successTitle: live("site", "formSuccessTitle"),
+      successText: live("site", "formSuccessText"),
+    },
+  };
+
   const content: HomeContent = {
+    settings,
     copy: {
       hero: {
         eyebrow: t("home", "heroEyebrow"),
@@ -144,7 +188,7 @@ export default async function EditorPage() {
     <EditorShell data={page.data}>
       {/* The page is shown in the live global theme (admin → Design). */}
       <SiteThemeStyle />
-      <SiteFrame>
+      <SiteFrame settings={settings}>
         <main id="main">
           <HomeSections content={content} slots={slots} />
         </main>

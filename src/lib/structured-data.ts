@@ -1,14 +1,16 @@
 import { site } from "@/data/site";
+import { headlineText, type SiteSettings } from "@/lib/cms/site-settings";
 import { absoluteUrl } from "@/lib/site-url";
 
 /**
  * schema.org LocalBusiness for the public homepage. Built only from verified
- * business data in src/data/site.ts — deliberately no opening hours, price
+ * business data (site details from the CMS; the name and description from
+ * src/data/site.ts) — deliberately no opening hours, price
  * range, ratings, email, coordinates, founding date or service radius.
  * Contains no user-submitted data.
  */
-export function localBusinessJsonLd() {
-  const { phone, address } = site.contact;
+export function localBusinessJsonLd(settings: SiteSettings) {
+  const { phone, address } = settings;
   const logo = absoluteUrl("/images/logo/canvas-creations-logo-512.png");
 
   return {
@@ -16,7 +18,7 @@ export function localBusinessJsonLd() {
     "@type": "LocalBusiness",
     "@id": `${absoluteUrl("/")}#business`,
     name: site.name,
-    slogan: site.slogan,
+    slogan: headlineText(settings),
     description: site.description,
     url: absoluteUrl("/"),
     telephone: phone.href.replace(/^tel:/, ""),
@@ -28,9 +30,9 @@ export function localBusinessJsonLd() {
       addressLocality: address.locality,
       addressRegion: address.region,
       postalCode: address.postcode,
-      addressCountry: address.countryCode,
+      addressCountry: site.contact.address.countryCode,
     },
-    sameAs: site.socials.map((social) => social.href),
+    sameAs: settings.socials.map((social) => social.href),
   };
 }
 

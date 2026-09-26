@@ -20,7 +20,7 @@ export default async function Home() {
       {/* Business structured data: verified facts only (see lib/structured-data.ts). */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: serializeJsonLd(localBusinessJsonLd()) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(localBusinessJsonLd(content.settings)) }}
       />
       {/* Same composition as the admin visual editor (/admin/editor). */}
       <HomeSections content={content} />

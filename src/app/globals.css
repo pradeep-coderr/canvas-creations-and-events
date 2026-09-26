@@ -64,7 +64,11 @@
   /* Muted text mixed 80% into white: 3.46:1 on white (WCAG 1.4.11) */
   --cc-input: #918885;
 
+  /* Sticky site header height; also offsets in-page anchor scrolling */
+  --header-height: 4.5rem;
+
   /* Theme choices (radius, weights, buttons, surfaces, shadows) */
+  --radius: 0.625rem;
   --cc-heading-weight: 500;
   --cc-body-weight: 400;
   --btn-radius: 0.5rem;
@@ -80,6 +84,19 @@
     0 2px 4px color-mix(in srgb, var(--cc-charcoal) 5%, transparent),
     0 24px 48px -20px color-mix(in srgb, var(--cc-charcoal) 22%, transparent);
 
+}
+
+/*
+ * Semantic tokens. Also re-derived on a homepage section whose background
+ * the admin set to a light tone (section style presets, Phase 18), so a
+ * normally dark section becomes light with the right tokens. Only token
+ * references live here — literal theme values stay in the block above.
+ */
+:root,
+[data-theme-scope],
+[data-ss-tone="default"] > section,
+[data-ss-tone="ivory"] > section,
+[data-ss-tone="blush"] > section {
   /* Core semantic tokens (shadcn contract) */
   --background: var(--cc-white);
   --foreground: var(--cc-charcoal);
@@ -105,9 +122,6 @@
   /* Form control boundaries: >= 3:1 on white (WCAG 1.4.11) */
   --input: var(--cc-input);
   --ring: var(--cc-rose-ink);
-  --radius: 0.625rem;
-  /* Sticky site header height; also offsets in-page anchor scrolling */
-  --header-height: 4.5rem;
 
   /* Brand-specific semantic tokens */
   --surface-ivory: var(--cc-ivory);
@@ -144,7 +158,8 @@
  */
 :root,
 [data-theme-scope],
-[data-tone="dark"] {
+[data-tone="dark"],
+[data-ss-tone] > section {
   --btn-bg: var(--button);
   --btn-fg: var(--button-foreground);
   --btn-border: transparent;
@@ -184,8 +199,10 @@
   }
 }
 
-/* Dark editorial surface (charcoal), scoped — see header comment */
-[data-tone="dark"] {
+/* Dark editorial surface (charcoal), scoped — see header comment.
+   Also a section the admin set to "Dark" (section style presets). */
+[data-tone="dark"],
+[data-ss-tone="dark"] > section {
   color-scheme: dark;
   --background: var(--cc-charcoal);
   --foreground: var(--cc-ivory);
@@ -370,4 +387,39 @@
    (WCAG 2.4.11 Focus Not Obscured). */
 html:has([data-cms-form]) {
   scroll-padding-bottom: 9rem;
+}
+/*
+ * Section style presets (Phase 18): set by the admin per homepage section in
+ * the visual editor. The attributes sit on a wrapper around the section,
+ * which exists only when a style is set (public: display: contents, so the
+ * layout is unchanged). The tokens are re-derived above; this sets only the
+ * background, colour scheme and vertical rhythm.
+ */
+[data-ss] {
+  display: contents;
+}
+[data-ss-tone="default"] > section {
+  color-scheme: light;
+  background-color: var(--background);
+  color: var(--foreground);
+}
+[data-ss-tone="ivory"] > section {
+  color-scheme: light;
+  background-color: var(--surface-ivory);
+  color: var(--foreground);
+}
+[data-ss-tone="blush"] > section {
+  color-scheme: light;
+  background-color: var(--surface-blush);
+  color: var(--foreground);
+}
+[data-ss-tone="dark"] > section {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+[data-ss-space="compact"] > section {
+  padding-block: clamp(3rem, 6vw, 4.5rem);
+}
+[data-ss-space="spacious"] > section {
+  padding-block: clamp(6rem, 12vw, 10rem);
 }

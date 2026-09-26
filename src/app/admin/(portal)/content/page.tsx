@@ -55,6 +55,11 @@ export default async function ContentOverviewPage() {
             Photos and videos. Upload once, then use them anywhere on the website.
           </span>
         </Card>
+        <Card href="/admin/content/site" title="Site details">
+          <span className="text-sm text-muted-foreground">
+            Headline, menu and button wording, phone, address, social links and enquiry form wording.
+          </span>
+        </Card>
       </ul>
 
       <h2 className="mt-10 text-eyebrow font-semibold text-emphasis uppercase">Page sections</h2>

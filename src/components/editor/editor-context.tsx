@@ -1,21 +1,25 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import {
   saveAboutContent,
   saveHomeContent,
+  savePageStyles,
+  saveSiteSettings,
   saveVideoStory,
   type CmsResult,
 } from "@/app/admin/(portal)/content/actions";
 import type { HomeSectionKey } from "@/components/home/home-sections";
 import type { CategoryOption, CollectionKey } from "@/lib/cms/collections";
 import type { MediaImage, MediaVideo } from "@/lib/media/types";
+import type { SiteValues } from "@/lib/cms/site-settings";
 import type { AboutValues, HomeValues, VideoValues } from "@/lib/cms/singletons";
 import { fieldDef, type EditorScope } from "@/lib/editor/fields";
+import type { PageStyles, SectionStyle, SectionStyleKey, StyleKey, TextStyle } from "@/lib/styles/schema";
 
 /*
- * Visual editor state. Page text lives in the three one-row CMS records
- * (home, about, video). Edits are kept as drafts (shown in place, marked
+ * Visual editor state. Page text lives in the four one-row CMS records
+ * (home, about, video, site details). Edits are kept as drafts (shown in place, marked
  * unsaved) until saved; saving sends the whole record through the existing
  * Phase 14 server action, one call per record, so two open edits can never
  * overwrite each other. Collection items are saved by their own forms and
@@ -28,6 +32,7 @@ export interface SavedValues {
   home: HomeValues;
   about: AboutValues;
   video: VideoValues;
+  site: SiteValues;
 }
 
 /** A collection item as the editor needs it (plain data from the server). */
@@ -46,6 +51,8 @@ export interface EditorItemMeta {
 
 export interface EditorData {
   saved: SavedValues;
+  /** Style presets (text and section styles), saved as they're chosen. */
+  styles: PageStyles;
   items: Record<CollectionKey, EditorItemMeta[]>;
   /** The media library (signed URLs), for photo fields. */
   imageOptions: MediaImage[];
@@ -84,6 +91,10 @@ interface EditorContextValue {
   announce: (kind: "success" | "error", text: string) => void;
   /** Item forms report unsaved changes (submit = null when clean). */
   registerForm: (id: string, submit: (() => void) | null) => void;
+  /** Style presets: applied on the page at once and saved immediately. */
+  styles: PageStyles;
+  setTextStyle: (key: StyleKey, style: TextStyle | undefined) => Promise<boolean>;
+  setSectionStyle: (key: SectionStyleKey, style: SectionStyle | undefined) => Promise<boolean>;
   findItem: (collection: CollectionKey, id: string) => EditorItemMeta | undefined;
 }
 
@@ -101,6 +112,7 @@ const actions: Record<EditorScope, (values: never) => Promise<CmsResult>> = {
   home: saveHomeContent,
   about: saveAboutContent,
   video: saveVideoStory,
+  site: saveSiteSettings,
 };
 
 export function EditorProvider({ data, children }: { data: EditorData; children: React.ReactNode }) {
@@ -110,6 +122,8 @@ export function EditorProvider({ data, children }: { data: EditorData; children:
   const [forms, setForms] = useState<Record<string, () => void>>({});
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<Status>(null);
+  const [styles, setStyles] = useState<PageStyles>(data.styles);
+  const stylesRef = useRef(data.styles);
   // Values saved in this session, until the server's refreshed data arrives
   // (a new `data.saved` object replaces them).
   const [override, setOverride] = useState<{ base: SavedValues; values: Partial<SavedValues> } | null>(null);
@@ -248,6 +262,58 @@ export function EditorProvider({ data, children }: { data: EditorData; children:
     });
   }, []);
 
+  // Style presets save as they're chosen. Saves run one after another, each
+  // sending the whole (latest) map, so the database always ends up with the
+  // last choice; a failed save puts the previous style back.
+  const styleChain = useRef<Promise<unknown>>(Promise.resolve());
+  const saveStyles = useCallback(
+    (next: PageStyles) => {
+      const previous = stylesRef.current;
+      stylesRef.current = next;
+      setStyles(next);
+      const run = styleChain.current.then(async () => {
+        try {
+          const result = await savePageStyles(next);
+          if (result.ok) {
+            announce("success", result.message);
+            return true;
+          }
+          announce("error", result.error);
+        } catch {
+          announce("error", "The style couldn't be saved. Check your connection and try again.");
+        }
+        if (stylesRef.current === next) {
+          stylesRef.current = previous;
+          setStyles(previous);
+        }
+        return false;
+      });
+      styleChain.current = run;
+      return run;
+    },
+    [announce],
+  );
+
+  const setTextStyle = useCallback(
+    (key: StyleKey, style: TextStyle | undefined) => {
+      const text = { ...stylesRef.current.text };
+      if (style && Object.values(style).some((v) => v !== undefined)) text[key] = style;
+      else delete text[key];
+      return saveStyles({ ...stylesRef.current, text });
+    },
+    [saveStyles],
+  );
+
+  const setSectionStyle = useCallback(
+    (key: SectionStyleKey, style: SectionStyle | undefined) => {
+      const sections = { ...stylesRef.current.sections };
+      if (style && Object.values(style).some((v) => v !== undefined)) sections[key] = style;
+      else delete sections[key];
+      return saveStyles({ ...stylesRef.current, sections });
+    },
+    [saveStyles],
+  );
+
   const ctx: EditorContextValue = {
     data,
     mode,
@@ -266,6 +332,9 @@ export function EditorProvider({ data, children }: { data: EditorData; children:
     announce,
     registerForm,
     findItem: (collection, id) => data.items[collection].find((i) => i.id === id),
+    styles,
+    setTextStyle,
+    setSectionStyle,
   };
 
   return <EditorContext.Provider value={ctx}>{children}</EditorContext.Provider>;

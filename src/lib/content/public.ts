@@ -36,6 +36,14 @@ import {
 } from "@/data/home";
 import { featuredServices, type Service } from "@/data/services";
 import { featuredTestimonials, type Testimonial } from "@/data/testimonials";
+import {
+  defaultSiteSettings,
+  settingsFromValues,
+  SITE_SETTINGS_SELECT,
+  siteToValues,
+  type SiteSettings,
+} from "@/lib/cms/site-settings";
+import { emptyPageStyles, rowToStyles, type PageStyles } from "@/lib/styles/schema";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createPublicClient } from "@/lib/supabase/public";
 import { PUBLIC_URL_TTL, signImagePaths } from "@/lib/media/server";
@@ -500,7 +508,7 @@ export function getVideoSection(): Promise<VideoSection> {
 
 /** Everything the homepage shows from the CMS, fetched in parallel. */
 export const getHomepageContent = cache(async () => {
-  const [services, categories, gallery, testimonials, faqs, processSteps, principles, copy, aboutCopy, video] =
+  const [services, categories, gallery, testimonials, faqs, processSteps, principles, copy, aboutCopy, video, settings, styles] =
     await Promise.all([
       getFeaturedServices(),
       getCategories(),
@@ -512,6 +520,51 @@ export const getHomepageContent = cache(async () => {
       getHomeCopy(),
       getAboutCopy(),
       getVideoSection(),
+      getSiteSettings(),
+      getPageStyles(),
     ]);
-  return { services, categories, gallery, testimonials, faqs, processSteps, principles, copy, about: aboutCopy, video };
+  return {
+    services,
+    categories,
+    gallery,
+    testimonials,
+    faqs,
+    processSteps,
+    principles,
+    copy,
+    about: aboutCopy,
+    video,
+    settings,
+    sectionStyles: styles.sections,
+  };
 });
+
+/**
+ * Site details (headline, navigation/button labels, contact details, social
+ * links, footer tagline, enquiry form wording). Loaded once per render and
+ * passed down as props; falls back to src/data/site.ts.
+ */
+export const getSiteSettings = cache(() =>
+  fromCms<SiteSettings>(
+    "site details",
+    async (db) => {
+      const { data, error } = await db.from("site_settings").select(SITE_SETTINGS_SELECT).eq("id", true).single();
+      if (error) throw error;
+      return settingsFromValues(siteToValues(data as unknown as Record<string, unknown>));
+    },
+    defaultSiteSettings,
+  ),
+);
+
+/** Style presets (text and section styles) set in the visual editor. */
+export const getPageStyles = cache(() =>
+  fromCms<PageStyles>(
+    "page styles",
+    async (db) => {
+      const { data, error } = await db.from("page_styles").select("text_styles, section_styles").eq("id", true).single();
+      if (error) throw error;
+      return rowToStyles(data);
+    },
+    emptyPageStyles,
+  ),
+);

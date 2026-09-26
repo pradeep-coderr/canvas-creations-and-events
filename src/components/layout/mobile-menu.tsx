@@ -12,7 +12,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { site } from "@/data/site";
+import type { SiteCopy } from "@/lib/cms/site-settings";
 
 // Scroll to an in-page anchor, or navigate normally if it isn't on this page.
 function goTo(href: string) {
@@ -36,7 +36,7 @@ function goTo(href: string) {
  * Links close the menu first and navigate once it has closed: while open,
  * the dialog's scroll lock would stop the page scrolling to an anchor.
  */
-export function MobileMenu() {
+export function MobileMenu({ settings }: { settings: SiteCopy }) {
   const [open, setOpen] = useState(false);
   const pendingHref = useRef<string | null>(null);
 
@@ -51,7 +51,7 @@ export function MobileMenu() {
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button variant="ghost" className="gap-2.5 px-3 lg:hidden">
-          <span className="text-eyebrow font-semibold uppercase">Menu</span>
+          <span className="text-eyebrow font-semibold uppercase">{settings.menuLabel}</span>
           <MenuIcon className="size-5" />
         </Button>
       </SheetTrigger>
@@ -91,7 +91,7 @@ export function MobileMenu() {
 
         <nav aria-label="Main" className="flex-1 overflow-y-auto px-5 pt-6 sm:px-8">
           <ul className="border-t border-highlight/40">
-            {site.navigation.map((item, i) => (
+            {settings.navigation.map((item, i) => (
               <li
                 key={item.href}
                 className="border-b border-highlight/40 motion-safe:animate-rise"
@@ -112,23 +112,23 @@ export function MobileMenu() {
         <div className="space-y-5 px-5 pt-8 pb-8 sm:px-8">
           <Button asChild size="lg" className="w-full">
             <a
-              href={site.enquiry.href}
-              onClick={(e) => navigate(e, site.enquiry.href)}
+              href={settings.enquiry.href}
+              onClick={(e) => navigate(e, settings.enquiry.href)}
             >
-              {site.enquiry.label}
+              {settings.enquiry.label}
             </a>
           </Button>
           <p className="text-center text-sm text-muted-foreground">
-            Prefer to talk?{" "}
+            {settings.callPrompt}{" "}
             <a
-              href={site.contact.phone.href}
+              href={settings.phone.href}
               className="font-semibold text-foreground underline decoration-primary/40 underline-offset-4 hover:text-primary"
             >
-              Call {site.contact.phone.display}
+              {settings.mobileCallLabel} {settings.phone.display}
             </a>
           </p>
           <ul className="flex justify-center gap-6 text-sm">
-            {site.socials.map((social) => (
+            {settings.socials.map((social) => (
               <li key={social.platform}>
                 <a
                   href={social.href}

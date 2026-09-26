@@ -7,10 +7,9 @@ import { ImageFrame } from "@/components/shared/image-frame";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { Button } from "@/components/ui/button";
 import { videoStory, type VideoContent, type VideoStoryCopy } from "@/data/home";
-import { site } from "@/data/site";
+import { defaultSiteSettings, type SiteCopy } from "@/lib/cms/site-settings";
 import { VideoPlayer } from "./video-player";
 
-const tiktok = site.socials.find((s) => s.platform === "tiktok");
 const providerLabels = { youtube: "YouTube", vimeo: "Vimeo", stream: "video" } as const;
 
 /**
@@ -21,14 +20,19 @@ const providerLabels = { youtube: "YouTube", vimeo: "Vimeo", stream: "video" } a
 export function VideoStory({
   video = videoStory.video,
   copy = videoStory,
+  socials = defaultSiteSettings.socials,
 }: {
   video?: VideoContent | null;
   copy?: VideoStoryCopy;
+  /** Social links (site details). */
+  socials?: SiteCopy["socials"];
 }) {
+  const tiktok = socials.find((s) => s.platform === "tiktok");
   return (
     <Section aria-labelledby="video-title">
       <Container>
         <SectionHeading
+          styleKeys={{ eyebrow: "video.eyebrow", title: "video.title" }}
           id="video-title"
           eyebrow={copy.eyebrow}
           title={copy.title}
@@ -69,7 +73,7 @@ export function VideoStory({
           ) : (
             // Deliberately not a fake player: no play button, no poster.
             <div className="mx-auto flex max-w-3xl flex-col items-center gap-8 bg-surface-ivory px-8 py-14 text-center outline outline-1 -outline-offset-12 outline-highlight/40 sm:py-16">
-              <p className="max-w-sm font-display text-display-sm text-foreground/90 italic">
+              <p data-sk="video.emptyText" className="max-w-sm font-display text-display-sm text-foreground/90 italic">
                 {copy.emptyText}
               </p>
               {tiktok && (

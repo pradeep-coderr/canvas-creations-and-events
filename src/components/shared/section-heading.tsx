@@ -11,6 +11,8 @@ interface SectionHeadingProps {
   /** Id for the heading, to use as the section's `aria-labelledby`. */
   id?: string;
   className?: string;
+  /** Style preset keys (data-sk) for the eyebrow, title and description — see src/lib/styles. */
+  styleKeys?: { eyebrow?: string; title?: string; description?: string };
 }
 
 export function SectionHeading({
@@ -21,6 +23,7 @@ export function SectionHeading({
   as: Heading = "h2",
   id,
   className,
+  styleKeys,
 }: SectionHeadingProps) {
   return (
     <div
@@ -30,15 +33,20 @@ export function SectionHeading({
         className,
       )}
     >
-      {eyebrow && <Eyebrow className="mb-4">{eyebrow}</Eyebrow>}
+      {eyebrow && (
+        <Eyebrow className="mb-4" data-sk={styleKeys?.eyebrow}>
+          {eyebrow}
+        </Eyebrow>
+      )}
       <Heading
         id={id}
+        data-sk={styleKeys?.title}
         className="font-display text-display-lg font-title text-foreground"
       >
         {title}
       </Heading>
       {description && (
-        <p className="mt-5 max-w-xl text-lead text-muted-foreground">
+        <p data-sk={styleKeys?.description} className="mt-5 max-w-xl text-lead text-muted-foreground">
           {description}
         </p>
       )}

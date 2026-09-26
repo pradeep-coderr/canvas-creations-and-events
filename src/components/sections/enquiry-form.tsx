@@ -10,7 +10,7 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { enquirySection } from "@/data/home";
-import { site } from "@/data/site";
+import { defaultSiteSettings, type SiteCopy } from "@/lib/cms/site-settings";
 import {
   enquirySchema,
   type Enquiry,
@@ -39,9 +39,10 @@ async function previewSubmit(): Promise<EnquiryResult> {
   return { status: "sent", notified: true };
 }
 
+type FormLabelKey = "name" | "email" | "phone" | "eventType" | "eventDate" | "venue";
+
 interface FieldConfig {
-  name: FieldPath<EnquiryInput>;
-  label: string;
+  name: FieldPath<EnquiryInput> & FormLabelKey;
   optional?: boolean;
   type?: string;
   autoComplete?: string;
@@ -49,13 +50,14 @@ interface FieldConfig {
   wide?: boolean;
 }
 
+// Labels are site details (settings.form[name]); which fields exist is code.
 const fields: FieldConfig[] = [
-  { name: "name", label: "Name", autoComplete: "name" },
-  { name: "email", label: "Email", type: "email", autoComplete: "email" },
-  { name: "phone", label: "Phone", optional: true, type: "tel", autoComplete: "tel", inputMode: "tel" },
-  { name: "eventType", label: "Type of event", optional: true },
-  { name: "eventDate", label: "Event date", optional: true },
-  { name: "venue", label: "Venue or location", optional: true },
+  { name: "name", autoComplete: "name" },
+  { name: "email", type: "email", autoComplete: "email" },
+  { name: "phone", optional: true, type: "tel", autoComplete: "tel", inputMode: "tel" },
+  { name: "eventType", optional: true },
+  { name: "eventDate", optional: true },
+  { name: "venue", optional: true },
 ];
 
 /**
@@ -69,10 +71,14 @@ const fields: FieldConfig[] = [
 export function EnquiryForm({
   enabled = false,
   preview = false,
+  settings = defaultSiteSettings,
 }: {
   enabled?: boolean;
   preview?: boolean;
+  /** Field labels, button, thank-you text and phone (site details). */
+  settings?: SiteCopy;
 }) {
+  const { phone, form: text } = settings;
   const [status, setStatus] = useState<Status>("idle");
   // False when the enquiry was stored but the business wasn't notified.
   const [notified, setNotified] = useState(true);
@@ -129,19 +135,17 @@ export function EnquiryForm({
           tabIndex={-1}
           className="font-display text-display-md font-title outline-none"
         >
-          Thank you.
+          {text.successTitle}
         </h3>
-        <p className="mt-4 text-muted-foreground">
-          We&apos;ve received your enquiry.
-        </p>
+        <p className="mt-4 text-muted-foreground">{text.successText}</p>
         {!notified && (
           <p className="mt-2 text-sm text-muted-foreground">
             If it&apos;s urgent, please also call us on{" "}
             <a
-              href={site.contact.phone.href}
+              href={phone.href}
               className="font-semibold whitespace-nowrap text-foreground underline decoration-primary/40 underline-offset-4 hover:text-primary"
             >
-              {site.contact.phone.display}
+              {phone.display}
             </a>
             .
           </p>
@@ -167,10 +171,10 @@ export function EnquiryForm({
         >
           {enquirySection.offlineNotice}{" "}
           <a
-            href={site.contact.phone.href}
+            href={phone.href}
             className="font-semibold whitespace-nowrap text-foreground underline decoration-primary/40 underline-offset-4 hover:text-primary"
           >
-            Call {site.contact.phone.display}
+            {settings.mobileCallLabel} {phone.display}
           </a>
         </p>
       )}
@@ -196,9 +200,9 @@ export function EnquiryForm({
           return (
             <Field key={f.name} data-invalid={!!error || undefined}>
               <FieldLabel htmlFor={id} id={`${id}-label`}>
-                {f.label}
+                {text[f.name]}
                 {f.optional && (
-                  <span className="font-normal text-muted-foreground">(optional)</span>
+                  <span className="font-normal text-muted-foreground">{text.optional}</span>
                 )}
               </FieldLabel>
               {f.name === "eventDate" ? (
@@ -237,7 +241,7 @@ export function EnquiryForm({
         })}
 
         <Field className="sm:col-span-2" data-invalid={!!errors.message || undefined}>
-          <FieldLabel htmlFor="enquiry-message">Tell us about your celebration</FieldLabel>
+          <FieldLabel htmlFor="enquiry-message">{text.message}</FieldLabel>
           <Textarea
             id="enquiry-message"
             rows={5}
@@ -260,15 +264,15 @@ export function EnquiryForm({
           className="w-full sm:w-auto"
           disabled={status === "submitting"}
         >
-          {status === "submitting" ? "Sending…" : "Send enquiry"}
+          {status === "submitting" ? "Sending…" : text.submit}
         </Button>
         <p className="text-sm text-muted-foreground">
           Or call{" "}
           <a
-            href={site.contact.phone.href}
+            href={phone.href}
             className="font-semibold whitespace-nowrap text-foreground underline decoration-primary/40 underline-offset-4 hover:text-primary"
           >
-            {site.contact.phone.display}
+            {phone.display}
           </a>
         </p>
       </div>
@@ -282,10 +286,10 @@ export function EnquiryForm({
               Your details look good, but online enquiries aren&apos;t connected yet, so
               nothing has been sent. Please call us on{" "}
               <a
-                href={site.contact.phone.href}
+                href={phone.href}
                 className="font-semibold whitespace-nowrap underline decoration-primary/40 underline-offset-4 hover:text-primary"
               >
-                {site.contact.phone.display}
+                {phone.display}
               </a>
               . Your details are still in the form.
             </span>
@@ -294,13 +298,13 @@ export function EnquiryForm({
         {status === "offline" && (
           <p className="mt-8 surface p-5 text-sm">
             You&apos;re offline, so your enquiry hasn&apos;t been sent. Your details are still
-            in the form — reconnect and press <strong>Send enquiry</strong> again.
+            in the form — reconnect and press <strong>{text.submit}</strong> again.
           </p>
         )}
         {status === "error" && (
           <p className="mt-8 surface p-5 text-sm text-destructive">
             Something went wrong and your enquiry wasn&apos;t sent. Please try again,
-            or call us on {site.contact.phone.display}.
+            or call us on {phone.display}.
           </p>
         )}
       </div>

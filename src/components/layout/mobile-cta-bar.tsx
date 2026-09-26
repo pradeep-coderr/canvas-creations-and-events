@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Phone } from "lucide-react";
 import { SiteLink } from "@/components/shared/site-link";
 import { Button } from "@/components/ui/button";
-import { site } from "@/data/site";
+import type { SiteCopy } from "@/lib/cms/site-settings";
 import { cn } from "@/lib/utils";
 
 /**
@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
  * the same actions — so it never covers the form, the keyboard or the end
  * of the page. Hidden bars are inert (not focusable or announced).
  */
-export function MobileCtaBar() {
+export function MobileCtaBar({ settings }: { settings: SiteCopy }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -45,13 +45,13 @@ export function MobileCtaBar() {
     >
       <nav aria-label="Quick contact" className="flex gap-3 px-5 py-3">
         <Button asChild variant="secondary" className="flex-1">
-          <a href={site.contact.phone.href}>
+          <a href={settings.phone.href}>
             <Phone data-icon="inline-start" />
-            Call
+            {settings.mobileCallLabel}
           </a>
         </Button>
         <Button asChild className="flex-1">
-          <SiteLink href={site.enquiry.href}>Enquire</SiteLink>
+          <SiteLink href={settings.enquiry.href}>{settings.mobileEnquireLabel}</SiteLink>
         </Button>
       </nav>
     </div>

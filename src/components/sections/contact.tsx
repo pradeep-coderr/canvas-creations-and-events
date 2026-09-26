@@ -3,19 +3,25 @@ import { Section } from "@/components/layout/section";
 import { Reveal } from "@/components/motion/reveal";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { contactSection, type ContactCopy } from "@/data/home";
-import { site } from "@/data/site";
-
-const { phone, address } = site.contact;
+import { defaultSiteSettings, type SiteCopy } from "@/lib/cms/site-settings";
 
 const linkClass =
   "underline decoration-primary/40 decoration-1 underline-offset-[6px] transition-colors hover:text-primary hover:decoration-primary";
 
-/** Direct contact details. Only verified information from site.ts. */
-export function Contact({ copy = contactSection }: { copy?: ContactCopy }) {
+/** Direct contact details (site details: phone, address, social links). */
+export function Contact({
+  copy = contactSection,
+  settings = defaultSiteSettings,
+}: {
+  copy?: ContactCopy;
+  settings?: SiteCopy;
+}) {
+  const { phone, address } = settings;
   return (
     <Section id="contact" aria-labelledby="contact-title">
       <Container className="grid gap-12 lg:grid-cols-12 lg:gap-16">
         <SectionHeading
+          styleKeys={{ eyebrow: "home.contactEyebrow", title: "home.contactTitle", description: "home.contactDescription" }}
           id="contact-title"
           eyebrow={copy.eyebrow}
           title={copy.title}
@@ -28,7 +34,7 @@ export function Contact({ copy = contactSection }: { copy?: ContactCopy }) {
           <address className="not-italic">
             <dl className="border-t border-foreground/15">
               <div className="border-b border-foreground/15 py-6">
-                <dt className="text-eyebrow font-semibold text-emphasis uppercase">Call</dt>
+                <dt className="text-eyebrow font-semibold text-emphasis uppercase">{settings.mobileCallLabel}</dt>
                 <dd className="mt-2 font-display text-display-sm">
                   <a href={phone.href} className={linkClass}>
                     {phone.display}
@@ -36,16 +42,16 @@ export function Contact({ copy = contactSection }: { copy?: ContactCopy }) {
                 </dd>
               </div>
               <div className="border-b border-foreground/15 py-6">
-                <dt className="text-eyebrow font-semibold text-emphasis uppercase">Based in</dt>
+                <dt className="text-eyebrow font-semibold text-emphasis uppercase" data-sk="site.basedInLabel">{settings.basedInLabel}</dt>
                 <dd className="mt-2 font-display text-display-sm">
                   {address.street}, {address.locality} {address.region} {address.postcode}
                 </dd>
               </div>
               <div className="border-b border-foreground/15 py-6">
-                <dt className="text-eyebrow font-semibold text-emphasis uppercase">Follow</dt>
+                <dt className="text-eyebrow font-semibold text-emphasis uppercase">{settings.footerHeadings.follow}</dt>
                 <dd className="mt-2">
                   <ul className="flex flex-wrap gap-x-6 gap-y-2 font-display text-display-sm">
-                    {site.socials.map((social) => (
+                    {settings.socials.map((social) => (
                       <li key={social.platform}>
                         <a
                           href={social.href}

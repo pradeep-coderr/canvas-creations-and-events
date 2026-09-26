@@ -36,7 +36,7 @@ export function Testimonials({
   return (
     <Section aria-labelledby="testimonials-title">
       <Container size="narrow" className="text-center">
-        <Eyebrow>{copy.eyebrow}</Eyebrow>
+        <Eyebrow data-sk="home.testimonialsEyebrow">{copy.eyebrow}</Eyebrow>
         <h2 id="testimonials-title" className="sr-only">
           {copy.title}
         </h2>

@@ -226,7 +226,7 @@ export type Renderable<T> = T extends string
   : T extends readonly (infer U)[]
     ? Renderable<U>[]
     : T extends object
-      ? { [K in keyof T]: K extends "href" | "src" | "alt" | "position" | "poster" ? T[K] : Renderable<T[K]> }
+      ? { [K in keyof T]: K extends "href" | "src" | "alt" | "position" | "poster" | "platform" ? T[K] : Renderable<T[K]> }
       : T;
 
 /*

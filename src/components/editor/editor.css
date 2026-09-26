@@ -69,6 +69,14 @@
   outline-offset: 5px;
 }
 
+/* Empty optional text in edit mode (e.g. no headline ending): a faint prompt. */
+.cc-placeholder {
+  font-size: 0.5em;
+  font-style: normal;
+  opacity: 0.6;
+  border-bottom: 1px dashed currentColor;
+}
+
 .cc-editable[data-unsaved] {
   outline: 1px solid var(--primary);
   background-color: color-mix(in srgb, var(--primary) 7%, transparent);
@@ -262,4 +270,41 @@ textarea.cc-edit-input {
   align-items: center;
   gap: 0.75rem;
   margin-top: 1.5rem;
+}
+
+/* Style presets (text: under the inline editor; sections: in the panel). */
+.cc-style-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-top: 0.75rem;
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: start;
+  line-height: 1.4;
+}
+.cc-style-field {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 8.5rem;
+}
+.cc-style-field label {
+  font-weight: 600;
+}
+.cc-style-field select {
+  height: 2.75rem;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+  background-color: var(--background);
+  color: var(--foreground);
+  padding-inline: 0.75rem;
+}
+.cc-style-field select:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }

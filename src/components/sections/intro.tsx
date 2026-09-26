@@ -17,6 +17,7 @@ export function Intro({ copy = intro }: { copy?: IntroCopy }) {
       <Container size="narrow">
         <Reveal>
           <SectionHeading
+          styleKeys={{ eyebrow: "home.introEyebrow", title: "home.introTitle", description: "home.introBody" }}
             id="intro-title"
             eyebrow={copy.eyebrow}
             title={copy.title}

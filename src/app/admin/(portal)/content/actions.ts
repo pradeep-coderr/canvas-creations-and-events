@@ -5,6 +5,8 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/admin/session";
 import { collections, isCollectionKey, singularTitle, type CollectionKey } from "@/lib/cms/collections";
 import { describeDbError } from "@/lib/cms/errors";
+import { siteSchema, siteToRow } from "@/lib/cms/site-settings";
+import { compactStyles, pageStylesSchema, type PageStyles } from "@/lib/styles/schema";
 import {
   aboutSchema,
   aboutToRow,
@@ -213,7 +215,7 @@ export async function deleteItem(key: CollectionKey, id: string, confirmLastFaq 
 // ---------------------------------------------------------------------------
 
 async function saveSingleton(
-  table: "home_content" | "about_content" | "video_story",
+  table: "home_content" | "about_content" | "video_story" | "site_settings",
   row: Record<string, unknown>,
   what: string,
 ): Promise<CmsResult> {
@@ -245,6 +247,38 @@ export async function saveAboutContent(input: unknown): Promise<CmsResult> {
   const parsed = aboutSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
   return saveSingleton("about_content", aboutToRow(parsed.data), "About section");
+}
+
+export async function saveSiteSettings(input: unknown): Promise<CmsResult> {
+  await requireAdmin();
+  const parsed = siteSchema.safeParse(input);
+  if (!parsed.success) return invalid(parsed.error);
+  return saveSingleton("site_settings", siteToRow(parsed.data), "site details");
+}
+
+/**
+ * Style presets from the visual editor. The whole map is validated against
+ * the fixed option lists (unknown keys or values are rejected), emptied
+ * entries are dropped, and the row is written with the admin's session.
+ */
+export async function savePageStyles(input: unknown): Promise<CmsResult & { styles?: PageStyles }> {
+  await requireAdmin();
+  const parsed = pageStylesSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Those style choices aren't available. Refresh the editor and try again." };
+  const styles = compactStyles(parsed.data);
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("page_styles")
+    .update({ text_styles: styles.text, section_styles: styles.sections })
+    .eq("id", true)
+    .select("id")
+    .single();
+  if (error) {
+    console.error("[cms] page styles save failed", { code: error.code });
+    return { ok: false, error: describeDbError(error, "save the style") };
+  }
+  contentChanged();
+  return { ok: true, message: "Style saved.", styles };
 }
 
 export async function saveVideoStory(input: unknown): Promise<CmsResult> {

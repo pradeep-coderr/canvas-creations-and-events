@@ -1,7 +1,8 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
-import { SlidersHorizontal } from "lucide-react";
+import { PanelTop, SlidersHorizontal } from "lucide-react";
+import { sectionAttrs } from "@/lib/styles/schema";
 import type { HomeSectionKey } from "@/components/home/home-sections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,8 +24,16 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { collections } from "@/lib/cms/collections";
 import { videoSourceLabels, videoSources, type VideoSource as VideoSourceKey } from "@/lib/cms/singletons";
-import { sections, validateField, type EditableField, type EditorScope } from "@/lib/editor/fields";
+import {
+  chromeSection,
+  sections,
+  validateField,
+  type EditableField,
+  type EditorScope,
+  type SectionDef,
+} from "@/lib/editor/fields";
 import { useEditor } from "./editor-context";
+import { SectionStyleControls } from "./style-controls";
 import { EditorMediaField } from "./editor-media";
 
 /*
@@ -237,30 +246,38 @@ function VideoSource() {
 
 function SectionPanel({
   section,
+  def,
+  title,
   open,
   onOpenChange,
   returnFocus,
 }: {
-  section: HomeSectionKey;
+  /** The homepage section (photos, video); none for the header & footer. */
+  section?: HomeSectionKey;
+  def: SectionDef;
+  title: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Opened from code (no Radix Trigger), so say where focus goes on close. */
   returnFocus: React.RefObject<HTMLElement | null>;
 }) {
   const editor = useEditor();
-  const def = sections[section];
   const scopes = [...new Set(def.fields.map((f) => f.scope))];
   const photoField = section === "hero" ? "heroImageId" : section === "about" ? "imageId" : null;
   const extraFields =
     section === "video" ? ["provider", "videoUrl", "videoMediaId", "posterId", "videoTitle", "caption"] : photoField ? [photoField] : [];
-  const unsaved = [...def.fields.map((f) => [f.scope, f.field] as const), ...extraFields.map((f) => [scopes[0], f] as const)].filter(
-    ([scope, field]) => editor.hasDraft(scope, field),
-  ).length;
+  // The scope the photo/video fields belong to (the section's own record).
+  const ownScope = section === "about" ? "about" : section === "video" ? "video" : "home";
+  const unsaved = new Set(
+    [...def.fields.map((f) => [f.scope, f.field] as const), ...extraFields.map((f) => [ownScope, f] as const)]
+      .filter(([scope, field]) => editor.hasDraft(scope, field))
+      .map(([scope, field]) => `${scope}.${field}`),
+  ).size;
 
   const save = async () => {
     let ok = true;
     for (const scope of scopes) {
-      const fields = [...def.fields.filter((f) => f.scope === scope).map((f) => f.field), ...extraFields];
+      const fields = [...def.fields.filter((f) => f.scope === scope).map((f) => f.field), ...(scope === ownScope ? extraFields : [])];
       ok = (await editor.saveScope(scope, fields)) && ok;
     }
     if (ok) onOpenChange(false);
@@ -277,7 +294,7 @@ function SectionPanel({
         }}
       >
         <SheetHeader>
-          <SheetTitle className="font-display text-display-sm font-title">{def.title} section</SheetTitle>
+          <SheetTitle className="font-display text-display-sm font-title">{title}</SheetTitle>
           <SheetDescription>
             Changes show on the page as you type. Save to put them on the website.
             {def.note && <span className="mt-2 block">{def.note}</span>}
@@ -289,7 +306,7 @@ function SectionPanel({
           ))}
           {photoField && (
             <EditorMediaField
-              scope={scopes[0]}
+              scope={ownScope}
               field={photoField}
               label="Photo"
               use={section === "hero" ? "hero" : "founder"}
@@ -301,6 +318,7 @@ function SectionPanel({
             />
           )}
           {section === "video" && <VideoSource />}
+          {section && <SectionStyleControls section={section} spacing={section !== "hero"} />}
           {def.collection && (
             <p className="border-l-2 border-highlight pl-3 text-sm text-muted-foreground">
               {collections[def.collection].title} are edited where they appear on the page: use “Edit” on an item, or
@@ -321,18 +339,28 @@ function SectionPanel({
   );
 }
 
-export function EditorSection({ section, children }: { section: HomeSectionKey; children: React.ReactNode }) {
+/** Editor wrapper for a homepage section (styles come from the editor state, not the `styles` prop). */
+export function EditorSection({ section, children }: { section: HomeSectionKey; styles?: unknown; children: React.ReactNode }) {
   const editor = useEditor();
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
 
   if (editor.mode === "preview") {
-    return editor.data.hiddenInPreview.includes(section) ? null : children;
+    if (editor.data.hiddenInPreview.includes(section)) return null;
+    // Same wrapper as the public page: only when the section has a style.
+    const attrs = sectionAttrs(editor.styles.sections[section]);
+    return attrs ? (
+      <div data-ss={section} {...attrs}>
+        {children}
+      </div>
+    ) : (
+      children
+    );
   }
 
   const def = sections[section];
   return (
-    <div className="cc-section" data-section={section}>
+    <div className="cc-section" data-section={section} {...sectionAttrs(editor.styles.sections[section])}>
       {children}
       <div className="cc-section-bar" data-editor-control="">
         <Button
@@ -347,7 +375,29 @@ export function EditorSection({ section, children }: { section: HomeSectionKey; 
           <span className="sr-only">: {def.title}</span>
         </Button>
       </div>
-      <SectionPanel section={section} open={open} onOpenChange={setOpen} returnFocus={trigger} />
+      <SectionPanel
+        section={section}
+        def={def}
+        title={`${def.title} section`}
+        open={open}
+        onOpenChange={setOpen}
+        returnFocus={trigger}
+      />
     </div>
+  );
+}
+
+/** Toolbar button: the header & footer wording and contact details (site details). */
+export function ChromePanelButton() {
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      <Button ref={trigger} type="button" variant="outline" className="max-sm:size-11 max-sm:px-0" onClick={() => setOpen(true)}>
+        <PanelTop aria-hidden="true" />
+        <span className="max-sm:sr-only">Header &amp; footer</span>
+      </Button>
+      <SectionPanel def={chromeSection} title="Header & footer" open={open} onOpenChange={setOpen} returnFocus={trigger} />
+    </>
   );
 }

@@ -19,7 +19,7 @@ import { createClient } from "@/lib/supabase/server";
 
 type Row = Record<string, unknown>;
 
-export type SingletonTable = "home_content" | "about_content" | "video_story";
+export type SingletonTable = "home_content" | "about_content" | "video_story" | "site_settings";
 
 /** Every row of a collection, drafts included, in display order. */
 export async function listCollection(key: CollectionKey): Promise<Row[] | null> {

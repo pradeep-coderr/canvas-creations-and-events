@@ -19,11 +19,17 @@ import type { GalleryItem } from "@/data/gallery";
 import type { AboutCopy, Principle, ProcessStep, VideoContent, VideoStoryCopy } from "@/data/home";
 import type { Service } from "@/data/services";
 import type { Testimonial } from "@/data/testimonials";
+import type { SiteCopy } from "@/lib/cms/site-settings";
+import { sectionAttrs, type PageStyles } from "@/lib/styles/schema";
 import type { HomeCopy } from "@/lib/content/public";
 
 /** Everything the homepage renders (from the CMS, or the editor's live values). */
 export interface HomeContent {
   copy: HomeCopy;
+  /** Site details: headline, button labels, phone, social links, form wording. */
+  settings: SiteCopy;
+  /** Section style presets (background, spacing) from the visual editor. */
+  sectionStyles?: PageStyles["sections"];
   about: AboutCopy;
   video: { copy: VideoStoryCopy; video: VideoContent | null };
   services: Service[];
@@ -52,7 +58,7 @@ export type HomeSectionKey =
 
 /** Editor-only hooks (see ItemSlots). The public page passes none. */
 export interface HomeEditorSlots {
-  Section?: ComponentType<{ section: HomeSectionKey; children: ReactNode }>;
+  Section?: ComponentType<{ section: HomeSectionKey; styles?: PageStyles["sections"]; children: ReactNode }>;
   /** Controls over the hero / About photos. */
   heroImage?: ReactNode;
   aboutImage?: ReactNode;
@@ -65,8 +71,27 @@ export interface HomeEditorSlots {
   principles?: ItemSlots<Principle>;
 }
 
-function Plain({ children }: { section: HomeSectionKey; children: ReactNode }) {
-  return children;
+/**
+ * Public wrapper: a section with a style preset gets a display: contents
+ * wrapper carrying it (see globals.css); without one, the HTML is unchanged.
+ */
+function StyledSection({
+  section,
+  styles,
+  children,
+}: {
+  section: HomeSectionKey;
+  styles?: PageStyles["sections"];
+  children: ReactNode;
+}) {
+  const attrs = sectionAttrs(styles?.[section]);
+  return attrs ? (
+    <div data-ss={section} {...attrs}>
+      {children}
+    </div>
+  ) : (
+    children
+  );
 }
 
 /**
@@ -74,49 +99,50 @@ function Plain({ children }: { section: HomeSectionKey; children: ReactNode }) {
  * visual editor, so the two can't drift apart.
  */
 export function HomeSections({ content, slots }: { content: HomeContent; slots?: HomeEditorSlots }) {
-  const { copy } = content;
-  const S = slots?.Section ?? Plain;
+  const { copy, settings } = content;
+  const S = slots?.Section ?? StyledSection;
+  const ss = content.sectionStyles;
   return (
     <>
-      <S section="hero">
-        <Hero copy={copy.hero} imageAction={slots?.heroImage} />
+      <S section="hero" styles={ss}>
+        <Hero copy={copy.hero} settings={settings} imageAction={slots?.heroImage} />
       </S>
-      <S section="intro">
+      <S section="intro" styles={ss}>
         <Intro copy={copy.intro} />
       </S>
-      <S section="services">
+      <S section="services" styles={ss}>
         <Services services={content.services} copy={copy.services} itemSlots={slots?.services} />
       </S>
-      <S section="categories">
+      <S section="categories" styles={ss}>
         <CategoryStrip categories={content.categories} copy={copy.categories} itemSlots={slots?.categories} />
       </S>
-      <S section="gallery">
-        <GalleryPreview items={content.gallery} copy={copy.gallery} itemSlots={slots?.gallery} />
+      <S section="gallery" styles={ss}>
+        <GalleryPreview items={content.gallery} copy={copy.gallery} itemSlots={slots?.gallery} socials={settings.socials} />
       </S>
-      <S section="about">
+      <S section="about" styles={ss}>
         <AboutFounder copy={content.about} imageAction={slots?.aboutImage} />
       </S>
-      <S section="process">
+      <S section="process" styles={ss}>
         <Process steps={content.processSteps} copy={copy.process} itemSlots={slots?.process} />
       </S>
       {/* Trust right after "how we work"; renders nothing until real testimonials exist. */}
-      <S section="testimonials">
+      <S section="testimonials" styles={ss}>
         <Testimonials testimonials={content.testimonials} copy={copy.testimonials} itemSlots={slots?.testimonials} />
       </S>
-      <S section="whyCanvas">
+      <S section="whyCanvas" styles={ss}>
         <WhyCanvas principles={content.principles} copy={copy.whyCanvas} itemSlots={slots?.principles} />
       </S>
-      <S section="video">
-        <VideoStory video={content.video.video} copy={content.video.copy} />
+      <S section="video" styles={ss}>
+        <VideoStory video={content.video.video} copy={content.video.copy} socials={settings.socials} />
       </S>
-      <S section="faq">
+      <S section="faq" styles={ss}>
         <Faq faqs={content.faqs} copy={copy.faq} itemSlots={slots?.faqs} />
       </S>
-      <S section="enquiry">
-        <Enquiry copy={copy.enquiry} />
+      <S section="enquiry" styles={ss}>
+        <Enquiry copy={copy.enquiry} settings={settings} />
       </S>
-      <S section="contact">
-        <Contact copy={copy.contact} />
+      <S section="contact" styles={ss}>
+        <Contact copy={copy.contact} settings={settings} />
       </S>
     </>
   );

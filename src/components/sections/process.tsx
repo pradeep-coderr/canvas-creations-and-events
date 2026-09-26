@@ -21,6 +21,7 @@ export function Process({
     <Section tone="blush" aria-labelledby="process-title">
       <Container>
         <SectionHeading
+          styleKeys={{ eyebrow: "home.processEyebrow", title: "home.processTitle" }}
           id="process-title"
           eyebrow={copy.eyebrow}
           title={copy.title}

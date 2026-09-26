@@ -2596,3 +2596,94 @@ The photo picker (content forms and the visual editor) only allowed choosing or 
 - **Fonts are fixed:** only the heading and text weights are adjustable.
 - **The admin keeps the code defaults** (deliberate). The visual editor and the Design preview show the saved or draft theme.
 - **A new theme reaches installed-PWA visitors on their next online visit** (network-first `/`).
+
+## Phase 18 — Everything Editable + Style Presets
+
+**Date:** Saturday 26 September 2026 · **Timezone:** NPT (UTC+05:45)
+**Result:** Committed (see git log). Not pushed to GitHub. **Both Phase 18 migrations were pushed to hosted** with the owner's approval.
+
+### Why
+
+The owner asked for two things while reviewing the visual editor:
+- **"Make everything editable":** the headline "Turning moments into masterpieces" couldn't be edited.
+- **"Apply styles here like spacing, font, color, background"** without code changes.
+
+Decisions they chose:
+- **All visible text** editable, with link destinations kept in code.
+- **Controlled presets**, not free-form CSS.
+- **Finish and commit Phase 17 first** (it was committed as `985d8dd`).
+
+### 18a — Site details (`site_settings`)
+
+- **What moved from code to the CMS** (migration `20260926115115_site_settings.sql`, a singleton seeded with the exact current values, so nothing changed visually):
+  - the hero headline, plus an optional italic-rose ending;
+  - the footer tagline and the six navigation labels;
+  - main button, mobile-bar, "Call" and "Menu" labels, and the "Prefer to talk?" prompt;
+  - footer headings and "Based in";
+  - phone number, address and the Instagram, Facebook and TikTok links (an empty link hides that platform everywhere);
+  - enquiry form labels, the "(optional)" marker, the Send button, and the thank-you heading and text.
+- **Stays in code:**
+  - link destinations and the business name and description;
+  - the form's validation and status messages, which always have to explain what happened;
+  - the manifests and email template;
+  - the 500 error page, which is a client error boundary that can't load data (it uses the code fallback).
+- **Database rules:**
+  - Text uses the existing `cms_line` / `cms_text` types.
+  - The phone must be a number with 8–15 digits; the call link is derived from it (`0426 071 109` → `tel:+61426071109`).
+  - Social links must be `https://` on that platform's own host (no `javascript:`, no look-alike domains).
+  - The postcode must be 4 digits.
+  - Same RLS as the other singletons.
+- **Rendering:**
+  - `getSiteSettings()` uses the same tagged public client, with `src/data/site.ts` as the fallback.
+  - The `(site)` layout loads it once and passes it to `SiteFrame` (header, footer, mobile menu, mobile bar) and `HomeSections` (hero, gallery, video, enquiry, contact).
+  - The page title (`generateMetadata`) and the JSON-LD business data use the editable headline, phone, address and links.
+- **Editing:**
+  - Visual editor: the headline and its ending are edited in place, and an empty optional ending shows a faint "Add …" prompt in edit mode only.
+  - Text inside links, buttons and form labels is edited in the section panels (Hero, Enquiry, Contact) and in a new **Header & footer** toolbar panel, which reuses the section panel, generalised.
+  - `/admin/content/site` is one grouped form, with a card on the Content overview.
+  - Saves go through `saveSiteSettings` (`requireAdmin`, Zod mirroring the database checks, `updateTag`).
+
+### 18b — Style presets (`page_styles`)
+
+- **What the client can set** (migration `20260926120239_page_styles.sql`, a singleton holding two JSON maps; the database guards the shape and size):
+  - **Text:** size (Small, Body, Large body, Heading S–XL), font (Cormorant or Manrope), weight, colour (main text, muted, rose), italic and alignment, for 43 editable texts.
+  - **Sections:** background (page, ivory, blush, dark) and spacing (compact, normal, spacious), for the 13 homepage sections (the hero has no spacing option; its padding is part of its layout).
+- **How it applies (no free CSS, no runtime classes):**
+  - **Text:** stylable elements carry `data-sk="<scope>.<field>"`. `textStylesCss()` turns the validated map into rules built only from recipe strings (the type-scale values, `var(--foreground | --muted-foreground | --primary)`, the next/font families), emitted as `<style id="page-styles">` only when something is styled. The rules are unlayered, so they beat Tailwind's layered utilities.
+  - **Sections:** the public `HomeSections` wraps a styled section in a `display: contents` div carrying `data-ss-tone` / `data-ss-space`. Unstyled sections render exactly as before. Static rules in `globals.css` set the background and spacing.
+  - **Tokens:** a dark tone applies the dark-token block to that section; a light tone re-derives the light semantic tokens on a normally dark section. For this, `globals.css` was split into a palette block (literal theme values, root only) and a semantic block (token references only), so a restyled section never resets the theme's `--radius` or palette.
+- **Accessibility:** colours are theme tokens only. The Design page's 16 checks already guarantee main, muted and rose text are readable on white, ivory and blush, and dark sections get the lifted rose and ivory text, so no preset combination can produce unreadable text. Controls are labelled native selects, 44px.
+- **Editor UX:**
+  - **Style** in the inline editor opens the six choices, each starting at "As designed", plus "Reset style".
+  - **Section style** sits in each section panel.
+  - Choices apply live, save immediately, and saves are serialised so the database always ends with the last choice; a failed save rolls back with an alert.
+  - Preview mode and the public page render the same wrapper.
+- **Security:** `savePageStyles` validates the whole map with strict Zod over the fixed keys and options, rejecting unknown keys, CSS in values, extra properties and unknown sections, then drops empty entries.
+
+### Issues found and fixed during testing
+
+1. **A "component created during render" lint error:** the first public section wrapper was a closure. It was replaced with a static `StyledSection` that receives the styles as a prop.
+2. **The font recipe referenced `var(--font-display)`:** that doesn't exist at runtime (it's an `@theme inline` value). It now uses the next/font variables directly.
+3. **A test expectation:** the old phone number still appears in an FAQ **answer**. That's FAQ content the client writes, not a site detail, so the test was narrowed to the call links.
+
+### Tests actually run
+
+Local production build (local Supabase; temporary test users, all removed afterwards):
+
+| Suite | Result | What it covers |
+| --- | --- | --- |
+| `site18.mjs` (new) | **14/14** | Headline edited in place → saved → public headline, page title and JSON-LD slogan; Header & footer panel: a menu label updates live and publicly while the link stays the same; form Send label via the Enquiry panel; `/admin/content/site` renders grouped; a bad phone and a `javascript:` link are rejected with messages; phone saved → new `tel:` link and JSON-LD telephone; an empty TikTok hides it everywhere; restored; no console errors |
+| `style18.mjs` (new) | **18/18** | Style in the inline editor (6 labelled choices + reset); heading restyled live, saved as fixed options, public (rose, centred, larger); FAQ section Dark + Compact live and public (charcoal background, ivory text: tokens swapped; padding 128→72px); normally dark Gallery → Ivory with dark text; no overflow; reset leaves `{}{}` and the public HTML returns to exactly the original (no style tag, no wrappers) |
+| `api18.mjs` (new) | **53/53** | Both tables: one row, public read, anon and non-admin updates rejected, no insert or delete even as admin. The database rejects bad phones, `javascript:` / look-alike / http social links, bad postcodes, multi-line labels, empty headlines and non-object style maps even from an admin. Both actions over HTTP are refused for no session and non-admin. Admin: unknown keys, CSS in values, unknown options, extra properties, unknown sections and tones, and CSS characters in keys are rejected server-side. The generated CSS equals the recipe exactly. Isolation: `/admin/content/site` → login; the public bundle has none of the editor or style code; `/` still ISR |
+| Full regression (from a clean seeded state) | all pass | `rls13` 141, `storage16` 46, `action14` 17, `act16` 24, `iso15` 7, `iso16` 24, `media16` 57, `cms14` 78, `editor15` 68, `focus14`, `api17` 46, `e2e17` 55, `picker17` 11; PWA, metadata, date picker and Select, header, keyboard/menu and 7-width audit unchanged from the baseline |
+
+**Hosted:**
+- Both migrations were pushed after a dry run, with the owner's approval. The push was needed because the owner's dev server (hosted env) couldn't open the visual editor without the new tables.
+- Checked with anonymous requests: `site_settings` has the seeded values, `page_styles` is `{}` / `{}`, and anonymous writes → `42501`.
+- Not done on hosted: saves as the real admin (no password).
+
+### Known limitations
+
+- **Still in code:** the form's error and status messages, the 500 error page's wording, the business name, and link destinations.
+- **Hero spacing:** no spacing option (its padding is part of the hero layout).
+- **FAQ answers** are free text: if they mention the phone number, update them in the FAQ list when the phone changes.

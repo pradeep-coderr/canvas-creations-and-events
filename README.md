@@ -122,7 +122,14 @@ Editable website content lives in Supabase and is edited from **`/admin/content`
   - `about_content`: About/founder. The founder name, role and image stay empty until real ones are provided.
   - `video_story`: an optional video. It links to a video in the media library whose provider must match (composite foreign key), plus an optional poster photo. The old `embed_url` column is retired and must stay empty.
 - **Media:** `media_assets` holds photos (files in the **private** Storage bucket `cms-media`) and videos (YouTube/Vimeo links stored as provider IDs; video files are never stored in Supabase). Content links to media by foreign key and never stores URLs. Photos in use can't be deleted (`ON DELETE RESTRICT`). See **Media library & video** below.
-- **Stays in code** (`src/data/site.ts`, components, config): business name, phone, address and socials (also used by JSON-LD, the manifests and emails); navigation and routes; design tokens and layout; security, auth, PWA and service worker.
+- **Site details** (`site_settings`, Phase 18): hero headline and its italic ending, navigation and button labels, phone, address, social links, footer text and the enquiry form's wording. These are loaded once per render (`getSiteSettings()`) and passed down as props. The page title and JSON-LD use them too. `src/data/site.ts` is now only the fallback.
+- **Stays in code** (`src/data/site.ts`, components, config):
+  - the business name and description;
+  - link destinations (the labels are site details);
+  - the form's validation and status messages;
+  - the manifests and email template;
+  - design tokens and layout;
+  - security, auth, PWA and service worker.
 - **Security (RLS):**
   - The public (anon) and signed-in non-admins can read only published collection rows, the singletons, and media used by visible content.
   - Only admins (`admin_users`, checked by `private.is_admin()`) can read drafts or insert, update or delete anything.
@@ -149,7 +156,14 @@ The **Edit website** button in the admin header opens the real homepage (same se
   - The last-published-FAQ safeguard applies here too.
 - **Toolbar:** unsaved count, **Save** (everything unsaved), **Preview** (exactly what visitors see: no controls, drafts hidden) and **Exit**, which asks before leaving with unsaved changes. The browser also warns on reload or close.
 - **While editing:** links scroll instead of navigating, and the enquiry form doesn't send.
-- **Not editable here, deliberately:** the hero headline (the slogan), navigation, phone and social links, link targets, the enquiry form's own labels (code, see Phase 13).
+- **Site details:**
+  - **Where they're edited:** the headline, its italic ending and the plain labels are edited in place. Text inside links, buttons and form labels is edited in the section panels (Hero, Enquiry, Contact) and in **Header & footer** (toolbar).
+  - **Not editable, deliberately:** link destinations, the business name, and the form's error and status messages.
+- **Style presets** (`page_styles`, Phase 18):
+  - **Text:** open any text in place, press **Style**, and choose size, font (serif or sans), weight, colour (main text, muted or rose), italic and alignment.
+  - **Sections:** each section panel has **Section style** (background: page, ivory, blush or dark; spacing: compact, normal or spacious).
+  - **Saving:** choices apply at once, save immediately, and "Reset style" removes them.
+  - **Always readable:** every option is a fixed choice rendered from code-owned recipes and theme tokens, so text stays readable. A dark section swaps to the dark tokens, and a light one restores the light tokens.
 - **Photos:** **Add photo** / **Change photo** on the hero and About photos (and the photo fields in panels and item forms) opens the media library picker. Choose an existing photo or upload a new one. Choosing saves straight away.
 - **How it's built:**
   - The public page and the editor render the same `HomeSections` (`src/components/home/home-sections.tsx`).
@@ -159,9 +173,19 @@ The **Edit website** button in the admin header opens the real homepage (same se
 
 `/admin/content` stays available for advanced management.
 
+### Style presets: how they're built
+
+- **Text styles:**
+  - Stylable elements carry `data-sk="<scope>.<field>"` (43 keys, `STYLE_KEYS` in `src/lib/styles/schema.ts`).
+  - `textStylesCss()` emits one rule per styled key into `<style id="page-styles">`, only when something is styled.
+  - Rules are unlayered, so they win over Tailwind's layered utilities.
+- **Section styles:** a `display: contents` wrapper (`data-ss`, `data-ss-tone`, `data-ss-space`) around the section, only when one is set. Static rules in `globals.css` re-derive the tokens for that section.
+- **Saving:** through `savePageStyles` (`requireAdmin`, strict Zod over fixed keys and options, empty entries dropped, `updateTag`). The database guards the shape and size.
+
 ### Using the CMS (`/admin/content`)
 
 - **Overview:** counts of published and draft items per list, and the state of the homepage, About and video sections.
+- **Site details** (`/admin/content/site`): the same site details as in the visual editor, as one form.
 - **Lists** (services, categories, gallery, testimonials, FAQs, process, Why Canvas):
   - Add and edit on their own pages.
   - Publish/Unpublish, move up/down, and delete (with a confirmation dialog) from the list.

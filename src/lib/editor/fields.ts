@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import type { HomeSectionKey } from "@/components/home/home-sections";
 import type { CollectionKey } from "@/lib/cms/collections";
+import { siteSchema } from "@/lib/cms/site-settings";
 import { aboutSchema, homeSchema, videoSchema } from "@/lib/cms/singletons";
 
 /*
@@ -9,12 +10,13 @@ import { aboutSchema, homeSchema, videoSchema } from "@/lib/cms/singletons";
  * src/lib/cms/singletons.ts and the Phase 14 server actions). Labels are
  * what the client sees; table and column names never reach the UI.
  *
- * Not listed = not editable here, deliberately: the hero headline (the
- * business slogan), navigation, phone/social links, link targets and the
- * enquiry form's own labels are part of the website's code (Phase 13).
+ * Site details (scope "site", Phase 18): the headline, navigation and
+ * button labels, phone, address, social links, footer text and the enquiry
+ * form's wording. Not editable here, deliberately: link destinations, the
+ * business name, and the form's validation and status messages (code).
  */
 
-export type EditorScope = "home" | "about" | "video";
+export type EditorScope = "home" | "about" | "video" | "site";
 /** line: one line · text: paragraph · lines: 1–3 heading lines · paragraphs: blank-line separated */
 export type FieldKind = "line" | "text" | "lines" | "paragraphs";
 
@@ -43,15 +45,32 @@ const home = (field: string, label: string, kind: FieldKind = "line", hint?: str
   hint,
 });
 
+const siteField = (field: string, label: string, hint?: string, extra: Partial<EditableField> = {}): EditableField => ({
+  scope: "site",
+  field,
+  label,
+  kind: "line",
+  hint,
+  ...extra,
+});
+
+const MAIN_BUTTON_HINT = "The Enquire button in the header, the hero, the mobile menu and the footer.";
+const PHONE_HINT = "Shown everywhere on the website and in Google's business details. The call link is made from it.";
+
 export const sections: Record<HomeSectionKey, SectionDef> = {
   hero: {
     title: "Hero",
     fields: [
       home("heroEyebrow", "Hero label"),
+      siteField("headlineLead", "Headline", "Also used in the page title for Google and social media."),
+      siteField("headlineEmphasis", "Headline ending (italic rose)", "Shown after the headline in italic rose, e.g. “masterpieces”. Leave empty for none.", { optional: true }),
       home("heroDescription", "Hero text", "text"),
+      siteField("enquireLabel", "Main button text", MAIN_BUTTON_HINT),
       home("heroSecondaryCtaLabel", "Second button text", "line", "The button takes visitors to the gallery."),
+      siteField("callPrompt", "Call prompt", "Before the phone link, e.g. “Prefer to talk?”."),
+      siteField("mobileCallLabel", "Call link text", "Before the number, e.g. “Call”. Also on the mobile bar and in Contact."),
+      siteField("phoneDisplay", "Phone number", PHONE_HINT),
     ],
-    note: "The headline is the business slogan and isn't edited here.",
   },
   intro: {
     title: "Introduction",
@@ -139,8 +158,19 @@ export const sections: Record<HomeSectionKey, SectionDef> = {
       home("enquiryEyebrow", "Enquiry label"),
       home("enquiryTitle", "Enquiry heading"),
       home("enquiryDescription", "Enquiry text", "text"),
+      siteField("formNameLabel", "Form: name label"),
+      siteField("formEmailLabel", "Form: email label"),
+      siteField("formPhoneLabel", "Form: phone label"),
+      siteField("formEventTypeLabel", "Form: event type label"),
+      siteField("formEventDateLabel", "Form: event date label"),
+      siteField("formVenueLabel", "Form: venue label"),
+      siteField("formMessageLabel", "Form: message label"),
+      siteField("formOptionalLabel", "Form: optional marker", "Shown after optional fields, e.g. “(optional)”."),
+      siteField("formSubmitLabel", "Form: send button"),
+      siteField("formSuccessTitle", "Thank-you heading", "Shown after an enquiry is sent."),
+      siteField("formSuccessText", "Thank-you text", undefined, { kind: "text" }),
     ],
-    note: "The form's own labels and messages are part of the website and aren't edited here.",
+    note: "The form's error and status messages stay as they are, so they always explain what happened.",
   },
   contact: {
     title: "Contact",
@@ -148,14 +178,46 @@ export const sections: Record<HomeSectionKey, SectionDef> = {
       home("contactEyebrow", "Contact label"),
       home("contactTitle", "Contact heading"),
       home("contactDescription", "Contact text", "text"),
+      siteField("phoneDisplay", "Phone number", PHONE_HINT),
+      siteField("basedInLabel", "“Based in” label"),
+      siteField("addressStreet", "Street"),
+      siteField("addressLocality", "Suburb"),
+      siteField("addressRegion", "State"),
+      siteField("addressPostcode", "Postcode"),
+      siteField("instagramUrl", "Instagram link", "Leave empty to hide Instagram everywhere.", { optional: true }),
+      siteField("facebookUrl", "Facebook link", "Leave empty to hide Facebook everywhere.", { optional: true }),
+      siteField("tiktokUrl", "TikTok link", "Leave empty to hide TikTok everywhere.", { optional: true }),
     ],
-    note: "The phone number and social links are part of the business details.",
+    note: "The phone number, address and links are also used in the header, footer and Google's business details.",
   },
+};
+
+/** The header and footer (site details), edited from the editor toolbar. */
+export const chromeSection: SectionDef = {
+  title: "Header & footer",
+  fields: [
+    siteField("navHome", "Menu: Home"),
+    siteField("navServices", "Menu: Services"),
+    siteField("navGallery", "Menu: Gallery"),
+    siteField("navAbout", "Menu: About"),
+    siteField("navFaq", "Menu: FAQ"),
+    siteField("navContact", "Menu: Contact"),
+    siteField("enquireLabel", "Main button text", MAIN_BUTTON_HINT),
+    siteField("menuLabel", "Mobile menu button", "The button that opens the menu on phones."),
+    siteField("mobileEnquireLabel", "Mobile bar: enquire button"),
+    siteField("mobileCallLabel", "Call link text", "Before the number, e.g. “Call”. Also on the mobile bar and in Contact."),
+    siteField("footerTagline", "Footer tagline"),
+    siteField("footerExploreHeading", "Footer: menu heading"),
+    siteField("footerContactHeading", "Footer: contact heading"),
+    siteField("footerFollowHeading", "Footer: social heading", "Also the “Follow” label in Contact."),
+    siteField("phoneDisplay", "Phone number", PHONE_HINT),
+  ],
+  note: "Link destinations stay as they are; only the wording changes.",
 };
 
 /** Look up a field's definition (for labels and kinds). */
 export function fieldDef(scope: EditorScope, field: string): EditableField | undefined {
-  for (const section of Object.values(sections)) {
+  for (const section of [...Object.values(sections), chromeSection]) {
     const found = section.fields.find((f) => f.scope === scope && f.field === field);
     if (found) return found;
   }
@@ -168,6 +230,7 @@ const shapes: Record<EditorScope, Record<string, z.ZodType>> = {
   home: homeSchema.shape,
   about: aboutSchema.shape,
   video: videoSchema.shape,
+  site: siteSchema.shape,
 };
 
 /** The first problem with a single field's value, or null. */

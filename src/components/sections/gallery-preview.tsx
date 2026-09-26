@@ -8,7 +8,7 @@ import { SectionHeading } from "@/components/shared/section-heading";
 import { Button } from "@/components/ui/button";
 import { galleryPreview, type GalleryItem } from "@/data/gallery";
 import { gallerySection, type GalleryCopy } from "@/data/home";
-import { site } from "@/data/site";
+import { defaultSiteSettings, type SiteCopy } from "@/lib/cms/site-settings";
 import { GalleryLightbox, LightboxTrigger } from "./gallery-lightbox";
 import { SlotItem, type ItemSlots } from "./item-slots";
 import { cn } from "@/lib/utils";
@@ -27,7 +27,6 @@ const slots = [
   { item: "lg:col-span-6", frame: "aspect-square lg:aspect-3/2", sizes: "(min-width: 1280px) 600px, (min-width: 1024px) 50vw, 50vw" },
 ];
 
-const instagram = site.socials.find((s) => s.platform === "instagram");
 
 function ExternalLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -42,11 +41,15 @@ export function GalleryPreview({
   items = galleryPreview,
   copy = gallerySection,
   itemSlots,
+  socials = defaultSiteSettings.socials,
 }: {
   items?: GalleryItem[];
   copy?: GalleryCopy;
   itemSlots?: ItemSlots<GalleryItem>;
+  /** Social links (site details). */
+  socials?: SiteCopy["socials"];
 }) {
+  const instagram = socials.find((s) => s.platform === "instagram");
   const hasImages = items.length > 0;
 
   return (
@@ -55,6 +58,7 @@ export function GalleryPreview({
         <Container>
           <div className="flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
             <SectionHeading
+          styleKeys={{ eyebrow: "home.galleryEyebrow", title: "home.galleryTitle" }}
               id="gallery-title"
               eyebrow={copy.eyebrow}
               title={copy.title}
@@ -116,6 +120,7 @@ export function GalleryPreview({
         // Deliberate empty state: no placeholder frames pretending to be work.
         <Container size="narrow" className="text-center">
           <SectionHeading
+          styleKeys={{ eyebrow: "home.galleryEyebrow", title: "home.galleryEmptyTitle", description: "home.galleryEmptyText" }}
             id="gallery-title"
             eyebrow={copy.eyebrow}
             title={copy.emptyTitle}
@@ -132,7 +137,7 @@ export function GalleryPreview({
               </Button>
             )}
             <ul className="flex gap-8 text-sm">
-              {site.socials
+              {socials
                 .filter((s) => s.platform !== "instagram")
                 .map((social) => (
                   <li key={social.platform}>

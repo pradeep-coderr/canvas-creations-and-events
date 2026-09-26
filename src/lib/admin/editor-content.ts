@@ -8,6 +8,8 @@ import type { EditorialImage, Principle, ProcessStep, VideoContent } from "@/dat
 import type { Service } from "@/data/services";
 import type { Testimonial } from "@/data/testimonials";
 import { collectionKeys, collections, type CollectionKey } from "@/lib/cms/collections";
+import { SITE_SETTINGS_SELECT, siteToValues } from "@/lib/cms/site-settings";
+import { rowToStyles } from "@/lib/styles/schema";
 import { VIDEO_STORY_SELECT, aboutToValues, homeToValues, videoToValues } from "@/lib/cms/singletons";
 import { ADMIN_URL_TTL, signImagePaths } from "@/lib/media/server";
 import { videoAdapters, uploadedVideoConfigured } from "@/lib/media/video-providers";
@@ -136,7 +138,7 @@ function toDomain(key: CollectionKey, row: Row, urls: Urls) {
 
 export async function loadEditorPage(): Promise<EditorPageData | null> {
   const supabase = await createClient();
-  const [homeRes, aboutRes, videoRes, imageOptions, videoOptions, categoryOptions, ...lists] = await Promise.all([
+  const [homeRes, aboutRes, videoRes, siteRes, stylesRes, imageOptions, videoOptions, categoryOptions, ...lists] = await Promise.all([
     supabase.from("home_content").select(`*, hero_image:media_assets!home_content_hero_image_fkey(${MEDIA})`).eq("id", true).single(),
     supabase.from("about_content").select(`*, image:media_assets!about_content_image_fkey(${MEDIA})`).eq("id", true).single(),
     supabase
@@ -144,6 +146,8 @@ export async function loadEditorPage(): Promise<EditorPageData | null> {
       .select(`${VIDEO_STORY_SELECT}, media:media_assets!video_story_video_provider_fkey(provider, external_id), poster:media_assets!video_story_poster_fkey(${MEDIA})`)
       .eq("id", true)
       .single(),
+    supabase.from("site_settings").select(SITE_SETTINGS_SELECT).eq("id", true).single(),
+    supabase.from("page_styles").select("text_styles, section_styles").eq("id", true).single(),
     getImageLibrary(),
     getVideoLibrary(),
     getCategoryOptions(),
@@ -152,7 +156,7 @@ export async function loadEditorPage(): Promise<EditorPageData | null> {
     ),
   ]);
 
-  const failed = [homeRes, aboutRes, videoRes, ...lists].find((r) => r.error);
+  const failed = [homeRes, aboutRes, videoRes, siteRes, stylesRes, ...lists].find((r) => r.error);
   if (failed?.error) {
     console.error("[editor] load failed", { code: failed.error.code });
     return null;
@@ -212,7 +216,13 @@ export async function loadEditorPage(): Promise<EditorPageData | null> {
 
   return {
     data: {
-      saved: { home: homeToValues(home), about: aboutToValues(about), video: videoToValues(video) },
+      saved: {
+        home: homeToValues(home),
+        about: aboutToValues(about),
+        video: videoToValues(video),
+        site: siteToValues(siteRes.data as unknown as Row),
+      },
+      styles: rowToStyles(stylesRes.data),
       items,
       imageOptions,
       videoOptions,

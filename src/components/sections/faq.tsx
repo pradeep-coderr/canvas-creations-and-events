@@ -28,6 +28,7 @@ export function Faq({
     <Section id="faq" tone="ivory" aria-labelledby="faq-title">
       <Container size="narrow">
         <SectionHeading
+          styleKeys={{ eyebrow: "home.faqEyebrow", title: "home.faqTitle" }}
           id="faq-title"
           eyebrow={copy.eyebrow}
           title={copy.title}
