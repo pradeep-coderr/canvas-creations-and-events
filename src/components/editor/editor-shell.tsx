@@ -66,7 +66,7 @@ function Toolbar() {
     <div className="cc-toolbar" role="region" aria-label="Website editor">
       <div className="cc-toolbar-inner">
         <div className="min-w-0 flex-1">
-          <p className="truncate font-display text-lg leading-tight font-medium">
+          <p className="truncate font-display text-lg leading-tight font-title">
             {preview ? "Previewing website" : "Editing website"}
           </p>
           <p role="status" className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">

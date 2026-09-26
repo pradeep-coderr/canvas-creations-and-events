@@ -85,7 +85,7 @@ export function CollectionList({
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 ref={headingRef} tabIndex={-1} className="font-display text-display-md font-medium outline-none">
+        <h1 ref={headingRef} tabIndex={-1} className="font-display text-display-md font-title outline-none">
           {title}
         </h1>
         {addButton}

@@ -123,11 +123,11 @@ export function EnquiryForm({
 
   if (status === "sent") {
     return (
-      <div className="bg-background px-6 py-12 text-center sm:px-10">
+      <div className="surface px-6 py-12 text-center sm:px-10">
         <h3
           ref={thanksRef}
           tabIndex={-1}
-          className="font-display text-display-md font-medium outline-none"
+          className="font-display text-display-md font-title outline-none"
         >
           Thank you.
         </h3>
@@ -139,7 +139,7 @@ export function EnquiryForm({
             If it&apos;s urgent, please also call us on{" "}
             <a
               href={site.contact.phone.href}
-              className="font-semibold whitespace-nowrap text-foreground underline decoration-highlight/70 underline-offset-4 hover:text-primary"
+              className="font-semibold whitespace-nowrap text-foreground underline decoration-primary/40 underline-offset-4 hover:text-primary"
             >
               {site.contact.phone.display}
             </a>
@@ -168,7 +168,7 @@ export function EnquiryForm({
           {enquirySection.offlineNotice}{" "}
           <a
             href={site.contact.phone.href}
-            className="font-semibold whitespace-nowrap text-foreground underline decoration-highlight/70 underline-offset-4 hover:text-primary"
+            className="font-semibold whitespace-nowrap text-foreground underline decoration-primary/40 underline-offset-4 hover:text-primary"
           >
             Call {site.contact.phone.display}
           </a>
@@ -266,7 +266,7 @@ export function EnquiryForm({
           Or call{" "}
           <a
             href={site.contact.phone.href}
-            className="font-semibold whitespace-nowrap text-foreground underline decoration-highlight/70 underline-offset-4 hover:text-primary"
+            className="font-semibold whitespace-nowrap text-foreground underline decoration-primary/40 underline-offset-4 hover:text-primary"
           >
             {site.contact.phone.display}
           </a>
@@ -276,14 +276,14 @@ export function EnquiryForm({
       {/* Announces the outcome of a submit attempt. */}
       <div role="status" aria-live="polite" className={cn(status !== "unavailable" && status !== "error" && status !== "offline" && "sr-only")}>
         {status === "unavailable" && (
-          <p className="mt-8 flex items-start gap-3 bg-background p-5 text-sm">
+          <p className="mt-8 flex items-start gap-3 surface p-5 text-sm">
             <Phone aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />
             <span>
               Your details look good, but online enquiries aren&apos;t connected yet, so
               nothing has been sent. Please call us on{" "}
               <a
                 href={site.contact.phone.href}
-                className="font-semibold whitespace-nowrap underline decoration-highlight/70 underline-offset-4 hover:text-primary"
+                className="font-semibold whitespace-nowrap underline decoration-primary/40 underline-offset-4 hover:text-primary"
               >
                 {site.contact.phone.display}
               </a>
@@ -292,13 +292,13 @@ export function EnquiryForm({
           </p>
         )}
         {status === "offline" && (
-          <p className="mt-8 bg-background p-5 text-sm">
+          <p className="mt-8 surface p-5 text-sm">
             You&apos;re offline, so your enquiry hasn&apos;t been sent. Your details are still
             in the form — reconnect and press <strong>Send enquiry</strong> again.
           </p>
         )}
         {status === "error" && (
-          <p className="mt-8 bg-background p-5 text-sm text-destructive">
+          <p className="mt-8 surface p-5 text-sm text-destructive">
             Something went wrong and your enquiry wasn&apos;t sent. Please try again,
             or call us on {site.contact.phone.display}.
           </p>

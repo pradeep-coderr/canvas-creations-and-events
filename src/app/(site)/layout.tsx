@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SiteFrame } from "@/components/layout/site-frame";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
+import { SiteThemeStyle } from "@/components/theme/site-theme-style";
 import { site } from "@/data/site";
 
 const title = `${site.name} | ${site.slogan}`;
@@ -34,10 +35,14 @@ export const metadata: Metadata = {
   },
 };
 
-/** Public website chrome. The admin area (/admin) has its own layout. */
+/**
+ * Public website chrome. The admin area (/admin) has its own layout.
+ * The global site theme (admin → Design) is applied here for every visitor.
+ */
 export default function SiteLayout({ children }: LayoutProps<"/">) {
   return (
     <>
+      <SiteThemeStyle />
       <SiteFrame>{children}</SiteFrame>
       <ServiceWorkerRegistration />
     </>

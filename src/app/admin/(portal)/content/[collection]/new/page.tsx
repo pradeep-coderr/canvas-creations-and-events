@@ -28,7 +28,7 @@ export default async function NewItemPage({ params }: PageProps<"/admin/content/
   return (
     <>
       <BackLink href={`/admin/content/${collection}`}>{def.title}</BackLink>
-      <h1 className="mt-6 font-display text-display-md font-medium">New {def.singular}</h1>
+      <h1 className="mt-6 font-display text-display-md font-title">New {def.singular}</h1>
       <p className="mt-3 max-w-2xl text-muted-foreground">
         New {def.plural} start as drafts. Tick “Published on the website” when it&apos;s ready.
       </p>

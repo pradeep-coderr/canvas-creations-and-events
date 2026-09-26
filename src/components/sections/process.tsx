@@ -18,7 +18,7 @@ export function Process({
   if (steps.length === 0 && !itemSlots?.after) return null;
 
   return (
-    <Section tone="ivory" aria-labelledby="process-title">
+    <Section tone="blush" aria-labelledby="process-title">
       <Container>
         <SectionHeading
           id="process-title"
@@ -39,7 +39,7 @@ export function Process({
                 >
                   {String(i + 1).padStart(2, "0")}
                 </span>
-                <h3 className="mt-4 font-display text-display-sm font-medium">
+                <h3 className="mt-4 font-display text-display-sm font-title">
                   {step.title}
                 </h3>
                 <p className="mt-3 max-w-xs text-muted-foreground">

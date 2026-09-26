@@ -14,7 +14,7 @@ export default async function HomeContentPage() {
   return (
     <>
       <BackLink href="/admin/content">Content</BackLink>
-      <h1 className="mt-6 font-display text-display-md font-medium">Homepage text</h1>
+      <h1 className="mt-6 font-display text-display-md font-title">Homepage text</h1>
       <div className="mt-8">
         {row ? (
           <HomeForm defaultValues={homeToValues(row)} imageOptions={imageOptions} />

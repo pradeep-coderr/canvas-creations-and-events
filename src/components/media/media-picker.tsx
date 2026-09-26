@@ -3,7 +3,8 @@
 import { useId, useRef, useState } from "react";
 import Image from "next/image";
 import { Check, ImageIcon } from "lucide-react";
-import { getLibraryImages } from "@/app/admin/(portal)/content/media/actions";
+import { deleteMedia, getLibraryImages } from "@/app/admin/(portal)/content/media/actions";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,8 +22,10 @@ import { UploadPhoto } from "./upload-photo";
 /*
  * Choosing a photo from the media library, from any image field (content
  * forms, the visual editor, gallery items, video poster). Photos can also be
- * uploaded right here — the same upload as the library. Selecting only
- * changes which library photo the field points to; files are never copied.
+ * uploaded right here — the same upload as the library — and an unused
+ * photo can be deleted here (same action and rules as the library: a photo
+ * used anywhere on the website can't be deleted). Selecting only changes
+ * which library photo the field points to; files are never copied.
  */
 
 export function MediaPicker({
@@ -35,6 +38,7 @@ export function MediaPicker({
   title,
   onSelect,
   onUploaded,
+  onDeleted,
   returnFocus,
 }: {
   open: boolean;
@@ -46,6 +50,7 @@ export function MediaPicker({
   title: string;
   onSelect: (image: MediaImage) => void;
   onUploaded: (image: MediaImage) => void;
+  onDeleted: (id: string) => void;
   returnFocus: React.RefObject<HTMLElement | null>;
 }) {
   const name = useId();
@@ -53,6 +58,8 @@ export function MediaPicker({
   const [query, setQuery] = useState("");
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const uploadRef = useRef<HTMLButtonElement>(null);
 
   const q = query.trim().toLowerCase();
   const shown = q
@@ -109,7 +116,7 @@ export function MediaPicker({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-              <Button type="button" variant="secondary" onClick={() => setUploading(true)}>
+              <Button ref={uploadRef} type="button" variant="secondary" onClick={() => setUploading(true)}>
                 Upload new photo
               </Button>
             </div>
@@ -177,6 +184,21 @@ export function MediaPicker({
 
         {!uploading && (
           <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+            {chosen && chosen.usage.length === 0 && (
+              <Button
+                type="button"
+                variant="destructive"
+                className="sm:mr-auto"
+                onClick={() => setConfirmDelete(true)}
+              >
+                Delete photo<span className="sr-only">: {chosen.alt}</span>
+              </Button>
+            )}
+            {chosen && chosen.usage.length > 0 && (
+              <p className="text-xs text-muted-foreground sm:mr-auto sm:max-w-64 sm:self-center">
+                Used on the website, so it can&apos;t be deleted here.
+              </p>
+            )}
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
@@ -194,6 +216,27 @@ export function MediaPicker({
           </DialogFooter>
         )}
       </DialogContent>
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete this photo?"
+        description={
+          <p>
+            “{chosen?.alt}” will be permanently deleted from your media library. This can&apos;t be undone.
+          </p>
+        }
+        confirmLabel="Delete photo"
+        destructive
+        returnFocus={uploadRef}
+        onConfirm={async () => {
+          if (!chosen) return;
+          const result = await deleteMedia(chosen.id);
+          if (!result.ok) return result.error;
+          onDeleted(chosen.id);
+          setChoice("");
+          setMessage("Photo deleted.");
+        }}
+      />
     </Dialog>
   );
 }
@@ -318,6 +361,11 @@ export function MediaSlot({
         title={`Choose a photo: ${label}`}
         onSelect={(image) => onChange(image.id)}
         onUploaded={(image) => setLibrary((l) => [image, ...l.filter((i) => i.id !== image.id)])}
+        onDeleted={(deletedId) => {
+          setLibrary((l) => l.filter((i) => i.id !== deletedId));
+          // An unsaved choice of the deleted photo can't stay in the field.
+          if (value === deletedId) onChange("");
+        }}
         returnFocus={changeRef}
       />
     </fieldset>

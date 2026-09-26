@@ -35,7 +35,7 @@ export function Hero({
 
           <h1
             id="hero-title"
-            className="mt-6 font-display text-display-xl font-medium text-foreground motion-safe:animate-rise sm:mt-8"
+            className="mt-6 font-display text-display-xl font-title text-foreground motion-safe:animate-rise sm:mt-8"
             style={{ animationDelay: "80ms" }}
           >
             {sloganLead}{" "}
@@ -71,7 +71,7 @@ export function Hero({
             Prefer to talk?{" "}
             <a
               href={site.contact.phone.href}
-              className="font-semibold text-foreground underline decoration-highlight/70 underline-offset-4 transition-colors hover:text-primary"
+              className="font-semibold text-foreground underline decoration-primary/40 underline-offset-4 transition-colors hover:text-primary"
             >
               Call {site.contact.phone.display}
             </a>

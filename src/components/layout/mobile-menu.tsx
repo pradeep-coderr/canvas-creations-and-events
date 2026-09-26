@@ -100,7 +100,7 @@ export function MobileMenu() {
                 <a
                   href={item.href}
                   onClick={(e) => navigate(e, item.href)}
-                  className="block py-3.5 font-display text-display-sm font-medium transition-colors duration-300 hover:text-primary"
+                  className="block py-3.5 font-display text-display-sm font-title transition-colors duration-300 hover:text-primary"
                 >
                   {item.label}
                 </a>
@@ -122,7 +122,7 @@ export function MobileMenu() {
             Prefer to talk?{" "}
             <a
               href={site.contact.phone.href}
-              className="font-semibold text-foreground underline decoration-highlight/70 underline-offset-4 hover:text-primary"
+              className="font-semibold text-foreground underline decoration-primary/40 underline-offset-4 hover:text-primary"
             >
               Call {site.contact.phone.display}
             </a>

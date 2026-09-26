@@ -107,6 +107,7 @@ Private area for managing enquiries: list (newest first, filter by status with c
 - **Remove an admin:** `delete from public.admin_users where user_id = …` (or delete the auth user).
 - **How access is enforced:** `src/proxy.ts` (Next 16 proxy, admin routes only) just refreshes the session. Every admin page and server action calls `requireAdmin()` (`src/lib/admin/session.ts`: verified JWT via `getClaims()` + `admin_users` membership), and RLS enforces the same rules in the database.
 - Code: `src/app/admin/` (login, list, detail, `actions.ts`), status vocabulary `src/lib/enquiry-status.ts` (matches the DB CHECK).
+- **Sections:** Enquiries | Content | Design, plus **Edit website** (the visual editor). **Design** (`/admin/design`) changes the whole website's look. See *Global theme* under Design system.
 
 ## CMS content model (Supabase)
 
@@ -180,7 +181,7 @@ The **Edit website** button in the admin header opens the real homepage (same se
 - **Library:** Photos and Videos tabs.
   - Each photo shows its description (alt text), size, dimensions and **where it's used** (drafts included).
   - **Edit description** changes the alt text everywhere the photo is used.
-  - **Delete** works only for unused photos; the database enforces this too.
+  - **Delete** works only for unused photos, from the library or directly in the photo picker; the database enforces this too.
   - One upload can be used in any number of places.
 - **Upload flow:**
   1. **Browser:** checks type (JPEG/PNG/WebP), size (≤10 MB) and that a description is filled in. It then uploads the raw file with the admin's session to `incoming/<uuid>`. Storage policies allow only that path pattern for admins.
@@ -316,11 +317,40 @@ Live reference: run `bun dev` and open **`/design-system`** (development only; r
 
 **Type scale** (fluid, no breakpoints needed): `text-display-xl` (hero), `text-display-lg` (section headings), `text-display-md` (statements/quotes), `text-display-sm` (small titles) — always with `font-display`; `text-lead`, `text-base`, `text-sm` with Manrope; `text-eyebrow` via `<Eyebrow>`.
 
-**Colour rules**
-- ~75% white/ivory, ~20% blush/rose, ~5% gold. Gold is for hairlines, borders and ornaments only — never small text on a light surface.
-- Rose text and primary buttons use `primary` (rose-ink `#9B605A`), not the lighter brand roses, which fail WCAG AA as text.
-- Don't put `text-muted-foreground` on `bg-secondary` (blush-soft): 4.32:1, below AA.
-- Dark surfaces: `data-tone="dark"` (set by `<Section tone="dark">`) swaps the tokens; no `dark:` classes needed.
+**Colour rules** (rose-pink refresh, Phase 17; the values are the *default* theme, the client can change them in admin → Design)
+- Mostly white/ivory, with the brand pink on the main buttons, a deeper rose for labels, links, headline accents and focus, soft blush for sections and selected states, and gold for hairlines and ornaments only (never small text on a light surface).
+- Main buttons use `button`: the brand pink `#F7889A` with charcoal text (6.0:1). The pink is too light for text (2.34:1 on white) or for white button text, which is why buttons have their own colour.
+- Rose **text** (eyebrows, the headline accent, links, focus rings) uses `primary` (`#B64762`: ≥4.76:1 on white, ivory and blush; white text on it 5.16:1).
+- Dark surfaces: `data-tone="dark"` (set by `<Section tone="dark">`) swaps the tokens; no `dark:` classes needed. Their rose is derived from the primary automatically (≥4.5:1 on charcoal).
+- Headings use `font-title` (the themeable heading weight), not a fixed `font-medium`. Panels use the `surface` utility.
+
+### Global theme (admin → Design)
+
+The website's look is **site configuration**: one `site_theme` row in Supabase, applied to the public site for **every visitor**.
+
+```text
+/admin/design (draft + live preview) → Save → saveSiteTheme (requireAdmin, Zod, contrast checks)
+  → site_theme (RLS: public read, admin update) → updateTag("cms-content")
+  → (site) layout: getSiteTheme() → <style id="site-theme">:root:root{--cc-…}</style> → every component
+```
+
+- **What's stored:**
+  - **Colours:** eleven client colours (button colour and button text, rose text and text on rose, soft blush, accent gold, page background, surface, main text, muted text, border).
+  - **Buttons:** style (filled / outline / soft / ghost), corners and size.
+  - **Shape and surfaces:** global corner radius, shadow strength, and surface panel background, border, corners and shadow.
+  - **Typography:** heading and text weight.
+  - **Enforcement:** the fixed lists are enforced by Zod (`src/lib/theme/schema.ts`) **and** by database checks.
+- **What stays in code:** fonts, layout, spacing, breakpoints, section order and motion. Also the token mapping in `globals.css` (how the stored values become semantic tokens, including dark sections).
+- **Rendering:** `src/lib/theme/css.ts` turns the theme into the layer-1 variables only (`--cc-*`, `--radius`, `--btn-*`, `--surface-*`, shadows, weights).
+  - It is built from validated hex values and fixed recipes, never free text, so nothing can be injected.
+  - The public pages, the 404 page and the visual editor include it.
+  - The admin itself keeps the code defaults, so a theme can't make the control panel hard to use.
+- **Accessibility:** `src/lib/theme/palette.ts` computes WCAG contrast for the 16 combinations the site actually uses: button text (normal and hovered), rose as text and under text, main and muted text on every light surface, form field borders, and dark sections.
+  - Failing checks are shown with their ratios in the editor, and saving is refused (again on the server).
+  - Buttons stay ≥ 44px at every size.
+- **Caching:** the theme is read with the same tagged public client as the content. Saving calls `updateTag(CMS_CONTENT_TAG)`, so the next request renders with the new theme, and `/` stays ISR.
+- **Defaults:** `defaultTheme` in `schema.ts` is the canonical default and fallback (no database or a failed load → the default is used, logged as `[theme] …`). `globals.css` holds the same values, kept in sync by the theme unit test. "Reset to defaults" in the editor restores it into the draft.
+- **Code:** `src/lib/theme/`, `src/components/theme/site-theme-style.tsx`, `src/components/design/`, `src/app/admin/(portal)/design/`, migration `supabase/migrations/…_site_theme.sql`.
 
 ## Conventions
 

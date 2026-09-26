@@ -60,7 +60,7 @@ export default async function AdminEnquiriesPage({ searchParams }: PageProps<"/a
 
   return (
     <>
-      <h1 className="font-display text-display-md font-medium">
+      <h1 className="font-display text-display-md font-title">
         {status ? `${enquiryStatusLabels[status]} enquiries` : "All enquiries"}
       </h1>
 

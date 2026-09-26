@@ -42,8 +42,8 @@ export default async function AdminEnquiryPage({ params }: PageProps<"/admin/enq
   const e = data as EnquiryRow;
 
   const details: [label: string, value: React.ReactNode][] = [
-    ["Email", <a key="email" href={`mailto:${e.email}`} className="underline decoration-highlight/70 underline-offset-4 hover:text-primary">{e.email}</a>],
-    ["Phone", e.phone ? <a key="phone" href={`tel:${e.phone.replace(/[^\d+]/g, "")}`} className="underline decoration-highlight/70 underline-offset-4 hover:text-primary">{e.phone}</a> : null],
+    ["Email", <a key="email" href={`mailto:${e.email}`} className="underline decoration-primary/40 underline-offset-4 hover:text-primary">{e.email}</a>],
+    ["Phone", e.phone ? <a key="phone" href={`tel:${e.phone.replace(/[^\d+]/g, "")}`} className="underline decoration-primary/40 underline-offset-4 hover:text-primary">{e.phone}</a> : null],
     ["Event type", e.event_type],
     ["Event date", e.event_date ? formatEventDate(e.event_date) : null],
     ["Venue", e.venue],
@@ -65,7 +65,7 @@ export default async function AdminEnquiryPage({ params }: PageProps<"/admin/enq
       </Link>
 
       <div className="mt-6 flex flex-wrap items-center gap-4">
-        <h1 className="font-display text-display-md font-medium break-words">{e.name}</h1>
+        <h1 className="font-display text-display-md font-title break-words">{e.name}</h1>
         <StatusBadge status={e.status} />
       </div>
 
@@ -96,7 +96,7 @@ export default async function AdminEnquiryPage({ params }: PageProps<"/admin/enq
           <StatusForm id={e.id} status={e.status} />
           <a
             href={`mailto:${e.email}`}
-            className="mt-6 block text-sm font-semibold underline decoration-highlight/70 underline-offset-4 hover:text-primary"
+            className="mt-6 block text-sm font-semibold underline decoration-primary/40 underline-offset-4 hover:text-primary"
           >
             Reply by email
           </a>

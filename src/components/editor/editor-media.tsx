@@ -112,6 +112,7 @@ export function EditPhotoButton({
         title={`Choose a photo: ${label}`}
         onUploaded={(image) => setLibrary((l) => [image, ...l.filter((i) => i.id !== image.id)])}
         onSelect={(image) => void editor.saveScope(scope, [field], { [field]: image.id })}
+        onDeleted={(deletedId) => setLibrary((l) => l.filter((i) => i.id !== deletedId))}
         returnFocus={button}
       />
     </div>

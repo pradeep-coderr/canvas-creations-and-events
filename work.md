@@ -2415,3 +2415,184 @@ Public "/"            → photos via next/image from signed URLs; gallery opens 
 - **Existing hosted content has no photos yet:** add real photos through the library. Nothing was invented.
 - **Signed URLs on the cached homepage last 1 year.** Replacing or deleting a photo updates the page immediately (`updateTag`), but a URL copied from the old page stays valid until it expires.
 - **Service worker v2** reaches existing visitors once all their tabs of the site have been closed.
+
+## Phase 17 — Global Theme Engine + Client Design Editor + Rose Pink Refresh
+
+**Date:** Saturday 26 September 2026 · **Timezone:** NPT (UTC+05:45)
+**Result:** Not committed (awaiting instruction). Not pushed to GitHub. **Both theme migrations were pushed to hosted with the owner's approval.** A hosted admin Design save was **not** tested.
+
+### Objective
+
+The website's look becomes **global site configuration** that the client manages from the admin: saved once in Supabase, applied by the server to the public website for every visitor. It is not an admin-only preview, a per-user theme or browser-local. Plus a deliberate rose-pink brand refresh as the new default.
+
+```text
+/admin/design → draft + live preview → Save → saveSiteTheme (requireAdmin, Zod, WCAG checks)
+  → site_theme (singleton, RLS) → updateTag("cms-content")
+  → (site) layout → getSiteTheme() (tagged public client) → <style id="site-theme">:root:root{--cc-…}</style>
+  → semantic tokens (globals.css) → existing components → every visitor
+```
+
+### Audit (before coding)
+
+- **Already themeable:** almost everything.
+  - Components consume semantic tokens only (`bg-primary`, `text-emphasis`, `bg-surface-*`, `border-border`, `ring`, `--radius`, `shadow-soft/lift`).
+  - Those tokens are mapped from a raw layer-1 palette (`--cc-*`) in `globals.css`, and dark sections re-map them under `[data-tone="dark"]`.
+  - All buttons come from one `cva` primitive.
+- **Hard-coded, found and left on purpose (developer-controlled):**
+  - The lightbox backdrop `#1c1817`.
+  - The manifest and `viewport.themeColor` `#ffffff` (static files).
+  - The email HTML colours (email clients can't use CSS variables).
+  - The offline page in `sw.js`.
+- **Hard-coded, made themeable:**
+  - The display-heading weight (fixed `font-medium` in 32 places, now `font-title`).
+  - Button colours, shape and size.
+  - Ad-hoc panels (now the `surface` utility).
+  - Shadow recipes.
+  - The border and input colours (now layer-1 variables).
+- **Stays in code:** fonts, layout, grid, spacing, breakpoints, section order, component structure and motion.
+
+### Architecture decisions
+
+- **One mechanism, layer 1 only.**
+  - The theme overrides only the layer-1 variables. `globals.css` stays the single place that says HOW they become semantic tokens, so dark sections, hover shades and every shadcn component follow automatically.
+  - There is no second styling system, no runtime Tailwind classes, and no source files rewritten.
+- **Colour maths in TypeScript** (`src/lib/theme/palette.ts`).
+  - Derived colours are computed from the eleven client colours as concrete hex values, so contrast can be checked exactly: section blush, the dark-section rose (the primary lifted until ≥4.5:1 on charcoal), gold shades, and the input border (≥3:1, else the muted text).
+  - The editor (live) and the server (on save) use the same code.
+- **Rendering** (`src/lib/theme/css.ts`).
+  - The output is built only from validated hex values plus fixed recipe strings keyed by enum, and it is re-validated there, so there's no CSS or HTML injection path.
+  - Selector `:root:root` beats `globals.css`'s `:root` regardless of stylesheet order.
+  - Tone-dependent variables (button colours, surface background and border) are also declared on `[data-tone="dark"]` containers, so their `var(--primary)` resolves to the dark-section token there.
+- **Where it applies:**
+  - The `(site)` layout, the root 404 page and the visual editor (`/admin/editor`) render `<SiteThemeStyle />`, so the editor shows the live theme.
+  - **The admin chrome keeps the code defaults**, so a theme choice can't make the control panel hard to use.
+  - The Design page's preview is scoped with `data-theme-scope`, which `globals.css` now also matches, so the semantic tokens are re-derived on that element.
+- **Buttons:** the primary variant reads `--btn-bg/fg/border/hover-*`, every button's radius `--btn-radius`, and the default size `--btn-height/px/text`.
+  - Style recipes: filled (the **button colour**, champagne inner edge), outline, soft (blush), ghost.
+  - Filled buttons have their own colour setting (client request, see below). Outline and ghost use the rose text colour, because their text sits on the page background.
+  - Hover moves away from the button's text colour (lighter under dark text, darker under white), so hovering never lowers contrast.
+  - The height never drops below 44px.
+  - Other variants are unchanged.
+- **Typography:**
+  - `--font-weight-title` (the utility `font-title`) replaces the fixed heading weight, and `body` uses `--cc-body-weight`.
+  - `cn()` (tailwind-merge) was taught that `font-title` is a weight. Without it, `cn()` dropped `font-display`; this was caught visually on the FAQ questions.
+  - Fonts can't be changed.
+- **Surfaces:** a `surface` utility (background, border, radius, shadow from the theme) is used only where a panel logically exists: the enquiry form's confirmation and notices. Sections keep their editorial layouts; no cards were added.
+- **Caching:**
+  - The theme is read through the same tagged, cached public client as the content (`cms-content`), so it's loaded once on the server with no client request.
+  - Saving calls `updateTag`, so the next request renders the new theme, and `/` stays static ISR (`s-maxage=3600`).
+  - Installed-PWA visitors get it too thanks to the Phase 16 service-worker `no-cache` page fetches.
+
+### Database (`20260926094403_site_theme.sql`)
+
+- **Table:** `public.site_theme`, a singleton (`id boolean primary key default true check (id)`) like `home_content`.
+- **Columns:** 11 colours and 11 options (two added by the follow-up migration below).
+  - Colours must match `^#[0-9a-f]{6}$` (lowercase, so injection-shaped values are rejected).
+  - Options are enum checks.
+- **Other:** an `updated_at` trigger, seeded with the rose-pink default.
+- **RLS, the same as the CMS singletons:** public (anon and authenticated) `select`; `update` only when `private.is_admin()`; no insert or delete grants.
+- **Deliberate gap:** contrast isn't checked in SQL (it needs colour maths). The app checks it on save; the database guarantees the format.
+
+### Rose-pink refresh (new defaults)
+
+| Token | Before | After | Why |
+| --- | --- | --- | --- |
+| **Button colour** (Enquire Now, Send enquiry) | `#9B605A` with white text | **`#F7889A`** brand pink, **charcoal** text | client's pink; charcoal text 6.0:1 (hover `#F89AA9`, 6.84:1) |
+| Rose text (eyebrows, headline accent, links, focus) | `#9B605A` dusty brown-rose | **`#B64762`** | a deeper shade of the button pink: 5.16 / 4.76 / 4.81:1 on white / ivory / blush; white text on it 5.16:1 |
+| Soft blush (secondary, selection) | `#FCE4E2` | **`#F9DDE2`** | pinker; charcoal on it 11.06:1 |
+| Section blush | `#FFF6F5` | **`#FDF5F6`** (derived) | muted text 4.87:1 on it |
+| Dark-section rose | `#D68B7F` | **`#CC7E91`** (derived) | 4.67:1 on charcoal |
+| Border | charcoal 12% | **`#EBE1DF`** | warm blush-grey hairline |
+| Ivory, white, gold, charcoal, muted | — | unchanged | kept by the brief |
+
+- **Visual changes:**
+  - Link underlines are rose (`decoration-primary/40`) instead of gold.
+  - The Process section moves from ivory to **blush**.
+  - Gold stays for hairlines and ornaments; charcoal stays the text colour.
+  - No gradients, no neon, no extra cards or shadows.
+- **The brief's example `#C85F78` was rejected as the primary:** white text on it is 3.9:1 (fails AA). The default and the editor's checks prevent it.
+- **Client pink `#F7889A` (asked for "as the primary"):** it passes as a button fill with charcoal text (6.0:1), but fails as text (2.34:1 on white; large text needs 3:1) and with white button text (2.34:1). So the theme gained a separate **Button colour** and **Button text** (migration `20260926105017_site_theme_button_color.sql`). The buttons are now `#F7889A`, and text-level rose moved to `#B64762` (same hue, readable).
+  - That migration only moves `primary_color` if it was still the untouched old default.
+  - Known and accepted: the pink button's edge against white is 2.34:1. WCAG 1.4.11 doesn't require it for buttons identified by their text, and their text is 6.0:1.
+  - The first implementation (Primary = buttons and text) was the initial Phase 17 design; its first-round results (46/46, 53/53) are superseded by the reruns below.
+
+### Admin → Design (`/admin/design`)
+
+- **Access and navigation:**
+  - Uses `requireAdmin` in the page and the action; there's no new auth layer.
+  - The nav is Enquiries | Content | **Design**, plus the existing **Edit website** button (the editor). On phones it shows "Edit" with " website" kept for screen readers, which fixed a 2px overflow the fourth item caused.
+- **Colours:** grouped as Buttons (button colour, button text), Brand (rose text and links, text on rose, soft blush, accent gold), Backgrounds, and Text and lines.
+- **Tabs** (shadcn tabs added with the CLI and restyled like the admin nav): Colors, Buttons, Surfaces, Typography, Shape.
+- **Colors:** each colour has a label, hint, native colour picker (the swatch) and editable hex (a half-typed hex isn't applied). Readability problems are listed at the colour that can fix them. "Button text" and "Text on rose" offer **Use a readable text colour**.
+- **Other tabs:** fixed options as native radio groups (arrow keys, 44px, selection shown by ✓ and weight).
+- **Readability:** 16 WCAG AA checks with their ratios. Failures are shown in words, Save is refused and focus moves to the list; the server refuses too.
+- **Live preview:** the real primitives (Eyebrow, headings, Button filled/secondary/link, Input, a focus ring, the `surface` panel, the gold divider, soft blush, border, and a dark section) under the draft theme.
+  - It updates on every change, and nothing is saved.
+  - Desktop: sticky beside the controls. Phones: controls → preview → readability.
+- **Save bar:** unsaved count, Discard changes, **Reset to defaults** (confirmation; it changes only the draft), **Save changes** (a status message on success, an alert on error).
+- **Leaving:** reload or close uses the browser prompt; in-app links open a "Leave with unsaved design changes?" dialog. Reloading discards the draft.
+
+### Design-system page
+
+A new "Global theme" section shows the live theme values, the semantic colour tokens as the real `bg-*` utilities, radius steps, shadows, the surface panel and the focus ring. The rest of the page (buttons, tones, forms) now renders through the theme, because it's under the `(site)` layout. It's still development-only.
+
+### Files
+
+- **New:**
+  - `src/lib/theme/schema.ts`, `palette.ts`, `css.ts`, `server.ts`.
+  - `src/components/theme/site-theme-style.tsx`.
+  - `src/components/design/design-editor.tsx`, `design-controls.tsx`, `theme-preview.tsx`.
+  - `src/app/admin/(portal)/design/page.tsx`, `actions.ts`.
+  - `src/components/ui/tabs.tsx`.
+  - The migration.
+- **Changed:**
+  - `globals.css`: palette defaults, `[data-theme-scope]`, button, surface, shadow and weight variables, the `surface` utility.
+  - `button.tsx`.
+  - `utils.ts`: the `font-title` merge rule.
+  - The `(site)` layout, `not-found.tsx` and the editor page (theme style).
+  - The admin nav and layout.
+  - The enquiry form (surface panels), process (blush tone), and link underlines in hero/contact/enquiry/gallery/mobile menu/accordion/field/button.
+  - Heading weight classes (32 strings, verified to be the only change in those files).
+  - The design-system page, README and `work.md`.
+
+### Tests actually run
+
+**Local production build** (local Supabase with Storage; temporary local admin, second admin and non-admin users):
+
+| Suite | Result | What it covers |
+| --- | --- | --- |
+| `theme17-unit.ts` (new) | **68/68** | Schema: valid theme; hex rejected (named colours, 3-digit, missing `#`, `url(x)`, `;}`, empty, null); enums; strict (extra key rejected); missing keys. Contrast: 21:1 white/black, symmetric, rounds down; the default passes all 16 checks; `#C85F78` fails as rose text; light pink + white button text fails; `#F7889A` + charcoal passes, + white fails, as text fails; hover never lowers contrast. CSS: scope, no HTML-breaking characters, refuses an invalid theme (no injection), outline/pill/radius/no-shadow/44px. Guards: `globals.css` defaults equal the default theme (no drift); row ⇄ theme round trip; a malformed row → default |
+| `api17.mjs` (new) | **46/46** | **Database:** singleton; anon and non-admin read; anon and non-admin updates rejected; no second row, no delete (even as admin); the database's own checks reject invalid hex, uppercase, a CSS-injection string and unknown options even from an admin; admin update works. **`saveSiteTheme` over HTTP:** refused for no session and non-admin (theme unchanged); as admin, malformed, unknown, extra-key, missing-key and unreadable (light pink + white, `#C85F78`) themes rejected server-side; a valid save works. **Routes:** `/admin/design` → login for anon and non-admin; admin 200, noindex, `no-store`. **Isolation:** public `/` stays ISR, carries the theme style, and its HTML and scripts contain no editor code, action names or secrets |
+| `e2e17.mjs` (new, headless Chrome) | **55/55** | **The brief's end-to-end check:** public before (pink button, charcoal text, rose eyebrow) → admin Design (tabs, 11 colours, preview, 16 checks; arrow keys) → change the rose to `#C2185B`: the preview changes immediately while the admin chrome, the database and the public site do not → unreadable button text is flagged at the control and in the list, Save is refused and focus moves to the list; "Use a readable text colour" fixes it → outline buttons → the leave dialog on an admin tab, Keep editing → **Save** → a fresh public request has the new theme (cache expired, still ISR) → public: header CTA outline in the new rose, eyebrow and headline accent, link underline, Send button, input border unchanged, **focus outline in the new rose**, dark sections re-derived → **mobile 390** CTA and no overflow → the visual editor and the 404 page use it → reload discards a draft → Reset to defaults (confirmation, draft only) → Save → the public site is back on the default. The Design page at 375/390/430/768/1024/1280/1440: no overflow, controls ≥44px; no console errors |
+| Regression, first full run (before the button-colour change) | all pass | `rls13` 141, `storage16` 46, `action14` 17, `act16` 24, `iso15` 7, `iso16` 24, `media16` 57, `editor15` 68, `focus14`, `cms14` 78 (on rerun; the batch run stalled once on a navigation), admin PWA, public PWA (caches `cc-*-v2`, offline homepage styled, 0 broken images), metadata, date picker/Select, header, keyboard/menu, 7-width public audit (no overflow; the same 2 lazy images at 375 as before) |
+| Regression, rerun on the final build (pink buttons) | all pass | `rls13` 141, `storage16` 46, `action14` 17, `act16` 24, `iso15` 7, `iso16` 24, `media16` 57, `cms14` 78, `editor15` 68, `focus14`, `controls10` (status Select saved, no console errors), admin and public PWA, metadata, header, keyboard/menu, 7-width audit. **Note:** the first batch rerun started from test data left by earlier runs (a test category, a test video, several copies of the date-picker suite's enquiry), which caused 12 failures in the data-level suites. After resetting the local data to the seed state, each affected suite passed; no code was changed |
+| `picker17.mjs` (new) | **11/11** | **Delete photo in the media picker** (asked for during testing): upload in the editor's hero picker → an unused selected photo offers **Delete photo** → confirmation (Cancel keeps it) → the row and the Storage file are deleted, "Photo deleted." is announced and focus stays in the picker → a photo **in use** shows no Delete and says why; no console errors |
+
+**Visual review** (screenshots at 1440 and 390 of `/`, and at 1280 and 390 of `/admin/design`). It found and fixed:
+1. **FAQ questions lost the display font:** `cn()` treated `font-title` as a font family.
+2. **A 2px horizontal overflow on phones in the admin header** after adding the Design tab.
+3. **The preview sat below the readability list on phones:** reordered to controls → preview → readability.
+
+Full-page captures need the scroll-driven `.reveal` disabled, because below-the-fold blocks sit at opacity 0 until scrolled. This is existing behaviour, not a bug.
+
+**Hosted:**
+- **Migrations:** both pushed after dry runs, with the owner's approval: `20260926094403_site_theme.sql`, then `20260926105017_site_theme_button_color.sql`.
+- **Checked with anonymous requests:** the theme is readable (buttons `#f7889a`/`#302a29`, rose `#b64762`), and anonymous updates → `42501 permission denied`.
+- **The owner's dev server** (hosted env) serves the theme style with the pink buttons.
+- **Not done on hosted:** a Design save as the real admin (no password; no hosted test users). The save path was verified **locally only**.
+
+### Added during testing: delete from the photo picker
+
+The photo picker (content forms and the visual editor) only allowed choosing or uploading, so an unwanted upload could only be deleted on the Media library page. It now shows **Delete photo** for the selected photo when it's unused, using the same `deleteMedia` action as the library (`requireAdmin`; the database's RESTRICT keys still refuse photos in use).
+- A photo in use shows "Used on the website, so it can't be deleted here."
+- If the deleted photo was the field's unsaved choice, the field is cleared.
+- Files: `src/components/media/media-picker.tsx`, `src/components/editor/editor-media.tsx`.
+
+### Known limitations
+
+- **Pink button edge:** it's 2.34:1 against white. WCAG 1.4.11 doesn't require it for text buttons (their text is 6.0:1).
+- **Contrast isn't enforced in SQL:** a direct database write by an admin, bypassing the app, could store readable-format but low-contrast colours. The app, its server action and the checks prevent it through the UI.
+- **Developer-controlled colours:** the manifest `theme_color`, the email template, the offline page and the lightbox backdrop don't follow the theme.
+- **Fonts are fixed:** only the heading and text weights are adjustable.
+- **The admin keeps the code defaults** (deliberate). The visual editor and the Design preview show the saved or draft theme.
+- **A new theme reaches installed-PWA visitors on their next online visit** (network-first `/`).

@@ -14,7 +14,7 @@ export default async function AboutContentPage() {
   return (
     <>
       <BackLink href="/admin/content">Content</BackLink>
-      <h1 className="mt-6 font-display text-display-md font-medium">About</h1>
+      <h1 className="mt-6 font-display text-display-md font-title">About</h1>
       <div className="mt-8">
         {row ? (
           <AboutForm defaultValues={aboutToValues(row)} imageOptions={imageOptions} />

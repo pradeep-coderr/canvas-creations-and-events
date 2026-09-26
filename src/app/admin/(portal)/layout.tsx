@@ -24,7 +24,7 @@ export default async function AdminPortalLayout({ children }: LayoutProps<"/admi
               loading="eager"
               className="size-10"
             />
-            <span className="font-display text-xl font-medium">
+            <span className="font-display text-xl font-title">
               Admin <span className="sr-only">— {site.name}</span>
             </span>
           </Link>
@@ -40,11 +40,14 @@ export default async function AdminPortalLayout({ children }: LayoutProps<"/admi
           </div>
         </Container>
         {/* Sections of the admin app; the active tab's underline sits on the header border. */}
-        <Container className="-mb-px flex items-center justify-between gap-2">
+        <Container className="-mb-px flex items-center justify-between gap-2 max-sm:gap-1">
           <AdminNav />
           {/* The main way to change the website: edit it where it appears. */}
-          <Button asChild className="mb-1 px-4">
-            <Link href="/admin/editor">Edit website</Link>
+          <Button asChild className="mb-1 shrink-0 px-4 max-sm:px-3">
+            {/* "Edit" on phones (four tabs share the row); the name stays "Edit website". */}
+            <Link href="/admin/editor">
+              Edit<span className="max-sm:sr-only"> website</span>
+            </Link>
           </Button>
         </Container>
       </header>

@@ -24,6 +24,9 @@ export const cn = createCn({
         },
       ],
       shadow: [{ shadow: ["soft", "lift"] }],
+      // `font-title` is the themeable heading WEIGHT (globals.css), not a
+      // family: without this it would replace `font-display`.
+      "font-weight": [{ font: ["title"] }],
     },
   },
 });

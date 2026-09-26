@@ -23,7 +23,7 @@ export default async function AdminLoginPage() {
             loading="eager"
             className="mx-auto size-18"
           />
-          <h1 className="mt-6 font-display text-display-sm font-medium">Admin sign in</h1>
+          <h1 className="mt-6 font-display text-display-sm font-title">Admin sign in</h1>
         </div>
         <div className="mt-8 bg-background p-6 sm:p-8">
           <LoginForm />

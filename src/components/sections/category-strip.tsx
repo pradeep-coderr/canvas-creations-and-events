@@ -29,7 +29,7 @@ export function CategoryStrip({
         <Eyebrow>{copy.eyebrow}</Eyebrow>
         <h2
           id="categories-title"
-          className="mt-4 font-display text-display-md font-medium"
+          className="mt-4 font-display text-display-md font-title"
         >
           {copy.title}
         </h2>

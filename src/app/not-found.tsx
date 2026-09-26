@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { SiteThemeStyle } from "@/components/theme/site-theme-style";
 import { Button } from "@/components/ui/button";
 import { site } from "@/data/site";
 
@@ -10,6 +11,8 @@ export const metadata: Metadata = { title: "Page not found" };
 export default function NotFound() {
   return (
     <main id="main" className="flex flex-1 items-center justify-center bg-surface-ivory px-5 py-20">
+      {/* Public 404 (outside the site layout): same global theme as the website. */}
+      <SiteThemeStyle />
       <div className="max-w-md text-center">
         <Image
           src="/images/logo/canvas-creations-logo-512.png"
@@ -21,7 +24,7 @@ export default function NotFound() {
           className="mx-auto size-20"
         />
         <p className="mt-8 text-eyebrow font-semibold text-emphasis uppercase">Page not found</p>
-        <h1 className="mt-4 font-display text-display-md font-medium">
+        <h1 className="mt-4 font-display text-display-md font-title">
           This page doesn&apos;t exist.
         </h1>
         <p className="mt-4 text-muted-foreground">

@@ -49,7 +49,7 @@ export function WhyCanvas({
                 >
                   {String(i + 1).padStart(2, "0")}
                 </span>
-                <h3 className="mt-3 font-display text-display-md font-medium">
+                <h3 className="mt-3 font-display text-display-md font-title">
                   {principle.title}
                 </h3>
                 <p className="mt-3 text-muted-foreground">

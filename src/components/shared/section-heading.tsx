@@ -33,7 +33,7 @@ export function SectionHeading({
       {eyebrow && <Eyebrow className="mb-4">{eyebrow}</Eyebrow>}
       <Heading
         id={id}
-        className="font-display text-display-lg font-medium text-foreground"
+        className="font-display text-display-lg font-title text-foreground"
       >
         {title}
       </Heading>

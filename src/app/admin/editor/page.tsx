@@ -7,6 +7,7 @@ import { EditorSection } from "@/components/editor/editor-section";
 import { EditorShell } from "@/components/editor/editor-shell";
 import { HomeSections, type HomeContent, type HomeEditorSlots } from "@/components/home/home-sections";
 import { SiteFrame } from "@/components/layout/site-frame";
+import { SiteThemeStyle } from "@/components/theme/site-theme-style";
 import { about as localAbout, enquirySection, hero as localHero } from "@/data/home";
 import { loadEditorPage } from "@/lib/admin/editor-content";
 import { requireAdmin } from "@/lib/admin/session";
@@ -46,7 +47,7 @@ export default async function EditorPage() {
   if (!page) {
     return (
       <main id="main" className="mx-auto max-w-xl px-5 py-24">
-        <h1 className="font-display text-display-md font-medium">The editor couldn&apos;t load</h1>
+        <h1 className="font-display text-display-md font-title">The editor couldn&apos;t load</h1>
         <p role="alert" className="mt-4 text-muted-foreground">
           The website content couldn&apos;t be loaded. Please refresh the page, or use Content instead.
         </p>
@@ -141,6 +142,8 @@ export default async function EditorPage() {
 
   return (
     <EditorShell data={page.data}>
+      {/* The page is shown in the live global theme (admin → Design). */}
+      <SiteThemeStyle />
       <SiteFrame>
         <main id="main">
           <HomeSections content={content} slots={slots} />

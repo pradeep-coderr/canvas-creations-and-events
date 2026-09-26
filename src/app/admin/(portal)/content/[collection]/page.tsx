@@ -33,7 +33,7 @@ export default async function CollectionPage({ params }: PageProps<"/admin/conte
       <div className="mt-6">
         {rows === null ? (
           <>
-            <h1 className="font-display text-display-md font-medium">{def.title}</h1>
+            <h1 className="font-display text-display-md font-title">{def.title}</h1>
             <p role="alert" className="mt-6 text-destructive">
               {def.title} couldn&apos;t be loaded. Please refresh the page.
             </p>

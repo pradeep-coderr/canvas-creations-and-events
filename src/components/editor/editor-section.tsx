@@ -277,7 +277,7 @@ function SectionPanel({
         }}
       >
         <SheetHeader>
-          <SheetTitle className="font-display text-display-sm font-medium">{def.title} section</SheetTitle>
+          <SheetTitle className="font-display text-display-sm font-title">{def.title} section</SheetTitle>
           <SheetDescription>
             Changes show on the page as you type. Save to put them on the website.
             {def.note && <span className="mt-2 block">{def.note}</span>}

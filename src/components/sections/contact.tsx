@@ -8,7 +8,7 @@ import { site } from "@/data/site";
 const { phone, address } = site.contact;
 
 const linkClass =
-  "underline decoration-highlight/70 decoration-1 underline-offset-[6px] transition-colors hover:text-primary hover:decoration-primary";
+  "underline decoration-primary/40 decoration-1 underline-offset-[6px] transition-colors hover:text-primary hover:decoration-primary";
 
 /** Direct contact details. Only verified information from site.ts. */
 export function Contact({ copy = contactSection }: { copy?: ContactCopy }) {

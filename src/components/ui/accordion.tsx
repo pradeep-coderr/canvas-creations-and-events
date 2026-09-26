@@ -41,7 +41,7 @@ function AccordionTrigger({
       <AccordionPrimitive.Trigger
         data-slot="accordion-trigger"
         className={cn(
-          "group/accordion-trigger relative flex flex-1 items-start justify-between gap-6 rounded-sm py-6 text-left font-display text-display-sm font-medium transition-colors duration-300 outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 **:data-[slot=accordion-trigger-icon]:ml-auto **:data-[slot=accordion-trigger-icon]:size-5 **:data-[slot=accordion-trigger-icon]:text-muted-foreground",
+          "group/accordion-trigger relative flex flex-1 items-start justify-between gap-6 rounded-sm py-6 text-left font-display text-display-sm font-title transition-colors duration-300 outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 **:data-[slot=accordion-trigger-icon]:ml-auto **:data-[slot=accordion-trigger-icon]:size-5 **:data-[slot=accordion-trigger-icon]:text-muted-foreground",
           className
         )}
         {...props}
@@ -70,7 +70,7 @@ function AccordionContent({
     >
       <div
         className={cn(
-          "max-w-2xl pt-0 pb-7 [&_a]:font-semibold [&_a]:text-foreground [&_a]:underline [&_a]:decoration-highlight/70 [&_a]:underline-offset-4 [&_a]:hover:text-primary [&_p:not(:last-child)]:mb-4",
+          "max-w-2xl pt-0 pb-7 [&_a]:font-semibold [&_a]:text-foreground [&_a]:underline [&_a]:decoration-primary/40 [&_a]:underline-offset-4 [&_a]:hover:text-primary [&_p:not(:last-child)]:mb-4",
           className
         )}
       >

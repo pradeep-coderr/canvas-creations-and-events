@@ -32,7 +32,7 @@ function ServiceRow({ service, number }: { service: Service; number?: string }) 
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <h3 className="font-display text-display-md font-medium transition-colors duration-500 group-hover:text-primary">
+        <h3 className="font-display text-display-md font-title transition-colors duration-500 group-hover:text-primary">
           {service.title}
         </h3>
         <p className="mt-3 max-w-md text-muted-foreground">{service.summary}</p>
@@ -109,7 +109,7 @@ export function Services({
               className="group flex items-center justify-between gap-6 border-b border-foreground/15 py-8 sm:py-10"
             >
               <span>
-                <span className="block font-display text-display-md font-medium italic transition-colors duration-500 group-hover:text-primary">
+                <span className="block font-display text-display-md font-title italic transition-colors duration-500 group-hover:text-primary">
                   {copy.enquiry.title}
                 </span>
                 <span className="mt-2 block text-muted-foreground">

@@ -34,6 +34,9 @@ import type { Category } from "@/data/categories";
 import type { GalleryItem } from "@/data/gallery";
 import type { Service } from "@/data/services";
 import type { Testimonial } from "@/data/testimonials";
+import { derivePalette } from "@/lib/theme/palette";
+import { optionLabels } from "@/lib/theme/schema";
+import { getSiteTheme } from "@/lib/theme/server";
 
 // Internal reference for the design system. Available in development only.
 export const metadata: Metadata = {
@@ -80,6 +83,78 @@ const sampleTestimonials: Testimonial[] = [1, 2, 3].map((n) => ({
   order: n,
 }));
 
+// Semantic tokens as components use them (bg-* classes). Their values come
+// from the global site theme (admin → Design) via the layer-1 variables.
+const tokenSwatches = [
+  ["bg-button", "button"],
+  ["bg-primary", "primary (rose text)"],
+  ["bg-primary-hover", "primary-hover"],
+  ["bg-secondary", "secondary (soft blush)"],
+  ["bg-surface-blush", "surface-blush"],
+  ["bg-surface-ivory", "surface-ivory"],
+  ["bg-background", "background"],
+  ["bg-foreground", "foreground"],
+  ["bg-muted-foreground", "muted-foreground"],
+  ["bg-highlight", "highlight (gold)"],
+  ["bg-highlight-soft", "highlight-soft"],
+  ["bg-border", "border"],
+  ["bg-input", "input"],
+] as const;
+
+async function ThemeReference() {
+  const theme = await getSiteTheme();
+  const p = derivePalette(theme);
+  return (
+    <Section aria-labelledby="theme">
+      <Container>
+        <Label>Global theme (live: admin → Design, stored in Supabase site_theme)</Label>
+        <h2 id="theme" className="sr-only">Global theme</h2>
+        <p className="max-w-2xl text-sm text-muted-foreground">
+          Buttons {theme.button} with {theme.buttonForeground} text · rose text {theme.primary} · blush {theme.blush} ·
+          gold {theme.accent} · dark-section rose {p.rose} · buttons {optionLabels.buttonStyle[theme.buttonStyle]},{" "}
+          {optionLabels.buttonRadius[theme.buttonRadius]}, {optionLabels.buttonSize[theme.buttonSize]} · radius{" "}
+          {optionLabels.radius[theme.radius]} · shadows {optionLabels.shadow[theme.shadow]} · headings{" "}
+          {optionLabels.headingWeight[theme.headingWeight]}
+        </p>
+        <ul className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          {tokenSwatches.map(([cls, name]) => (
+            <li key={cls} className="text-xs">
+              <span className={`block h-14 border border-border ${cls}`} />
+              <span className="mt-2 block font-mono">{name}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-10 grid gap-8 md:grid-cols-3">
+          <div>
+            <p className="mb-3 text-sm font-semibold">Radius (--radius)</p>
+            <div className="flex flex-wrap gap-3">
+              {["rounded-sm", "rounded-md", "rounded-lg", "rounded-xl"].map((r) => (
+                <span key={r} className={`flex size-16 items-end border border-input bg-muted p-1 text-[10px] ${r}`}>
+                  {r.replace("rounded-", "")}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-3 text-sm font-semibold">Shadows</p>
+            <div className="flex gap-4">
+              <span className="flex size-16 items-end bg-background p-1 text-[10px] shadow-soft">soft</span>
+              <span className="flex size-16 items-end bg-background p-1 text-[10px] shadow-lift">lift</span>
+            </div>
+          </div>
+          <div>
+            <p className="mb-3 text-sm font-semibold">Surface and focus</p>
+            <div className="surface p-4 text-sm">Surface panel</div>
+            <Button type="button" variant="secondary" tabIndex={-1} className="mt-3 ring-2 ring-ring ring-offset-2 ring-offset-background">
+              Focus ring
+            </Button>
+          </div>
+        </div>
+      </Container>
+    </Section>
+  );
+}
+
 function Label({ children }: { children: React.ReactNode }) {
   return (
     <p className="mb-6 border-b pb-3 text-sm font-semibold text-muted-foreground">
@@ -88,7 +163,7 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function DesignSystemPage() {
+export default async function DesignSystemPage() {
   if (process.env.NODE_ENV === "production") notFound();
 
   return (
@@ -104,14 +179,16 @@ export default function DesignSystemPage() {
         </Container>
       </Section>
 
+      <ThemeReference />
+
       <Section tone="ivory" aria-labelledby="type">
         <Container>
           <Label>Type scale</Label>
           <div id="type" className="space-y-6">
-            <p className="font-display text-display-xl font-medium">
+            <p className="font-display text-display-xl font-title">
               Turning moments into masterpieces
             </p>
-            <p className="font-display text-display-lg font-medium">
+            <p className="font-display text-display-lg font-title">
               display-lg — section headings
             </p>
             <p className="font-display text-display-md italic">

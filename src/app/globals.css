@@ -22,26 +22,63 @@
  *
  * Contrast (WCAG AA) was measured for every text/background pair used here;
  * see work.md → Phase 2 for the numbers.
+ *
+ * Global site theme (Phase 17): the admin Design page stores the brand
+ * palette and a few design choices in Supabase (site_theme). The public
+ * layout renders them as an override of the layer-1 variables below
+ * (src/lib/theme/css.ts), so the semantic mapping here stays the single
+ * source of HOW the theme applies. The defaults below equal
+ * defaultTheme (src/lib/theme/schema.ts) run through derivePalette — keep
+ * them in sync (checked by the theme tests). `[data-theme-scope]` re-derives
+ * every token on an element (the Design page's live preview).
  */
 
 @custom-variant dark (&:is(.dark *));
 
-:root {
-  /* Brand palette */
+:root,
+[data-theme-scope] {
+  /* Brand palette (rose-pink refresh, Phase 17; see the theme note above) */
   --cc-white: #ffffff;
   --cc-ivory: #fbf5ec;
-  --cc-blush: #fff6f5;
-  --cc-blush-soft: #fce4e2;
-  --cc-rose: #d68b7f;
-  --cc-rose-deep: #b96f68;
-  --cc-champagne: #f6d499;
+  /* Section blush: the soft blush mixed 30% into the page background */
+  --cc-blush: #fdf5f6;
+  --cc-blush-soft: #f9dde2;
+  /* Rose for dark sections: the primary lifted to >= 4.5:1 on charcoal */
+  --cc-rose: #cc7e91;
+  --cc-rose-deep: #b64762;
+  --cc-champagne: #ebd2ad;
   --cc-gold: #d29a49;
-  --cc-gold-deep: #b77a31;
+  --cc-gold-deep: #b28443;
   --cc-charcoal: #302a29;
   --cc-muted: #756a67;
-  /* Derived: rose-deep mixed 22% toward charcoal. The only rose that passes
-     4.5:1 as text on white/ivory/blush and with white text on top of it. */
-  --cc-rose-ink: #9b605a;
+  /* Rose for text-level accents (links, eyebrows, headline accent, focus):
+     >= 4.5:1 as text on white/ivory/blush, and white text on it 5.16:1. */
+  --cc-rose-ink: #b64762;
+  --cc-on-primary: #ffffff;
+  /* Main button colour (the brand pink) with charcoal text: 6.0:1; hover is
+     lighter under dark text (6.84:1). */
+  --cc-button: #f7889a;
+  --cc-on-button: #302a29;
+  --cc-button-hover: #f89aa9;
+  --cc-border: #ebe1df;
+  /* Muted text mixed 80% into white: 3.46:1 on white (WCAG 1.4.11) */
+  --cc-input: #918885;
+
+  /* Theme choices (radius, weights, buttons, surfaces, shadows) */
+  --cc-heading-weight: 500;
+  --cc-body-weight: 400;
+  --btn-radius: 0.5rem;
+  --btn-height: 2.75rem;
+  --btn-px: 1.5rem;
+  --btn-text: 0.875rem;
+  --surface-radius: 0px;
+  --surface-shadow: none;
+  --cc-shadow-soft:
+    0 1px 2px color-mix(in srgb, var(--cc-charcoal) 5%, transparent),
+    0 12px 32px -16px color-mix(in srgb, var(--cc-charcoal) 16%, transparent);
+  --cc-shadow-lift:
+    0 2px 4px color-mix(in srgb, var(--cc-charcoal) 5%, transparent),
+    0 24px 48px -20px color-mix(in srgb, var(--cc-charcoal) 22%, transparent);
 
   /* Core semantic tokens (shadcn contract) */
   --background: var(--cc-white);
@@ -51,8 +88,11 @@
   --popover: var(--cc-white);
   --popover-foreground: var(--cc-charcoal);
   --primary: var(--cc-rose-ink);
-  --primary-foreground: var(--cc-white);
+  --primary-foreground: var(--cc-on-primary);
   --primary-hover: color-mix(in srgb, var(--cc-rose-ink) 86%, var(--cc-charcoal));
+  --button: var(--cc-button);
+  --button-foreground: var(--cc-on-button);
+  --button-hover: var(--cc-button-hover);
   --secondary: var(--cc-blush-soft);
   --secondary-foreground: var(--cc-charcoal);
   --muted: var(--cc-ivory);
@@ -61,9 +101,9 @@
   --accent-foreground: var(--cc-charcoal);
   --destructive: #b42318;
   /* Decorative dividers and hairlines */
-  --border: color-mix(in srgb, var(--cc-charcoal) 12%, var(--cc-white));
-  /* Form control boundaries: >= 3:1 on white/ivory (WCAG 1.4.11) */
-  --input: color-mix(in srgb, var(--cc-muted) 80%, var(--cc-white));
+  --border: var(--cc-border);
+  /* Form control boundaries: >= 3:1 on white (WCAG 1.4.11) */
+  --input: var(--cc-input);
   --ring: var(--cc-rose-ink);
   --radius: 0.625rem;
   /* Sticky site header height; also offsets in-page anchor scrolling */
@@ -94,6 +134,25 @@
   --sidebar-accent-foreground: var(--cc-charcoal);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--cc-rose-ink);
+}
+
+/*
+ * Theme variables that reference tone-dependent tokens. Declared on dark
+ * containers too, so e.g. a primary button in a dark section uses the dark
+ * section's --primary. Defaults = the "filled" button style and plain
+ * surfaces; the site theme overrides them (src/lib/theme/css.ts).
+ */
+:root,
+[data-theme-scope],
+[data-tone="dark"] {
+  --btn-bg: var(--button);
+  --btn-fg: var(--button-foreground);
+  --btn-border: transparent;
+  --btn-hover-bg: var(--button-hover);
+  --btn-hover-fg: var(--button-foreground);
+  --btn-inset: color-mix(in srgb, var(--highlight-soft) 25%, transparent);
+  --surface-bg: var(--background);
+  --surface-border: transparent;
 }
 
 /*
@@ -208,6 +267,8 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-hover: var(--primary-hover);
+  --color-button: var(--button);
+  --color-button-foreground: var(--button-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -249,13 +310,23 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 
-  /* Warm, low shadows. Prefer borders; use these sparingly. */
-  --shadow-soft:
-    0 1px 2px color-mix(in srgb, var(--cc-charcoal) 5%, transparent),
-    0 12px 32px -16px color-mix(in srgb, var(--cc-charcoal) 16%, transparent);
-  --shadow-lift:
-    0 2px 4px color-mix(in srgb, var(--cc-charcoal) 5%, transparent),
-    0 24px 48px -20px color-mix(in srgb, var(--cc-charcoal) 22%, transparent);
+  /* Warm, low shadows (strength is a theme choice). Prefer borders; use these sparingly. */
+  --shadow-soft: var(--cc-shadow-soft);
+  --shadow-lift: var(--cc-shadow-lift);
+
+  /* Display heading weight (theme choice): `font-title` */
+  --font-weight-title: var(--cc-heading-weight);
+}
+
+/*
+ * A reusable panel (notices, confirmations). Its background, border, radius
+ * and shadow are theme choices; layout and spacing stay with the component.
+ */
+@utility surface {
+  background-color: var(--surface-bg);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--surface-radius);
+  box-shadow: var(--surface-shadow);
 }
 
 @layer base {
@@ -268,6 +339,7 @@
   }
   body {
     @apply bg-background leading-relaxed text-foreground;
+    font-weight: var(--cc-body-weight);
   }
   h1,
   h2,

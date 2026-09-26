@@ -18,7 +18,7 @@ function Card({ href, title, children }: { href: string; title: string; children
         href={href as never}
         className="flex h-full flex-col gap-2 border border-transparent bg-background p-6 transition-colors hover:border-foreground/20"
       >
-        <span className="font-display text-display-sm font-medium">{title}</span>
+        <span className="font-display text-display-sm font-title">{title}</span>
         {children}
       </Link>
     </li>
@@ -43,7 +43,7 @@ export default async function ContentOverviewPage() {
 
   return (
     <>
-      <h1 className="font-display text-display-md font-medium">Website content</h1>
+      <h1 className="font-display text-display-md font-title">Website content</h1>
       <p className="mt-3 max-w-2xl text-muted-foreground">
         Edit the words and lists on the website. Changes appear on the website as soon as they&apos;re saved. Drafts
         stay here until you publish them.

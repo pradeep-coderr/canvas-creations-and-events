@@ -140,7 +140,7 @@ export function GalleryPreview({
                       href={social.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-semibold underline decoration-highlight/70 underline-offset-4 transition-colors hover:text-primary"
+                      className="font-semibold underline decoration-primary/40 underline-offset-4 transition-colors hover:text-primary"
                     >
                       <ExternalLabel>{social.label}</ExternalLabel>
                     </a>

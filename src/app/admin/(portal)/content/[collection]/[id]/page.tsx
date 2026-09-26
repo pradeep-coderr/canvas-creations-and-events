@@ -25,7 +25,7 @@ export default async function EditItemPage({ params, searchParams }: PageProps<"
     <>
       <BackLink href={`/admin/content/${collection}`}>{def.title}</BackLink>
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <h1 className="font-display text-display-md font-medium break-words">
+        <h1 className="font-display text-display-md font-title break-words">
           {def.label(row) || `Untitled ${def.singular}`}
         </h1>
         <VisibilityBadge published={row.is_published === true} />
