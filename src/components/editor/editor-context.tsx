@@ -8,7 +8,8 @@ import {
   type CmsResult,
 } from "@/app/admin/(portal)/content/actions";
 import type { HomeSectionKey } from "@/components/home/home-sections";
-import type { CategoryOption, CollectionKey, MediaOption } from "@/lib/cms/collections";
+import type { CategoryOption, CollectionKey } from "@/lib/cms/collections";
+import type { MediaImage, MediaVideo } from "@/lib/media/types";
 import type { AboutValues, HomeValues, VideoValues } from "@/lib/cms/singletons";
 import { fieldDef, type EditorScope } from "@/lib/editor/fields";
 
@@ -46,8 +47,11 @@ export interface EditorItemMeta {
 export interface EditorData {
   saved: SavedValues;
   items: Record<CollectionKey, EditorItemMeta[]>;
-  imageOptions: MediaOption[];
-  videoOptions: MediaOption[];
+  /** The media library (signed URLs), for photo fields. */
+  imageOptions: MediaImage[];
+  videoOptions: MediaVideo[];
+  /** Is an uploaded-video provider configured on this deployment? */
+  uploadedVideoConfigured: boolean;
   categoryOptions: CategoryOption[];
   /** Sections a visitor wouldn't see (nothing published in them). */
   hiddenInPreview: HomeSectionKey[];
@@ -65,8 +69,12 @@ interface EditorContextValue {
   setDraft: (scope: EditorScope, field: string, value: unknown) => void;
   discardDraft: (scope: EditorScope, field: string) => void;
   error: (scope: EditorScope, field: string) => string | undefined;
-  /** Save drafts of one record (optionally only some fields). */
-  saveScope: (scope: EditorScope, fields?: string[]) => Promise<boolean>;
+  /**
+   * Save drafts of one record (optionally only some fields). `values` saves
+   * those values directly (e.g. a photo just chosen), without waiting for
+   * a draft to be stored first.
+   */
+  saveScope: (scope: EditorScope, fields?: string[], values?: Record<string, unknown>) => Promise<boolean>;
   /** Save everything unsaved: text drafts and open item forms. */
   saveAll: () => Promise<boolean>;
   discardAll: () => void;
@@ -160,16 +168,21 @@ export function EditorProvider({ data, children }: { data: EditorData; children:
   }, []);
 
   const saveScope = useCallback(
-    async (scope: EditorScope, fields?: string[]) => {
+    async (scope: EditorScope, fields?: string[], direct?: Record<string, unknown>) => {
       const prefix = `${scope}.`;
-      const own = Object.keys(drafts)
-        .filter((k) => k.startsWith(prefix))
-        .map((k) => k.slice(prefix.length))
-        .filter((f) => !fields || fields.includes(f));
+      const own = [
+        ...new Set([
+          ...Object.keys(drafts)
+            .filter((k) => k.startsWith(prefix))
+            .map((k) => k.slice(prefix.length))
+            .filter((f) => !fields || fields.includes(f)),
+          ...Object.keys(direct ?? {}),
+        ]),
+      ];
       if (own.length === 0) return true;
 
       const values = { ...(saved[scope] as Record<string, unknown>) };
-      for (const f of own) values[f] = drafts[keyOf(scope, f)];
+      for (const f of own) values[f] = direct && f in direct ? direct[f] : drafts[keyOf(scope, f)];
 
       setSaving(true);
       let result: CmsResult;

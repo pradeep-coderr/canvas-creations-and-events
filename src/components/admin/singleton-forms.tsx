@@ -2,19 +2,18 @@
 
 import { useWatch } from "react-hook-form";
 import { saveAboutContent, saveHomeContent, saveVideoStory } from "@/app/admin/(portal)/content/actions";
-import type { MediaOption } from "@/lib/cms/collections";
 import {
   aboutSchema,
   homeSchema,
-  videoProviderLabels,
-  videoProviders,
   videoSchema,
+  videoSourceLabels,
+  videoSources,
   type AboutValues,
   type HomeValues,
   type VideoValues,
 } from "@/lib/cms/singletons";
-import { NO_PHOTOS_HINT } from "./collection-forms";
-import { FormSection, SelectField, TextAreaField, TextField, type CmsFormApi } from "./cms-fields";
+import type { MediaImage, MediaVideo } from "@/lib/media/types";
+import { FormSection, MediaFormField, SelectField, TextAreaField, TextField, type CmsFormApi } from "./cms-fields";
 import { CmsForm } from "./cms-form";
 
 /*
@@ -24,10 +23,6 @@ import { CmsForm } from "./cms-form";
 
 const LABEL = "Small label";
 const LABEL_HINT = "The short text above the heading.";
-
-function photoOptions(options: MediaOption[]) {
-  return options.map((o) => ({ value: o.id, label: o.label }));
-}
 
 // ---------------------------------------------------------------------------
 // Homepage
@@ -57,7 +52,7 @@ function Heading({ form, prefix }: { form: CmsFormApi<HomeValues>; prefix: strin
   );
 }
 
-export function HomeForm({ defaultValues, imageOptions }: { defaultValues: HomeValues; imageOptions: MediaOption[] }) {
+export function HomeForm({ defaultValues, imageOptions }: { defaultValues: HomeValues; imageOptions: MediaImage[] }) {
   return (
     <CmsForm schema={homeSchema} defaultValues={defaultValues} save={(v) => saveHomeContent(v)} submitLabel="Save homepage">
       {(form) => (
@@ -94,15 +89,14 @@ export function HomeForm({ defaultValues, imageOptions }: { defaultValues: HomeV
               label="Second button text"
               hint="This button takes visitors to the gallery."
             />
-            <SelectField
+            <MediaFormField
               form={form}
               name="heroImageId"
               label="Photo"
               optional
-              noneLabel="No photo (shows the monogram)"
-              options={photoOptions(imageOptions)}
-              disabled={imageOptions.length === 0}
-              hint={imageOptions.length === 0 ? NO_PHOTOS_HINT : undefined}
+              images={imageOptions}
+              use="hero"
+              emptyText="No photo: the Canvas Creations monogram is shown."
             />
           </FormSection>
 
@@ -176,7 +170,7 @@ export function HomeForm({ defaultValues, imageOptions }: { defaultValues: HomeV
 // About
 // ---------------------------------------------------------------------------
 
-export function AboutForm({ defaultValues, imageOptions }: { defaultValues: AboutValues; imageOptions: MediaOption[] }) {
+export function AboutForm({ defaultValues, imageOptions }: { defaultValues: AboutValues; imageOptions: MediaImage[] }) {
   return (
     <CmsForm schema={aboutSchema} defaultValues={defaultValues} save={(v) => saveAboutContent(v)} submitLabel="Save About section">
       {(form) => (
@@ -201,15 +195,14 @@ export function AboutForm({ defaultValues, imageOptions }: { defaultValues: Abou
           >
             <TextField form={form} name="founderName" label="Name" optional />
             <TextField form={form} name="founderRole" label="Role or title" optional hint="For example, Founder & stylist." />
-            <SelectField
+            <MediaFormField
               form={form}
               name="imageId"
               label="Photo"
               optional
-              noneLabel="No photo (shows the logo)"
-              options={photoOptions(imageOptions)}
-              disabled={imageOptions.length === 0}
-              hint={imageOptions.length === 0 ? NO_PHOTOS_HINT : undefined}
+              images={imageOptions}
+              use="founder"
+              emptyText="No photo: the Canvas Creations logo is shown."
             />
           </FormSection>
         </>
@@ -226,15 +219,17 @@ function VideoFields({
   form,
   imageOptions,
   videoOptions,
+  uploadConfigured,
 }: {
   form: CmsFormApi<VideoValues>;
-  imageOptions: MediaOption[];
-  videoOptions: MediaOption[];
+  imageOptions: MediaImage[];
+  videoOptions: MediaVideo[];
+  uploadConfigured: boolean;
 }) {
   const provider = useWatch({ control: form.control, name: "provider" });
-  // "Uploaded video file" needs a video and a poster image to choose from.
-  const uploadPossible = (videoOptions.length > 0 && imageOptions.length > 0) || provider === "upload";
-  const choices = videoProviders.filter((p) => p !== "upload" || uploadPossible);
+  // Uploaded video is only offered once a provider is configured (or if already chosen).
+  const choices = videoSources.filter((p) => p !== "stream" || uploadConfigured || provider === "stream");
+  const streamVideos = videoOptions.filter((v) => v.provider === "stream");
 
   return (
     <FormSection title="Video">
@@ -242,50 +237,37 @@ function VideoFields({
         form={form}
         name="provider"
         label="Video"
-        options={choices.map((p) => ({ value: p, label: videoProviderLabels[p] }))}
+        options={choices.map((p) => ({ value: p, label: videoSourceLabels[p] }))}
         hint={
-          uploadPossible
+          uploadConfigured
             ? undefined
-            : "Uploading a video file isn't set up yet. You can link a YouTube or Vimeo video instead."
+            : "Uploaded video is not configured yet. Add a YouTube or Vimeo link instead."
         }
       />
 
-      {provider === "upload" && (
-        <>
-          <SelectField
-            form={form}
-            name="videoMediaId"
-            label="Video file"
-            options={photoOptions(videoOptions)}
-          />
-          <SelectField
-            form={form}
-            name="posterId"
-            label="Poster image"
-            hint="Shown before the video plays."
-            options={photoOptions(imageOptions)}
-          />
-        </>
+      {(provider === "youtube" || provider === "vimeo") && (
+        <TextField
+          form={form}
+          name="videoUrl"
+          label={provider === "youtube" ? "YouTube link" : "Vimeo link"}
+          maxLength={500}
+          hint={
+            provider === "youtube"
+              ? "Copy it from the video's Share button, e.g. https://youtu.be/…"
+              : "Copy it from the video's Share button, e.g. https://vimeo.com/…"
+          }
+        />
       )}
 
-      {(provider === "youtube" || provider === "vimeo") && (
-        <>
-          <TextField
-            form={form}
-            name="embedUrl"
-            label={provider === "youtube" ? "YouTube link" : "Vimeo link"}
-            maxLength={500}
-            hint={
-              provider === "youtube"
-                ? "The video's address on youtube.com or youtu.be."
-                : "The video's address on vimeo.com."
-            }
-          />
-          <p className="border-l-2 border-highlight pl-4 text-sm text-muted-foreground">
-            The link is saved, but the website doesn&apos;t show YouTube or Vimeo videos yet. Until it does, visitors
-            see the text above.
-          </p>
-        </>
+      {provider === "stream" && (
+        <SelectField
+          form={form}
+          name="videoMediaId"
+          label="Uploaded video"
+          options={streamVideos.map((v) => ({ value: v.id, label: v.title }))}
+          disabled={streamVideos.length === 0}
+          hint={streamVideos.length === 0 ? "No uploaded videos yet." : undefined}
+        />
       )}
 
       {provider !== "none" && (
@@ -294,9 +276,19 @@ function VideoFields({
             form={form}
             name="videoTitle"
             label="What the video shows"
-            hint="Read out by screen readers, e.g. Styling highlights from a garden wedding."
+            hint="Read out by screen readers and shown on the play button, e.g. Styling highlights from a garden wedding."
           />
           <TextField form={form} name="caption" label="Caption" optional />
+          <MediaFormField
+            form={form}
+            name="posterId"
+            label="Cover photo"
+            optional
+            images={imageOptions}
+            use="posters"
+            hint="Shown before the video plays. The video player only loads when a visitor presses Play."
+            emptyText="No cover photo: a Canvas Creations cover is shown."
+          />
         </>
       )}
     </FormSection>
@@ -307,10 +299,12 @@ export function VideoForm({
   defaultValues,
   imageOptions,
   videoOptions,
+  uploadConfigured,
 }: {
   defaultValues: VideoValues;
-  imageOptions: MediaOption[];
-  videoOptions: MediaOption[];
+  imageOptions: MediaImage[];
+  videoOptions: MediaVideo[];
+  uploadConfigured: boolean;
 }) {
   return (
     <CmsForm schema={videoSchema} defaultValues={defaultValues} save={(v) => saveVideoStory(v)} submitLabel="Save video section">
@@ -322,7 +316,12 @@ export function VideoForm({
             <TextAreaField form={form} name="emptyText" label="Text while there's no video" rows={2} />
             <TextField form={form} name="tiktokCta" label="TikTok link text" />
           </FormSection>
-          <VideoFields form={form} imageOptions={imageOptions} videoOptions={videoOptions} />
+          <VideoFields
+            form={form}
+            imageOptions={imageOptions}
+            videoOptions={videoOptions}
+            uploadConfigured={uploadConfigured}
+          />
         </>
       )}
     </CmsForm>

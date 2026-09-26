@@ -6,7 +6,6 @@ import {
   CategoryForm,
   FaqForm,
   GalleryItemForm,
-  NO_PHOTOS_HINT,
   ServiceForm,
   StepForm,
   TestimonialForm,
@@ -215,7 +214,6 @@ export function AddItem({ collection }: { collection: CollectionKey }) {
 
   const { singular } = collections[collection];
   const items = editor.data.items[collection];
-  const noPhotos = collection === "gallery" && editor.data.imageOptions.length === 0;
   const nextOrder = items.reduce((max, i) => Math.max(max, Number(i.values.sortOrder) || 0), 0) + 1;
   // Same defaults as the table: a draft at the end; services and
   // testimonials are featured by default, gallery photos aren't.
@@ -239,18 +237,11 @@ export function AddItem({ collection }: { collection: CollectionKey }) {
             id={`add-${collection}`}
             type="button"
             variant="secondary"
-            disabled={noPhotos}
-            aria-describedby={noPhotos ? `add-${collection}-reason` : undefined}
             onClick={() => form.start(button.current)}
           >
             <Plus data-icon="inline-start" aria-hidden="true" />
             Add {singular}
           </Button>
-          {noPhotos && (
-            <p id={`add-${collection}-reason`} className="cc-item-note">
-              {NO_PHOTOS_HINT}
-            </p>
-          )}
         </>
       )}
     </div>

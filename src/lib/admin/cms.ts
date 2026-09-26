@@ -4,8 +4,10 @@ import {
   collections,
   type CategoryOption,
   type CollectionKey,
-  type MediaOption,
 } from "@/lib/cms/collections";
+import { VIDEO_STORY_SELECT } from "@/lib/cms/singletons";
+import { listImages, listVideos } from "@/lib/media/server";
+import type { MediaImage, MediaVideo } from "@/lib/media/types";
 import { createClient } from "@/lib/supabase/server";
 
 /*
@@ -77,24 +79,20 @@ export async function getCollectionCounts(): Promise<Record<CollectionKey, Colle
 
 export async function getSingleton(table: SingletonTable): Promise<Row | null> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from(table).select("*").eq("id", true).maybeSingle();
+  // The video section also needs its linked library entry (for the link).
+  const select = table === "video_story" ? VIDEO_STORY_SELECT : "*";
+  const { data, error } = await supabase.from(table).select(select).eq("id", true).maybeSingle();
   if (error) console.error("[cms] singleton read failed", { table, code: error.code });
   return (data as Row | null) ?? null;
 }
 
-/** Media files of one kind, for pickers. Labelled by alt text, else file name. */
-export async function getMediaOptions(kind: "image" | "video"): Promise<MediaOption[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("media_assets")
-    .select("id, storage_path, alt")
-    .eq("kind", kind)
-    .order("created_at", { ascending: false });
-  if (error) {
-    console.error("[cms] media read failed", { code: error.code });
-    return [];
-  }
-  return data.map((m) => ({ id: m.id, label: m.alt || m.storage_path.split("/").pop() || m.storage_path }));
+/** Every photo in the media library (signed URLs, usage), newest first. */
+export async function getImageLibrary(): Promise<MediaImage[]> {
+  return listImages(await createClient());
+}
+
+export async function getVideoLibrary(): Promise<MediaVideo[]> {
+  return listVideos(await createClient());
 }
 
 export async function getCategoryOptions(): Promise<CategoryOption[]> {

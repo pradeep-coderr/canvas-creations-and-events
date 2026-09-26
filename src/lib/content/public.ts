@@ -38,7 +38,9 @@ import { featuredServices, type Service } from "@/data/services";
 import { featuredTestimonials, type Testimonial } from "@/data/testimonials";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createPublicClient } from "@/lib/supabase/public";
-import { cmsMediaUrl } from "./media";
+import { PUBLIC_URL_TTL, signImagePaths } from "@/lib/media/server";
+import { videoAdapters } from "@/lib/media/video-providers";
+import type { VideoProvider } from "@/lib/media/types";
 
 /*
  * Public website content from the CMS (Supabase), mapped to the application
@@ -49,11 +51,17 @@ import { cmsMediaUrl } from "./media";
  * this deployment has no database configured, or a query fails — so the page
  * always renders. An EMPTY result is a real answer (e.g. every testimonial
  * unpublished) and is never replaced by local data.
+ *
+ * Images come from the private cms-media bucket as signed URLs. They are
+ * signed with this anonymous client, and Storage RLS lets it sign only
+ * images used by published content — a draft's photo can't leak here.
  */
 
 type Db = ReturnType<typeof createPublicClient>;
 
 interface MediaRow {
+  width: number | null;
+  height: number | null;
   storage_path: string;
   alt: string | null;
 }
@@ -73,6 +81,20 @@ async function fromCms<T>(label: string, query: (db: Db) => Promise<T>, fallback
   }
 }
 
+const MEDIA = "storage_path, alt, width, height";
+
+/** Signed URLs for these media rows (public pages: long-lived, see PUBLIC_URL_TTL). */
+async function signed(db: Db, media: (MediaRow | null | undefined)[]) {
+  return signImagePaths(db, media.map((m) => m?.storage_path), PUBLIC_URL_TTL);
+}
+
+/** A CMS image ready for next/image, or null if it can't be shown. */
+function toImage(media: MediaRow | null | undefined, urls: Map<string, string>) {
+  const src = media && urls.get(media.storage_path);
+  if (!media || !src) return null;
+  return { src, alt: media.alt ?? "", width: media.width ?? undefined, height: media.height ?? undefined };
+}
+
 // Every public query filters on is_published explicitly as well as through
 // RLS, and orders by sort_order then creation for a stable order.
 
@@ -82,7 +104,7 @@ export function getFeaturedServices(): Promise<Service[]> {
     async (db) => {
       const { data, error } = await db
         .from("services")
-        .select("slug, title, summary, sort_order, image:media_assets!services_image_fkey(storage_path, alt)")
+        .select(`slug, title, summary, sort_order, image:media_assets!services_image_fkey(${MEDIA})`)
         .eq("is_published", true)
         .eq("is_featured", true)
         .order("sort_order")
@@ -92,11 +114,12 @@ export function getFeaturedServices(): Promise<Service[]> {
           { merge: false }
         >();
       if (error) throw error;
+      const urls = await signed(db, data.map((row) => row.image));
       return data.map((row) => ({
         id: row.slug,
         title: row.title,
         summary: row.summary,
-        image: row.image ? { src: cmsMediaUrl(row.image.storage_path), alt: row.image.alt ?? "" } : undefined,
+        image: toImage(row.image, urls) ?? undefined,
         order: row.sort_order,
         featured: true,
       }));
@@ -131,7 +154,7 @@ export function getGalleryPreview(): Promise<GalleryItem[]> {
       const { data, error } = await db
         .from("gallery_items")
         .select(
-          "id, title, sort_order, media:media_assets!gallery_items_media_fkey(storage_path, alt), category:categories(slug)",
+          `id, title, sort_order, media:media_assets!gallery_items_media_fkey(${MEDIA}), category:categories(slug)`,
         )
         .eq("is_published", true)
         .eq("is_featured", true)
@@ -150,21 +173,23 @@ export function getGalleryPreview(): Promise<GalleryItem[]> {
           { merge: false }
         >();
       if (error) throw error;
-      return data.flatMap((row) =>
-        row.media
+      const urls = await signed(db, data.map((row) => row.media));
+      // An item whose photo can't be shown is left out rather than rendered broken.
+      return data.flatMap((row) => {
+        const image = toImage(row.media, urls);
+        return image
           ? [
               {
                 id: row.id,
-                src: cmsMediaUrl(row.media.storage_path),
-                alt: row.media.alt ?? "",
+                ...image,
                 title: row.title ?? undefined,
                 categoryId: row.category?.slug,
                 featured: true,
                 order: row.sort_order,
               },
             ]
-          : [],
-      );
+          : [];
+      });
     },
     galleryPreview,
   );
@@ -336,8 +361,6 @@ interface HomeRow {
   contact_description: string;
 }
 
-const editorialImage = (media: MediaRow | null) =>
-  media ? { src: cmsMediaUrl(media.storage_path), alt: media.alt ?? "" } : null;
 
 export function getHomeCopy(): Promise<HomeCopy> {
   return fromCms(
@@ -345,17 +368,18 @@ export function getHomeCopy(): Promise<HomeCopy> {
     async (db) => {
       const { data, error } = await db
         .from("home_content")
-        .select("*, hero_image:media_assets!home_content_hero_image_fkey(storage_path, alt)")
+        .select(`*, hero_image:media_assets!home_content_hero_image_fkey(${MEDIA})`)
         .eq("id", true)
         .single();
       if (error) throw error;
       const r = data as unknown as HomeRow;
+      const urls = await signed(db, [r.hero_image]);
       return {
         hero: {
           eyebrow: r.hero_eyebrow,
           description: r.hero_description,
           secondaryCta: { label: r.hero_secondary_cta_label, href: hero.secondaryCta.href },
-          image: editorialImage(r.hero_image),
+          image: toImage(r.hero_image, urls),
         },
         intro: { eyebrow: r.intro_eyebrow, title: r.intro_title, body: r.intro_body },
         services: {
@@ -396,7 +420,7 @@ export function getAboutCopy(): Promise<AboutCopy> {
       const { data, error } = await db
         .from("about_content")
         .select(
-          "eyebrow, title, body, founder_name, founder_role, cta_label, image:media_assets!about_content_image_fkey(storage_path, alt)",
+          `eyebrow, title, body, founder_name, founder_role, cta_label, image:media_assets!about_content_image_fkey(${MEDIA})`,
         )
         .eq("id", true)
         .single();
@@ -414,7 +438,7 @@ export function getAboutCopy(): Promise<AboutCopy> {
         eyebrow: r.eyebrow,
         title: r.title,
         body: r.body,
-        image: editorialImage(r.image),
+        image: toImage(r.image, await signed(db, [r.image])),
         cta: { label: r.cta_label, href: about.cta.href },
         founder: r.founder_name ? { name: r.founder_name, role: r.founder_role ?? undefined } : null,
       };
@@ -435,7 +459,7 @@ export function getVideoSection(): Promise<VideoSection> {
       const { data, error } = await db
         .from("video_story")
         .select(
-          "eyebrow, title, empty_text, tiktok_cta, provider, video_title, caption, file:media_assets!video_story_video_fkey(storage_path), poster:media_assets!video_story_poster_fkey(storage_path)",
+          `eyebrow, title, empty_text, tiktok_cta, provider, video_title, caption, media:media_assets!video_story_video_provider_fkey(provider, external_id), poster:media_assets!video_story_poster_fkey(${MEDIA})`,
         )
         .eq("id", true)
         .single();
@@ -445,21 +469,24 @@ export function getVideoSection(): Promise<VideoSection> {
         title: string;
         empty_text: string;
         tiktok_cta: string;
-        provider: "upload" | "youtube" | "vimeo" | null;
         video_title: string | null;
         caption: string | null;
-        file: { storage_path: string } | null;
-        poster: { storage_path: string } | null;
+        media: { provider: VideoProvider; external_id: string } | null;
+        poster: MediaRow | null;
       };
-      // Only uploaded files can be played for now. YouTube/Vimeo links are
-      // stored but not rendered yet, so the section keeps its empty state.
-      const video =
-        r.provider === "upload" && r.file && r.poster && r.video_title
+      // The provider adapter decides how the video plays; an unconfigured
+      // provider (e.g. uploaded video) gives no player and the section keeps
+      // its honest empty state.
+      const playerUrl = r.media ? videoAdapters[r.media.provider].playerUrl(r.media.external_id) : null;
+      const poster = toImage(r.poster, await signed(db, [r.poster]));
+      const video: VideoContent | null =
+        r.media && playerUrl && r.video_title
           ? {
-              src: cmsMediaUrl(r.file.storage_path),
-              poster: cmsMediaUrl(r.poster.storage_path),
+              provider: r.media.provider,
               title: r.video_title,
               caption: r.caption ?? undefined,
+              playerUrl,
+              poster: poster ? { src: poster.src, alt: poster.alt } : null,
             }
           : null;
       return {

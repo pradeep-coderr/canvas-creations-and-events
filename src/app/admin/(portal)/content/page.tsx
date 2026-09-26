@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getCollectionCounts, getSingleton } from "@/lib/admin/cms";
 import { requireAdmin } from "@/lib/admin/session";
 import { collectionKeys, collections } from "@/lib/cms/collections";
-import { videoProviderLabels, type VideoProvider } from "@/lib/cms/singletons";
+import { videoProviderLabels, type VideoProvider } from "@/lib/media/types";
 
 export const metadata: Metadata = { title: "Content" };
 
@@ -34,14 +34,12 @@ export default async function ContentOverviewPage() {
     getSingleton("video_story"),
   ]);
 
-  const provider = (video?.provider ?? null) as Exclude<VideoProvider, "none"> | null;
+  const provider = (video?.provider ?? null) as VideoProvider | null;
   const videoStatus = !video
     ? "Couldn't load. Refresh to try again."
     : provider === null
       ? "No video yet. The section shows its text and a TikTok link."
-      : provider === "upload"
-        ? "An uploaded video is set."
-        : `${videoProviderLabels[provider]} video saved. Not shown on the website yet.`;
+      : `${videoProviderLabels[provider]} video set. It plays when a visitor presses Play.`;
 
   return (
     <>
@@ -50,6 +48,14 @@ export default async function ContentOverviewPage() {
         Edit the words and lists on the website. Changes appear on the website as soon as they&apos;re saved. Drafts
         stay here until you publish them.
       </p>
+
+      <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Card href="/admin/content/media" title="Media library">
+          <span className="text-sm text-muted-foreground">
+            Photos and videos. Upload once, then use them anywhere on the website.
+          </span>
+        </Card>
+      </ul>
 
       <h2 className="mt-10 text-eyebrow font-semibold text-emphasis uppercase">Page sections</h2>
       <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -1,18 +1,22 @@
+import Image from "next/image";
 import { ArrowUpRight } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { Section } from "@/components/layout/section";
 import { Reveal } from "@/components/motion/reveal";
+import { ImageFrame } from "@/components/shared/image-frame";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { Button } from "@/components/ui/button";
 import { videoStory, type VideoContent, type VideoStoryCopy } from "@/data/home";
 import { site } from "@/data/site";
+import { VideoPlayer } from "./video-player";
 
 const tiktok = site.socials.find((s) => s.platform === "tiktok");
+const providerLabels = { youtube: "YouTube", vimeo: "Vimeo", stream: "video" } as const;
 
 /**
- * Event film slot. With a local video: native player with controls, poster
- * and no autoplay (nothing moves or plays until the visitor chooses to).
- * Without one: an honest empty state pointing to the studio's TikTok.
+ * Event film slot. With a video: a cover (poster from the media library, or
+ * the Canvas cover) and a Play button; the provider's player loads only
+ * when pressed. Without one: an honest empty state pointing to TikTok.
  */
 export function VideoStory({
   video = videoStory.video,
@@ -33,21 +37,34 @@ export function VideoStory({
         <Reveal className="mx-auto mt-12 max-w-5xl sm:mt-14">
           {video ? (
             <figure>
-              <video
-                controls
-                playsInline
-                preload="none"
-                poster={video.poster}
-                aria-label={video.title}
-                className="aspect-video w-full bg-muted object-cover"
-              >
-                <source src={video.src} />
-              </video>
-              {video.caption && (
-                <figcaption className="mt-4 text-center text-sm text-muted-foreground">
-                  {video.caption}
-                </figcaption>
-              )}
+              {/* One player for every provider; the iframe loads on Play. */}
+              <div className="relative aspect-video w-full overflow-hidden bg-surface-ivory">
+                <VideoPlayer playerUrl={video.playerUrl} title={video.title} providerLabel={providerLabels[video.provider]}>
+                  {video.poster ? (
+                    <ImageFrame
+                      src={video.poster.src}
+                      alt=""
+                      sizes="(min-width: 1024px) 1024px, 100vw"
+                      className="absolute inset-0 aspect-auto size-full"
+                    />
+                  ) : (
+                    // Canvas cover when no poster is chosen (no third-party thumbnail).
+                    <div className="absolute inset-0 flex items-center justify-center outline outline-1 -outline-offset-12 outline-highlight/40">
+                      <Image
+                        src="/images/logo/canvas-creations-monogram.png"
+                        alt=""
+                        width={804}
+                        height={804}
+                        sizes="160px"
+                        className="w-32 opacity-80 mix-blend-multiply sm:w-40"
+                      />
+                    </div>
+                  )}
+                </VideoPlayer>
+              </div>
+              <figcaption className="mt-4 text-center text-sm text-muted-foreground">
+                {video.caption ?? video.title}
+              </figcaption>
             </figure>
           ) : (
             // Deliberately not a fake player: no play button, no poster.

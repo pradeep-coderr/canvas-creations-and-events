@@ -9,12 +9,13 @@ import {
   type CategoryOption,
   type CollectionKey,
   type CollectionValues,
-  type MediaOption,
 } from "@/lib/cms/collections";
 import { suggestSlug } from "@/lib/cms/fields";
+import type { MediaImage } from "@/lib/media/types";
 import {
   CheckboxField,
   FormSection,
+  MediaFormField,
   OrderField,
   SelectField,
   TextAreaField,
@@ -56,9 +57,6 @@ function formProps<K extends CollectionKey>(
     ...inlineOptions,
   };
 }
-
-export const NO_PHOTOS_HINT =
-  "Photo uploads aren't set up yet, so there are no photos to choose from. This can be added once uploads are available.";
 
 /** Published / featured / order, with the difference spelled out. */
 function VisibilitySection<T extends FieldValues>({
@@ -118,38 +116,7 @@ function SlugField<T extends FieldValues>({ form, from }: { form: CmsFormApi<T>;
   );
 }
 
-function PhotoSelect<T extends FieldValues>({
-  form,
-  name,
-  label,
-  options,
-  optional = true,
-}: {
-  form: CmsFormApi<T>;
-  name: Path<T>;
-  label: string;
-  options: MediaOption[];
-  optional?: boolean;
-}) {
-  return (
-    <SelectField
-      form={form}
-      name={name}
-      label={label}
-      optional={optional}
-      options={options.map((o) => ({ value: o.id, label: o.label }))}
-      noneLabel={optional ? "No photo" : undefined}
-      disabled={options.length === 0}
-      hint={
-        options.length === 0
-          ? NO_PHOTOS_HINT
-          : "Photos are listed by their description (alt text), which is set with the photo."
-      }
-    />
-  );
-}
-
-export function ServiceForm(props: ItemFormProps<"services"> & { imageOptions: MediaOption[] }) {
+export function ServiceForm(props: ItemFormProps<"services"> & { imageOptions: MediaImage[] }) {
   return (
     <CmsForm {...formProps("services", props)}>
       {(form) => (
@@ -158,7 +125,15 @@ export function ServiceForm(props: ItemFormProps<"services"> & { imageOptions: M
             <TextField form={form} name="title" label="Title" />
             <SlugField form={form} from="title" />
             <TextAreaField form={form} name="summary" label="Summary" hint="One or two sentences." rows={3} />
-            <PhotoSelect form={form} name="imageId" label="Photo" options={props.imageOptions} />
+            <MediaFormField
+              form={form}
+              name="imageId"
+              label="Photo"
+              optional
+              images={props.imageOptions}
+              use="services"
+              hint="Shown beside the service on larger screens."
+            />
           </FormSection>
           <VisibilitySection form={form} featuredLabel="Featured on the homepage" />
         </>
@@ -184,14 +159,21 @@ export function CategoryForm(props: ItemFormProps<"categories">) {
 }
 
 export function GalleryItemForm(
-  props: ItemFormProps<"gallery"> & { imageOptions: MediaOption[]; categoryOptions: CategoryOption[] },
+  props: ItemFormProps<"gallery"> & { imageOptions: MediaImage[]; categoryOptions: CategoryOption[] },
 ) {
   return (
     <CmsForm {...formProps("gallery", props)}>
       {(form) => (
         <>
           <FormSection title="Photo">
-            <PhotoSelect form={form} name="mediaId" label="Photo" options={props.imageOptions} optional={false} />
+            <MediaFormField
+              form={form}
+              name="mediaId"
+              label="Photo"
+              images={props.imageOptions}
+              use="gallery"
+              hint="The photo's description (alt text) is set with the photo in the media library."
+            />
             <TextField form={form} name="title" label="Caption" optional hint="A short title, e.g. the setting." />
             <SelectField
               form={form}

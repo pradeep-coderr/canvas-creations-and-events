@@ -2297,3 +2297,121 @@ Every page spot maps to an existing CMS field (the form-value names from `src/li
 - **Leaving:** browser back to another admin page within the app isn't intercepted; Exit, reload and close are.
 - **Enquiry status form (Phase 9):** still disables its button while saving (focus drops).
 - **Hosted admin-session check** of the editor by the real admin once deployed.
+
+## Phase 16 — Media Library, Image Uploads & Hybrid Video Architecture
+
+**Date:** Friday 25 September 2026 · **Timezone:** NPT (UTC+05:45)
+**Result:** Not committed (the brief names no commit; awaiting instruction). Not pushed. **Database:** one migration, `20260924151332_media_library.sql`, applied locally and, with the owner's approval, **pushed to the hosted project** (it was needed because the dev server on `.env.local` uses hosted and its admin pages failed without it).
+
+### What the client can do now
+
+```text
+/admin/content/media  → upload photos (with a description), see where each is used, edit descriptions, delete unused ones
+                      → add YouTube / Vimeo links
+Any photo field (editor or /admin/content) → picker: choose from the library or upload → saved by id
+Public "/"            → photos via next/image from signed URLs; gallery opens in a lightbox;
+                        video shows a cover + "Play video" and loads the player only on click
+```
+
+### Database (`…_media_library.sql`)
+
+- **`media_assets`** gained `provider` (`supabase` | `youtube` | `vimeo` | `stream`), `external_id`, `source_url`, `title`, `original_filename`, `mime_type` and `file_size`. `storage_path` is now nullable (videos have none).
+- **Checks:**
+  - An image is a `supabase` file at `images/<use>/<uuid>.(jpg|png|webp)` with alt text, width and height.
+  - A video is a link with no file, a title, a valid provider ID (YouTube 11 characters; Vimeo digits with an optional private hash) and a source URL on that provider's host.
+  - The same video can't be added twice.
+- **Photo foreign keys:** service, hero and About photos went from `SET NULL` to **`RESTRICT`**, like the gallery. A photo in use can't disappear.
+- **`video_story`:**
+  - Links to a library video through a composite foreign key `(video_media_id, video_kind, provider)`, so the provider must match the video.
+  - `embed_url` is retired and must be NULL.
+  - An existing `embed_url` would have been carried over into the library; neither database had one.
+- **Storage:**
+  - Private bucket `cms-media` (10 MB, JPEG/PNG/WebP only).
+  - Admins may insert only at `incoming/<uuid>` or `images/<use>/<uuid>.<ext>`, and may delete.
+  - There's no update policy, so files can't be overwritten.
+  - Reads are allowed when the caller can see the `media_assets` row: the public sees only media used by published content; admins see everything.
+- **Bug fixed while writing it:** the carry-over first used one statement with a data-modifying CTE. Its UPDATE couldn't see the rows the INSERT had just added, so it was split into two statements and verified in a rolled-back transaction.
+
+### Upload, processing, delivery
+
+- **Upload flow:**
+  1. The browser checks the file, then uploads it with the admin session to `incoming/<uuid>`.
+  2. `finalizeImageUpload` (`requireAdmin`) checks the magic bytes, fully decodes the image with sharp (`failOn: error`, 50 MP limit, animated images rejected), and re-encodes it: orientation applied, EXIF and GPS stripped, fitted inside 3000 px.
+  3. It stores the result at `images/<use>/<uuid>.<ext>` with its real dimensions.
+  4. The incoming file is always removed. The processed file is removed if the database insert fails, and incoming files older than 24 h are swept.
+  - `sharp` is now an explicit dependency (it was already installed through Next).
+- **Delivery:** a single strategy.
+  - Signed URLs: public pages sign with the anon key (1 year, because the page is cached for an hour); admin pages sign with the session (1 hour).
+  - Photos go through `next/image`, whose `remotePatterns` allow only `/storage/v1/object/sign/cms-media/images/**`. `dangerouslyAllowLocalIP` is on only when Supabase is local.
+  - No Supabase transformations.
+- **Video:**
+  - Adapters in `src/lib/media/video-providers.ts`, with `youtube-nocookie` and Vimeo `dnt=1`.
+  - The click-to-load `VideoPlayer` loads no iframe or third-party request before Play.
+  - **Uploaded video ("stream") is NOT configured.** It isn't offered in the admin, and the server refuses it with an explanation. Nothing is faked, and no video is stored in Supabase.
+- **CSP:** only `frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com` was added (the stream host only when configured). There are no wildcards.
+
+### Admin UI
+
+- **`/admin/content/media`:**
+  - Photos and Videos tabs (links with `aria-current`), with search and an upload dialog.
+  - Photo cards show the description, dimensions, size and "Used in: …" or "Unused".
+  - "Edit description" dialog.
+  - Delete is disabled with an explanation when a photo is used; the database also enforces it.
+  - The Videos tab has an add-link form and the honest "uploaded video isn't set up" notice.
+- **Picker** (`MediaPicker`/`MediaSlot`):
+  - Used by every photo field in the Phase 14 forms and in the editor.
+  - Keyboard radio grid, search, and "Upload new photo" inside it.
+  - Selection is shown in words, and focus returns to the field.
+- **Editor:**
+  - "Add photo" / "Change photo" over the hero and About photos saves straight away.
+  - The video panel takes a YouTube/Vimeo link plus a poster.
+  - The gallery "Add" is no longer disabled.
+- **Gallery lightbox:** a Radix dialog on the public page.
+  - Prev/Next with wrap-around, arrow keys and Esc, and "Photo X of N".
+  - 44 px controls, and focus returns to the photo.
+- **shadcn `dialog`** was added with the CLI, then restyled with site tokens and motion-safe animations.
+
+### Issues found and fixed during testing
+
+1. **Stale homepage for visitors with the installed site (Phase 11 bug, found here).**
+   - After a content change, the service worker's `fetch("/")` got the **previous** page from the browser's HTTP cache. Chrome applies the page's `stale-while-revalidate` directive to service-worker fetches.
+   - Visitors saw old content once after every edit. The server itself was correct (verified by comparing the server HTML with the browser's navigation entry: `transferSize 0`, `deliveryType "cache"`).
+   - **Fix:** page fetches in `sw.js` use `cache: "no-cache"` (a cheap 304 via the ETag), and `VERSION` was bumped to `v2` so installed workers update.
+2. **Editor stale closure:** choosing a photo then saving saved nothing. `saveScope` now accepts the values directly.
+3. **Portal events:** the editor canvas's submit/link interceptor also caught events from dialogs (React portals bubble through the React tree), which would have blocked uploads inside the picker. It now ignores targets outside the page DOM.
+4. **Local Storage:**
+   - The stack had been started without Storage, so it was restarted with it.
+   - The local `storage.objects` indexes lacked `COLLATE "C"` (hosted has it), giving `42P10` on upload.
+   - The indexes were rebuilt locally as `supabase_admin`, as a local tooling repair (README).
+
+### Tests actually run
+
+**Local production build** (local Supabase with Storage, temporary local admin + non-admin users; all removed afterwards):
+
+| Suite | Result | What it covers |
+| --- | --- | --- |
+| `storage16.mjs` (new) | **46/46** | **Uploads:** anon and non-admin can't upload; admin only at app paths (traversal, unknown folder, non-uuid, `.gif`, nested all rejected); non-image type and over-10 MB rejected by the bucket; no overwrite. **Reads:** anon/non-admin can't read an upload in progress or list the bucket; an image used only by a draft can't be signed by anon, and one used by published content can (served 200). **Deletes:** anon/non-admin can't delete objects or rows; RESTRICT on gallery, service and hero photos. **Constraints:** alt, dimensions, app path, provider/kind, YouTube ID and host, `javascript:` rejected, duplicate video, provider-matching FK, `embed_url` retired |
+| `media16.mjs` (new, headless Chrome) | **57/57** | **Library and uploads:** honest empty library; JPEG/PNG/WebP uploads; a fake `.jpg` rejected by the server with nothing left behind; 4000×2667 scaled to 3000×2000 with EXIF gone; thumbnails via `next/image`; search; edit description. **Editor and reuse:** picker by keyboard; hero photo saved and shown publicly via a signed `next/image` URL, high priority; one file reused in 3 places; usage list; delete disabled when used; gallery item created from the editor; lazy-loaded gallery with `sizes`. **Lightbox:** keyboard, arrows, wrap, 44 px, Esc, focus return. **Video:** no iframe or YouTube request before Play; uploaded video honestly not offered; bad link rejected; YouTube normalized, and Play loads `youtube-nocookie`; Vimeo `dnt=1` only after Play; exact CSP; video and hero photo removal back to honest fallbacks. **Responsive:** 375–1440 with no overflow |
+| `act16.mjs` (new) | **24/24** | Every media server action called directly over HTTP as **no session** and **signed-in non-admin** is refused, with storage and rows unchanged. As admin: path outside `incoming/`, traversal, unknown folder, missing or too-long description, `javascript:` and foreign-host video links are all rejected server-side. Controls: finalize stores `images/gallery/<uuid>.jpg`, sanitizes the filename, scales, and removes the incoming file; description update and delete of an unused photo work |
+| `iso16.mjs` (new) | **24/24** | Library pages → login for anon and non-admin (only the static page title, no data); admin 200, noindex, `no-store`. With a published photo and video on `/`: its HTML and 18 scripts contain no library/upload/editor strings or action names, no `incoming/` and no secrets; only signed `images/` paths; no iframe or player script before Play |
+| `rls13.mjs` | **141/141** | Updated for Phase 16: valid media paths, RESTRICT (was SET NULL) for service photos, library videos instead of `embed_url`; now cleans up after itself |
+| `cms14.mjs` | **78/78** | Updated: video field `videoUrl` stored as a library video (the public page now shows the player); gallery Add is enabled and has the picker (was "uploads aren't set up") |
+| `editor15.mjs` | **68/68** | Updated: gallery Add enabled |
+| `iso15`, `action14`, `focus14` | 7/7, 17/17, all pass | unchanged |
+| **Regression** | same as the Phase 15 baseline | Admin PWA; public PWA (caches now `cc-*-v2`, offline homepage and form, no private data cached); metadata; date picker and status Select; header state; keyboard/menu; 7-width public audit (no overflow; the same 2 not-yet-loaded lazy images at 375 as before); CTA/FAQ/form suite (its `/design-system` preview step is dev-only and errors on production builds, as before) |
+
+**Hosted:**
+- **Migration:** pushed after a dry run, with the owner's approval. Checked with anonymous requests: new columns and the video FK resolve; anon upload to `cms-media` → 403. Hosted had no video set, so nothing was carried over.
+- **`hosted13.mjs`:** 18/19. The one "failure" is its seed-count assumption: hosted has **2 published services** (the owner's own content; see Phase 15).
+- **Final gate** with the normal hosted env: `bun install --frozen-lockfile`, typecheck, lint, build (**0** content/media fallback logs) and `git diff --check` all pass.
+- **Hosted build served locally:** `/` 200 with the exact CSP, no iframe before Play, `sw.js` v2; `/admin/content/media` and `/admin/editor` → login.
+- **Not done on hosted:** uploads and saves as the real admin (no password; no hosted test users created). Upload, delete and video writes were verified **locally only**. No photos or videos were added to hosted.
+
+**Cleanup:** local test users, enquiries, media rows and Storage objects removed (local content equals the seed); test servers (:3065, :3066) stopped; temp profiles and logs removed. The local Supabase stack is left running **with Storage**. Your dev server (:3000) wasn't touched.
+
+### Remaining / deferred
+
+- **Uploaded video provider:** not configured. It needs a provider decision, `VIDEO_STREAM_CUSTOMER_CODE`, and an upload implementation with server-only credentials.
+- **Existing hosted content has no photos yet:** add real photos through the library. Nothing was invented.
+- **Signed URLs on the cached homepage last 1 year.** Replacing or deleting a photo updates the page immediately (`updateTag`), but a URL copied from the old page stays valid until it expires.
+- **Service worker v2** reaches existing visitors once all their tabs of the site have been closed.

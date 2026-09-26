@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/admin/back-link";
 import { CollectionList, type ListItem } from "@/components/admin/collection-list";
-import { NO_PHOTOS_HINT } from "@/components/admin/collection-forms";
-import { getMediaOptions, listCollection } from "@/lib/admin/cms";
+import { listCollection } from "@/lib/admin/cms";
 import { requireAdmin } from "@/lib/admin/session";
 import { collections, isCollectionKey } from "@/lib/cms/collections";
 
@@ -18,10 +17,7 @@ export default async function CollectionPage({ params }: PageProps<"/admin/conte
   if (!isCollectionKey(collection)) notFound();
   const def = collections[collection];
 
-  const [rows, photos] = await Promise.all([
-    listCollection(collection),
-    collection === "gallery" ? getMediaOptions("image") : Promise.resolve(null),
-  ]);
+  const rows = await listCollection(collection);
 
   const items: ListItem[] = (rows ?? []).map((row) => ({
     id: String(row.id),
@@ -46,7 +42,6 @@ export default async function CollectionPage({ params }: PageProps<"/admin/conte
           <CollectionList
             collection={collection}
             items={items}
-            addDisabledReason={photos && photos.length === 0 ? NO_PHOTOS_HINT : undefined}
           />
         )}
       </div>

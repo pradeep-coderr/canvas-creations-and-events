@@ -10,7 +10,14 @@ import { site } from "@/data/site";
 // Mobile/tablet use a shorter crop so the image doesn't dominate the scroll.
 const frameRatio = "aspect-[4/3] sm:aspect-[3/2] lg:aspect-[4/5]";
 
-export function Hero({ copy = hero }: { copy?: HeroCopy }) {
+export function Hero({
+  copy = hero,
+  imageAction,
+}: {
+  copy?: HeroCopy;
+  /** Admin visual editor only: the "Change photo" control over the photo. */
+  imageAction?: React.ReactNode;
+}) {
   // Emphasise the slogan's final word ("masterpieces") in italic rose.
   const splitAt = site.slogan.lastIndexOf(" ");
   const sloganLead = site.slogan.slice(0, splitAt);
@@ -109,6 +116,7 @@ export function Hero({ copy = hero }: { copy?: HeroCopy }) {
               />
             </div>
           )}
+          {imageAction}
         </div>
       </Container>
     </section>

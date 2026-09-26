@@ -3,6 +3,7 @@
  *
  * Deliberately small. What it does:
  *   - Homepage HTML ("/")           network-first → last cached copy when offline
+ *     (pages are always revalidated with the server: see freshPage)
  *   - /_next/static/* (JS, CSS, fonts; content-hashed, immutable)  cache-first
  *   - Local images/icons (/images/*, /icons/*, /_next/image, app icons)
  *                                   stale-while-revalidate, capped at MEDIA_LIMIT
@@ -21,7 +22,7 @@
  * filling in the enquiry form; on activation old "cc-" caches are deleted.
  */
 
-const VERSION = "v1";
+const VERSION = "v2";
 const PAGES = `cc-pages-${VERSION}`;
 const STATIC = `cc-static-${VERSION}`;
 const MEDIA = `cc-media-${VERSION}`;
@@ -93,7 +94,7 @@ self.addEventListener("fetch", (event) => {
 async function homepage(request) {
   const cache = await caches.open(PAGES);
   try {
-    const response = await fetch(request);
+    const response = await freshPage(request);
     if (response.ok && response.type === "basic") await cache.put("/", response.clone());
     return response;
   } catch {
@@ -103,10 +104,19 @@ async function homepage(request) {
 
 async function navigation(request) {
   try {
-    return await fetch(request);
+    return await freshPage(request);
   } catch {
     return offlinePage();
   }
+}
+
+// Pages are sent with "s-maxage=…, stale-while-revalidate=…" for the server
+// cache. The browser applies stale-while-revalidate to fetches made from a
+// service worker, which would show a visitor the previous version of a page
+// once after every content change. "no-cache" makes the browser check with the
+// server every time (a cheap 304 via the ETag when nothing changed).
+function freshPage(request) {
+  return fetch(request, { cache: "no-cache" });
 }
 
 async function cacheFirst(request) {

@@ -137,7 +137,12 @@ function Toolbar() {
 function Canvas({ children }: { children: React.ReactNode }) {
   const { announce } = useEditor();
 
-  const onClickCapture = (event: React.MouseEvent) => {
+  // React events bubble through portals, so dialogs (photo pickers, panels)
+  // reach these handlers too: only act on the page itself.
+  const onPage = (event: React.SyntheticEvent<HTMLDivElement>) => event.currentTarget.contains(event.target as Node);
+
+  const onClickCapture = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!onPage(event)) return;
     const target = event.target as HTMLElement;
     if (target.closest("[data-editor-control]")) return;
     const link = target.closest("a[href]");
@@ -151,6 +156,7 @@ function Canvas({ children }: { children: React.ReactNode }) {
   };
 
   const onSubmitCapture = (event: React.SyntheticEvent<HTMLDivElement>) => {
+    if (!onPage(event)) return;
     const form = event.target as HTMLElement;
     if (form.closest("[data-editor-control]")) return;
     event.preventDefault();

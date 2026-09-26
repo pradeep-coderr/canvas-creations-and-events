@@ -22,8 +22,11 @@ export interface GalleryItem {
   src: StaticImageData | string;
   /** Describe what is in the photo (the scene and styling). */
   alt: string;
-  /** Short caption, used by the future lightbox. */
+  /** Short caption, shown in the lightbox. */
   title?: string;
+  /** Intrinsic size (CMS images), for the lightbox. */
+  width?: number;
+  height?: number;
   /** References Category.id, for future filtering. */
   categoryId?: string;
   /** Included in the homepage preview. */

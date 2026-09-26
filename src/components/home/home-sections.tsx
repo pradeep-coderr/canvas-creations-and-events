@@ -53,6 +53,9 @@ export type HomeSectionKey =
 /** Editor-only hooks (see ItemSlots). The public page passes none. */
 export interface HomeEditorSlots {
   Section?: ComponentType<{ section: HomeSectionKey; children: ReactNode }>;
+  /** Controls over the hero / About photos. */
+  heroImage?: ReactNode;
+  aboutImage?: ReactNode;
   services?: ItemSlots<Service>;
   categories?: ItemSlots<Category>;
   gallery?: ItemSlots<GalleryItem>;
@@ -76,7 +79,7 @@ export function HomeSections({ content, slots }: { content: HomeContent; slots?:
   return (
     <>
       <S section="hero">
-        <Hero copy={copy.hero} />
+        <Hero copy={copy.hero} imageAction={slots?.heroImage} />
       </S>
       <S section="intro">
         <Intro copy={copy.intro} />
@@ -91,7 +94,7 @@ export function HomeSections({ content, slots }: { content: HomeContent; slots?:
         <GalleryPreview items={content.gallery} copy={copy.gallery} itemSlots={slots?.gallery} />
       </S>
       <S section="about">
-        <AboutFounder copy={content.about} />
+        <AboutFounder copy={content.about} imageAction={slots?.aboutImage} />
       </S>
       <S section="process">
         <Process steps={content.processSteps} copy={copy.process} itemSlots={slots?.process} />

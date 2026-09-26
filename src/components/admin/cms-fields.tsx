@@ -18,7 +18,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { MediaSlot } from "@/components/media/media-picker";
 import { LINE_MAX, TEXT_MAX } from "@/lib/cms/fields";
+import type { ImageUse, MediaImage } from "@/lib/media/types";
 import { cn } from "@/lib/utils";
 
 /*
@@ -260,5 +262,42 @@ export function FormSection({
       {description && <p className="clear-both pt-2 text-sm text-muted-foreground">{description}</p>}
       <div className="clear-both grid gap-6 pt-6">{children}</div>
     </fieldset>
+  );
+}
+
+/** A photo field bound to the form: current photo, Change / Remove, library picker. */
+export function MediaFormField<T extends FieldValues>({
+  form,
+  name,
+  label,
+  hint,
+  optional,
+  images,
+  use,
+  emptyText,
+}: BaseProps<T> & { images: MediaImage[]; use: ImageUse; emptyText?: string }) {
+  const error = get(form.formState.errors, name)?.message as string | undefined;
+  return (
+    <Controller
+      control={form.control}
+      name={name}
+      render={({ field }) => (
+        <MediaSlot
+          label={label}
+          value={String(field.value ?? "")}
+          images={images}
+          required={!optional}
+          use={use}
+          hint={hint}
+          error={error}
+          emptyText={emptyText}
+          buttonRef={field.ref}
+          onChange={(id) => {
+            field.onChange(id);
+            field.onBlur();
+          }}
+        />
+      )}
+    />
   );
 }

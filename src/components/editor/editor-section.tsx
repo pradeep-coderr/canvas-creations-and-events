@@ -3,7 +3,6 @@
 import { useId, useRef, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import type { HomeSectionKey } from "@/components/home/home-sections";
-import { NO_PHOTOS_HINT } from "@/components/admin/collection-forms";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,9 +22,10 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { collections } from "@/lib/cms/collections";
-import { videoProviderLabels, videoProviders, type VideoProvider } from "@/lib/cms/singletons";
+import { videoSourceLabels, videoSources, type VideoSource as VideoSourceKey } from "@/lib/cms/singletons";
 import { sections, validateField, type EditableField, type EditorScope } from "@/lib/editor/fields";
 import { useEditor } from "./editor-context";
+import { EditorMediaField } from "./editor-media";
 
 /*
  * Wraps each homepage section in the editor: an "Edit section" button that
@@ -179,9 +179,9 @@ function PanelSelect({
 /** Where the video comes from: same choices and rules as /admin/content/video. */
 function VideoSource() {
   const editor = useEditor();
-  const { imageOptions, videoOptions } = editor.data;
-  const provider = String(editor.value("video", "provider")) as VideoProvider;
-  const uploadPossible = (videoOptions.length > 0 && imageOptions.length > 0) || provider === "upload";
+  const { videoOptions, uploadedVideoConfigured } = editor.data;
+  const provider = String(editor.value("video", "provider")) as VideoSourceKey;
+  const streamVideos = videoOptions.filter((v) => v.provider === "stream");
   const text = (field: string, label: string, hint?: string, optional?: boolean) => (
     <PanelField def={{ scope: "video", field, label, kind: "line", hint, optional }} />
   );
@@ -192,29 +192,43 @@ function VideoSource() {
         scope="video"
         field="provider"
         label="Video"
-        options={videoProviders
-          .filter((p) => p !== "upload" || uploadPossible)
-          .map((p) => ({ value: p, label: videoProviderLabels[p] }))}
-        hint={uploadPossible ? undefined : "Uploading a video file isn't set up yet. You can link a YouTube or Vimeo video instead."}
+        options={videoSources
+          .filter((p) => p !== "stream" || uploadedVideoConfigured || provider === "stream")
+          .map((p) => ({ value: p, label: videoSourceLabels[p] }))}
+        hint={
+          uploadedVideoConfigured
+            ? undefined
+            : "Uploaded video is not configured yet. Add a YouTube or Vimeo link instead."
+        }
       />
-      {provider === "upload" && (
-        <>
-          <PanelSelect scope="video" field="videoMediaId" label="Video file" options={videoOptions.map((o) => ({ value: o.id, label: o.label }))} />
-          <PanelSelect scope="video" field="posterId" label="Poster image" options={imageOptions.map((o) => ({ value: o.id, label: o.label }))} />
-        </>
-      )}
-      {(provider === "youtube" || provider === "vimeo") && (
-        <>
-          {text("embedUrl", provider === "youtube" ? "YouTube link" : "Vimeo link")}
-          <p className="border-l-2 border-highlight pl-3 text-sm text-muted-foreground">
-            The link is saved, but the website doesn&apos;t show YouTube or Vimeo videos yet.
-          </p>
-        </>
+      {(provider === "youtube" || provider === "vimeo") &&
+        text(
+          "videoUrl",
+          provider === "youtube" ? "YouTube link" : "Vimeo link",
+          "Copy it from the video's Share button.",
+        )}
+      {provider === "stream" && (
+        <PanelSelect
+          scope="video"
+          field="videoMediaId"
+          label="Uploaded video"
+          options={streamVideos.map((v) => ({ value: v.id, label: v.title }))}
+          disabled={streamVideos.length === 0}
+          hint={streamVideos.length === 0 ? "No uploaded videos yet." : undefined}
+        />
       )}
       {provider !== "none" && (
         <>
-          {text("videoTitle", "What the video shows", "Read out by screen readers.")}
+          {text("videoTitle", "What the video shows", "Read out by screen readers and shown on the play button.")}
           {text("caption", "Caption", undefined, true)}
+          <EditorMediaField
+            scope="video"
+            field="posterId"
+            label="Cover photo"
+            use="posters"
+            hint="Shown before the video plays. The player only loads when a visitor presses Play."
+            emptyText="No cover photo: a Canvas Creations cover is shown."
+          />
         </>
       )}
     </fieldset>
@@ -237,9 +251,8 @@ function SectionPanel({
   const def = sections[section];
   const scopes = [...new Set(def.fields.map((f) => f.scope))];
   const photoField = section === "hero" ? "heroImageId" : section === "about" ? "imageId" : null;
-  const images = editor.data.imageOptions;
   const extraFields =
-    section === "video" ? ["provider", "videoMediaId", "posterId", "embedUrl", "videoTitle", "caption"] : photoField ? [photoField] : [];
+    section === "video" ? ["provider", "videoUrl", "videoMediaId", "posterId", "videoTitle", "caption"] : photoField ? [photoField] : [];
   const unsaved = [...def.fields.map((f) => [f.scope, f.field] as const), ...extraFields.map((f) => [scopes[0], f] as const)].filter(
     ([scope, field]) => editor.hasDraft(scope, field),
   ).length;
@@ -275,14 +288,16 @@ function SectionPanel({
             <PanelField key={`${f.scope}.${f.field}`} def={f} />
           ))}
           {photoField && (
-            <PanelSelect
+            <EditorMediaField
               scope={scopes[0]}
               field={photoField}
               label="Photo"
-              noneLabel={section === "hero" ? "No photo (shows the monogram)" : "No photo (shows the logo)"}
-              options={images.map((o) => ({ value: o.id, label: o.label }))}
-              disabled={images.length === 0}
-              hint={images.length === 0 ? NO_PHOTOS_HINT : undefined}
+              use={section === "hero" ? "hero" : "founder"}
+              emptyText={
+                section === "hero"
+                  ? "No photo: the Canvas Creations monogram is shown."
+                  : "No photo: the Canvas Creations logo is shown."
+              }
             />
           )}
           {section === "video" && <VideoSource />}

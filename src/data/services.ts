@@ -14,7 +14,7 @@ export interface Service {
   /** One or two sentences. */
   summary: string;
   /** Real photography only (public/images/services/). */
-  image?: { src: string; alt: string };
+  image?: { src: string; alt: string; width?: number; height?: number };
   /** Detail page, once one exists. Rows without an href are not links. */
   href?: string;
   /** Ascending display order. */

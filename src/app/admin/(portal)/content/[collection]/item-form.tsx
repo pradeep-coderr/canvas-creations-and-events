@@ -2,17 +2,16 @@ import {
   CategoryForm,
   FaqForm,
   GalleryItemForm,
-  NO_PHOTOS_HINT,
   ServiceForm,
   StepForm,
   TestimonialForm,
 } from "@/components/admin/collection-forms";
-import { getCategoryOptions, getMediaOptions } from "@/lib/admin/cms";
+import { getCategoryOptions, getImageLibrary } from "@/lib/admin/cms";
 import { collections, type CollectionKey, type CollectionValues } from "@/lib/cms/collections";
 
 /**
  * Picks the content-specific form for a collection and loads the options
- * it needs (photos, categories). Used by the create and edit pages.
+ * it needs (library photos, categories). Used by the create and edit pages.
  */
 export async function ItemForm({
   collection,
@@ -33,14 +32,13 @@ export async function ItemForm({
 
   switch (collection) {
     case "services":
-      return <ServiceForm {...common} defaultValues={values("services")} imageOptions={await getMediaOptions("image")} />;
+      return <ServiceForm {...common} defaultValues={values("services")} imageOptions={await getImageLibrary()} />;
     case "categories":
       return <CategoryForm {...common} defaultValues={values("categories")} />;
     case "gallery": {
-      const [imageOptions, categoryOptions] = await Promise.all([getMediaOptions("image"), getCategoryOptions()]);
-      if (imageOptions.length === 0) {
-        return <p className="bg-background p-6 text-muted-foreground sm:p-8">{NO_PHOTOS_HINT}</p>;
-      }
+      // Photos can be uploaded from the photo picker, so a gallery item can
+      // always be created.
+      const [imageOptions, categoryOptions] = await Promise.all([getImageLibrary(), getCategoryOptions()]);
       return (
         <GalleryItemForm
           {...common}

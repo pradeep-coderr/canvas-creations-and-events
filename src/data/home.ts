@@ -7,6 +7,9 @@ export interface EditorialImage {
   alt: string;
   /** Tailwind object-position class for editorial cropping, e.g. "object-[50%_35%]". */
   position?: string;
+  /** Intrinsic size (CMS images), for previews and the lightbox. */
+  width?: number;
+  height?: number;
 }
 
 /**
@@ -161,13 +164,20 @@ export const whyCanvas = {
 };
 
 /** Event film or video story. Local files only (public/images/videos/). */
+/**
+ * A video ready to render, whatever its source (YouTube, Vimeo or an
+ * uploaded-video provider). Provider details stay in the data layer
+ * (src/lib/media/video-providers.ts); the page only gets a player URL.
+ */
 export interface VideoContent {
-  src: string;
-  /** Still frame from the same video, shown before playback. */
-  poster: string;
+  provider: "youtube" | "vimeo" | "stream";
   /** Accessible name for the player, e.g. "Styling highlights from a garden wedding". */
   title: string;
   caption?: string;
+  /** Embeddable player, loaded only after the visitor presses Play. */
+  playerUrl: string;
+  /** Cover image from the media library (optional). */
+  poster: { src: string; alt: string } | null;
 }
 
 export const videoStory = {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseVideoLink } from "@/lib/media/video-url";
 import { LINE_MAX, line, optionalId, optionalLine, text } from "./fields";
 
 /*
@@ -158,32 +159,33 @@ export const aboutToValues = (row: Row): AboutValues => ({
 // Video / story (video_story)
 // ---------------------------------------------------------------------------
 
-export const videoProviders = ["none", "upload", "youtube", "vimeo"] as const;
-export type VideoProvider = (typeof videoProviders)[number];
+/** Where the video comes from ("none" = no video). */
+export const videoSources = ["none", "youtube", "vimeo", "stream"] as const;
+export type VideoSource = (typeof videoSources)[number];
 
-export const videoProviderLabels: Record<VideoProvider, string> = {
+export const videoSourceLabels: Record<VideoSource, string> = {
   none: "No video",
-  upload: "Uploaded video file",
   youtube: "YouTube",
   vimeo: "Vimeo",
+  stream: "Uploaded video",
 };
 
-// Same hosts as the video_story_video_check constraint.
-const EMBED_HOSTS: Record<"youtube" | "vimeo", RegExp> = {
-  youtube: /^https:\/\/(www\.)?(youtube\.com|youtube-nocookie\.com|youtu\.be)\/\S+$/,
-  vimeo: /^https:\/\/(player\.)?vimeo\.com\/\S+$/,
-};
-
+/*
+ * YouTube / Vimeo: the admin pastes a link; the server normalizes it into a
+ * media library entry (media_assets, provider + id) and points the section
+ * at it. Uploaded video ("stream") picks an existing provider video and is
+ * refused by the server while no provider is configured.
+ */
 export const videoSchema = z
   .object({
     eyebrow: line(),
     title: line(),
     emptyText: text(),
     tiktokCta: line(),
-    provider: z.enum(videoProviders),
+    provider: z.enum(videoSources),
+    videoUrl: z.string().trim().max(500, "Keep this to 500 characters or fewer."),
     videoMediaId: optionalId(),
     posterId: optionalId(),
-    embedUrl: z.string().trim().max(500, "Keep this to 500 characters or fewer."),
     videoTitle: optionalLine(),
     caption: optionalLine(),
   })
@@ -191,48 +193,51 @@ export const videoSchema = z
     const need = (path: string, message: string) => ctx.addIssue({ code: "custom", path: [path], message });
     if (v.provider === "none") return;
     if (!v.videoTitle) need("videoTitle", "Describe the video for screen readers.");
-    if (v.provider === "upload") {
-      if (!v.videoMediaId) need("videoMediaId", "Choose the video file.");
-      if (!v.posterId) need("posterId", "Choose a poster image.");
-    } else if (!EMBED_HOSTS[v.provider].test(v.embedUrl)) {
-      need(
-        "embedUrl",
-        v.provider === "youtube"
-          ? "Paste a YouTube link, e.g. https://www.youtube.com/watch?v=…"
-          : "Paste a Vimeo link, e.g. https://vimeo.com/…",
-      );
+    if (v.provider === "stream") {
+      if (!v.videoMediaId) need("videoMediaId", "Choose the uploaded video.");
+      return;
     }
+    const link = parseVideoLink(v.videoUrl, v.provider);
+    if (!link.ok) need("videoUrl", link.error);
   });
 
 export type VideoValues = z.input<typeof videoSchema>;
 
-/** Only the fields that belong to the chosen provider are kept (the rest are NULL). */
-export function videoToRow(v: z.output<typeof videoSchema>): Row {
+/**
+ * Only the fields that belong to the chosen source are kept (the rest are
+ * NULL). `videoMediaId` is the library entry the server resolved.
+ */
+export function videoToRow(v: z.output<typeof videoSchema>, videoMediaId: string | null): Row {
   const base = { eyebrow: v.eyebrow, title: v.title, empty_text: v.emptyText, tiktok_cta: v.tiktokCta };
   const none = { video_media_id: null, poster_id: null, embed_url: null, video_title: null, caption: null };
   if (v.provider === "none") return { ...base, provider: null, ...none };
-  if (v.provider === "upload")
-    return {
-      ...base,
-      ...none,
-      provider: "upload",
-      video_media_id: v.videoMediaId,
-      poster_id: v.posterId,
-      video_title: v.videoTitle,
-      caption: v.caption,
-    };
-  return { ...base, ...none, provider: v.provider, embed_url: v.embedUrl, video_title: v.videoTitle, caption: v.caption };
+  return {
+    ...base,
+    ...none,
+    provider: v.provider,
+    video_media_id: videoMediaId,
+    poster_id: v.posterId,
+    video_title: v.videoTitle,
+    caption: v.caption,
+  };
 }
 
-export const videoToValues = (row: Row): VideoValues => ({
-  eyebrow: str(row.eyebrow),
-  title: str(row.title),
-  emptyText: str(row.empty_text),
-  tiktokCta: str(row.tiktok_cta),
-  provider: (videoProviders as readonly string[]).includes(str(row.provider)) ? (row.provider as VideoProvider) : "none",
-  videoMediaId: str(row.video_media_id),
-  posterId: str(row.poster_id),
-  embedUrl: str(row.embed_url),
-  videoTitle: str(row.video_title),
-  caption: str(row.caption),
-});
+/** `row.video` is the linked media entry (provider + source link), if any. */
+export const videoToValues = (row: Row): VideoValues => {
+  const video = row.video as { source_url?: string | null } | null | undefined;
+  return {
+    eyebrow: str(row.eyebrow),
+    title: str(row.title),
+    emptyText: str(row.empty_text),
+    tiktokCta: str(row.tiktok_cta),
+    provider: (videoSources as readonly string[]).includes(str(row.provider)) ? (row.provider as VideoSource) : "none",
+    videoUrl: str(video?.source_url),
+    videoMediaId: str(row.video_media_id),
+    posterId: str(row.poster_id),
+    videoTitle: str(row.video_title),
+    caption: str(row.caption),
+  };
+};
+
+/** Select for video_story including its media link (for videoToValues). */
+export const VIDEO_STORY_SELECT = "*, video:media_assets!video_story_video_provider_fkey(source_url)";

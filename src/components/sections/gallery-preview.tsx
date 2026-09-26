@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { galleryPreview, type GalleryItem } from "@/data/gallery";
 import { gallerySection, type GalleryCopy } from "@/data/home";
 import { site } from "@/data/site";
+import { GalleryLightbox, LightboxTrigger } from "./gallery-lightbox";
 import { SlotItem, type ItemSlots } from "./item-slots";
 import { cn } from "@/lib/utils";
 
@@ -70,6 +71,8 @@ export function GalleryPreview({
           </div>
 
           {/* Lightbox-ready: each item carries its index for a future viewer. */}
+          {/* The grid stays server-rendered; the lightbox adds an open button per photo. */}
+          <GalleryLightbox photos={items.map((i) => ({ src: String(i.src), alt: i.alt, title: i.title }))}>
           <ul className="mt-12 grid grid-cols-2 gap-3 sm:gap-4 lg:mt-16 lg:grid-cols-12 lg:gap-5">
             {items.map((item, i) => {
               const slot = slots[i] ?? slots[slots.length - 1];
@@ -83,7 +86,7 @@ export function GalleryPreview({
                 >
                   <SlotItem slots={itemSlots} item={item}>
                   <Reveal className="h-full">
-                    <figure className="h-full">
+                    <figure className="relative h-full">
                       <ImageFrame
                         src={item.src}
                         alt={item.alt}
@@ -98,6 +101,7 @@ export function GalleryPreview({
                       {item.title && (
                         <figcaption className="sr-only">{item.title}</figcaption>
                       )}
+                      <LightboxTrigger index={i} label={item.title ?? item.alt} />
                     </figure>
                   </Reveal>
                   </SlotItem>
@@ -105,6 +109,7 @@ export function GalleryPreview({
               );
             })}
           </ul>
+          </GalleryLightbox>
           {itemSlots?.after}
         </Container>
       ) : (

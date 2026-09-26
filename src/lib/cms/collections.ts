@@ -305,12 +305,6 @@ export function singularTitle(key: CollectionKey) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/** A media file offered in pickers. */
-export interface MediaOption {
-  id: string;
-  label: string;
-}
-
 /** A category offered in the gallery form. */
 export interface CategoryOption {
   id: string;

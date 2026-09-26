@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { EditableText, LiveText } from "@/components/editor/editable-text";
 import { AddItem, EditorItem } from "@/components/editor/editor-item";
+import { EditPhotoButton } from "@/components/editor/editor-media";
 import { EditorSection } from "@/components/editor/editor-section";
 import { EditorShell } from "@/components/editor/editor-shell";
 import { HomeSections, type HomeContent, type HomeEditorSlots } from "@/components/home/home-sections";
@@ -127,6 +128,8 @@ export default async function EditorPage() {
 
   const slots: HomeEditorSlots = {
     Section: EditorSection,
+    heroImage: <EditPhotoButton scope="home" field="heroImageId" label="Hero photo" use="hero" />,
+    aboutImage: <EditPhotoButton scope="about" field="imageId" label="About photo" use="founder" />,
     services: itemSlots("services"),
     categories: itemSlots("categories"),
     gallery: itemSlots("gallery"),

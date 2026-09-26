@@ -10,7 +10,14 @@ import { Button } from "@/components/ui/button";
 import { about, type AboutCopy } from "@/data/home";
 
 /** The human side of the brand: portrait slot beside the studio's story. */
-export function AboutFounder({ copy = about }: { copy?: AboutCopy }) {
+export function AboutFounder({
+  copy = about,
+  imageAction,
+}: {
+  copy?: AboutCopy;
+  /** Admin visual editor only: the "Change photo" control over the photo. */
+  imageAction?: React.ReactNode;
+}) {
   return (
     <Section id="about" aria-labelledby="about-title">
       <Container className="grid items-center gap-12 lg:grid-cols-12 lg:gap-16 xl:gap-24">
@@ -42,7 +49,7 @@ export function AboutFounder({ copy = about }: { copy?: AboutCopy }) {
           </Button>
         </Reveal>
 
-        <Reveal className="lg:order-first lg:col-span-5">
+        <Reveal className="relative lg:order-first lg:col-span-5">
           {copy.image ? (
             <ImageFrame
               src={copy.image.src}
@@ -66,6 +73,7 @@ export function AboutFounder({ copy = about }: { copy?: AboutCopy }) {
               />
             </div>
           )}
+          {imageAction}
         </Reveal>
       </Container>
     </Section>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { BackLink } from "@/components/admin/back-link";
 import { AboutForm } from "@/components/admin/singleton-forms";
-import { getMediaOptions, getSingleton } from "@/lib/admin/cms";
+import { getImageLibrary, getSingleton } from "@/lib/admin/cms";
 import { requireAdmin } from "@/lib/admin/session";
 import { aboutToValues } from "@/lib/cms/singletons";
 
@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "About" };
 
 export default async function AboutContentPage() {
   await requireAdmin();
-  const [row, imageOptions] = await Promise.all([getSingleton("about_content"), getMediaOptions("image")]);
+  const [row, imageOptions] = await Promise.all([getSingleton("about_content"), getImageLibrary()]);
 
   return (
     <>
