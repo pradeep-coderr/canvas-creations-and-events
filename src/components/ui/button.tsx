@@ -18,7 +18,7 @@ import { Loader2 } from "lucide-react"
 //               <ArrowRight data-icon="inline-end" /> and it nudges on hover
 //   outline   → neutral bordered button (used by shadcn internals)
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center gap-2 rounded-(--btn-radius) border border-transparent bg-clip-padding font-sans text-sm font-semibold tracking-[0.02em] whitespace-nowrap transition-[color,background-color,border-color,box-shadow,text-decoration-color] duration-300 ease-elegant outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/30 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg]:transition-transform [&_svg]:duration-300 [&_svg]:ease-elegant motion-safe:group-hover/button:[&_svg[data-icon=inline-end]]:translate-x-0.5",
+  "group/button inline-flex shrink-0 items-center justify-center gap-2 rounded-(--btn-radius) border border-transparent bg-clip-padding font-sans text-sm font-semibold tracking-[0.02em] whitespace-nowrap transition-[color,background-color,border-color,box-shadow,text-decoration-color] duration-300 ease-elegant outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 [&[aria-disabled=true]:not([data-pending])]:cursor-not-allowed [&[aria-disabled=true]:not([data-pending])]:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/30 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg]:transition-transform [&_svg]:duration-300 [&_svg]:ease-elegant motion-safe:group-hover/button:[&_svg[data-icon=inline-end]]:translate-x-0.5",
   {
     variants: {
       variant: {
@@ -91,6 +91,9 @@ function Button({
   }) {
   const Comp = asChild ? Slot.Root : "button"
   const busy = pending && !asChild
+  // aria-disabled (nothing to do right now): looks disabled and does nothing,
+  // but stays focusable, so focus isn't lost when e.g. a save finishes.
+  const inactive = !asChild && (busy || props["aria-disabled"] === true || props["aria-disabled"] === "true")
 
   return (
     <Comp
@@ -103,7 +106,7 @@ function Button({
       {...props}
       aria-disabled={busy ? true : props["aria-disabled"]}
       onClick={
-        busy
+        inactive
           ? (event: React.MouseEvent<HTMLButtonElement>) => {
               event.preventDefault()
               event.stopPropagation()

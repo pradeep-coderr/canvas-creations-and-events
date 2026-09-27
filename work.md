@@ -2782,3 +2782,24 @@ Local production build (local Supabase; temporary test users, all removed afterw
 
 - **Hosted:** no admin save was tested on the live site (the owner chose local testing). After deploying, an admin tab opened **before** the deploy will show the "page is out of date" message on its next save; reloading fixes it.
 - **Deploy skew:** Vercel Skew Protection (paid plans) would remove the stale-page case entirely.
+
+### Follow-up: buttons with nothing to do are disabled (owner's request)
+
+The owner saw a save refused (white text on `#FF7A91`: 2.48:1). Charcoal text on that pink passes at 5.67:1, and "Use a readable text colour" sets it. They then asked that buttons which can't do anything look disabled and not send requests.
+
+- **`Button`:** `aria-disabled` (when no request is running) now looks disabled (50% opacity, not-allowed cursor) and ignores clicks and implicit form submits. It stays focusable, so keyboard focus isn't lost when a save finishes and the button turns disabled.
+- **Design:**
+  - **Save changes** is disabled when there are no unsaved changes, or while the draft fails a readability check (the "Not saved yet" banner and the Readability list explain why; the button is linked to it via `aria-describedby`).
+  - **Reset to defaults** is disabled when the draft already equals the defaults.
+- **Visual editor:** the toolbar **Save** and the panel's **Save section** are disabled with nothing unsaved.
+- **CMS edit forms:** **Save** is disabled until a field actually differs from the saved record, and turns disabled again if it's changed back. New-item forms keep **Create** enabled, so validation explains empty fields.
+
+**Tests (local):** `disabled19.mjs` **17/17**:
+- Design Save and Reset disabled and inert (no request, no dialog) but focusable.
+- An unreadable draft keeps Save disabled with the banner; a readable draft enables it.
+- After saving, Save is disabled again with focus kept.
+- A CMS form's Save is disabled until a change (Enter doesn't submit either) and disabled again when the change is reverted; a new-item Create stays enabled.
+- The editor's toolbar Save and Save section are disabled until a change.
+- No console errors.
+
+`e2e19.mjs` rerun: **28/28**.

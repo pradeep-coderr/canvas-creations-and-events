@@ -130,6 +130,7 @@ export function CmsForm<TIn extends FieldValues, TOut>({
         <Button
           ref={submitRef}
           type="submit"
+          aria-disabled={(!createdUrl && !isDirty) || undefined}
           pending={form.formState.isSubmitting}
           pendingLabel="Saving…"
           className="w-full sm:w-auto"

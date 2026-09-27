@@ -368,10 +368,24 @@ export function DesignEditor({ saved: initialSaved }: { saved: SiteTheme }) {
               Discard changes
             </Button>
           )}
-          <Button type="button" variant="outline" onClick={() => setResetOpen(true)}>
+          <Button
+            type="button"
+            variant="outline"
+            aria-disabled={same(draft, defaultTheme) || undefined}
+            title={same(draft, defaultTheme) ? "The design already uses the defaults" : undefined}
+            onClick={() => setResetOpen(true)}
+          >
             Reset to defaults
           </Button>
-          <Button type="button" aria-disabled={!dirty || undefined} pending={saving} pendingLabel="Saving design…" onClick={save}>
+          <Button
+            type="button"
+            aria-disabled={!dirty || failing.length > 0 || undefined}
+            aria-describedby={dirty && failing.length > 0 ? "checks-title" : undefined}
+            title={!dirty ? "No changes to save" : failing.length > 0 ? "Fix the readability problems first" : undefined}
+            pending={saving}
+            pendingLabel="Saving design…"
+            onClick={save}
+          >
             Save changes
           </Button>
         </div>
