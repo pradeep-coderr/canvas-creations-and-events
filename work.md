@@ -2708,7 +2708,18 @@ Local production build (local Supabase; temporary test users, all removed afterw
   - The three Resend variables are optional. The local `.env.local` has an API key but no sender or recipient, so email stays off until a Resend domain is verified; enquiries are still stored and shown in `/admin`.
   - Vercel's Supabase and Resend integrations were **not** used (the existing hosted database is connected through the variables).
 - **Hosted database:** all migrations are applied, including `site_theme`, `site_theme_button_color`, `site_settings` and `page_styles`.
-- **Not yet verified:** the live deployment itself (URL not yet shared), and admin saves on hosted as the real admin.
+- **Live site:** https://canvas-creations-and-events.vercel.app/ (checked from outside on 27 September 2026, no login):
+
+  | Area | Result |
+  | --- | --- |
+  | Homepage | 200 in ~0.9 s, `x-vercel-cache: HIT`. Content from the hosted database (headline, phone, services, enquiry form); theme style present (buttons `#f7889a`, rose text `#b64762`); no iframes before Play; no text-style overrides set |
+  | Security headers | HSTS (preload), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, CSP `frame-ancestors 'none'; frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com` |
+  | SEO | Title "Canvas Creations and Events \| Turning moments into masterpieces"; canonical and `og:url` use the live domain; JSON-LD slogan and telephone `+61426071109`; `robots.txt` disallows `/admin` and `/design-system`; the sitemap lists `/` on the live domain |
+  | Admin | `/admin`, `/admin/editor`, `/admin/design`, `/admin/content/site` → 307 to `/admin/login`; login 200 with `X-Robots-Tag: noindex, nofollow` and `no-store` |
+  | Other | `/design-system` and unknown pages → 404; both manifests, `sw.js` and the icons → 200 |
+  | Services | Only one "Event styling & decoration" is published now (the extra test service is no longer shown) |
+
+- **Not verified by me** (needs the owner's login, or would create real data): admin sign-in and a save on the live site, a test enquiry reaching `/admin`, and turning off Supabase sign-ups.
 - **Before go-live:**
   - Confirm the owner's login is in `admin_users`.
   - Turn off Supabase sign-ups.
