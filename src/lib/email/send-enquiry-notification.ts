@@ -25,6 +25,12 @@ function withTimeout<T>(promise: Promise<T>, ms: number) {
   ]);
 }
 
+export interface DeliveryResult {
+  outcome: NotificationOutcome;
+  /** Resend's error (code: message) when it failed; never contains the API key. */
+  error?: string;
+}
+
 /**
  * Emails the business about a stored enquiry. Never throws.
  *
@@ -40,14 +46,33 @@ export async function sendEnquiryNotification(
   id: string,
   enquiry: Enquiry,
 ): Promise<NotificationOutcome> {
+  return (await deliverEnquiryEmail({ id, enquiry, idempotencyKey: `enquiry-notification/${id}` })).outcome;
+}
+
+/**
+ * The one delivery path, shared by real enquiries and the Settings test
+ * email (which passes `test: true`: "[Test]" subject, its own key).
+ */
+export async function deliverEnquiryEmail({
+  id,
+  enquiry,
+  idempotencyKey,
+  test = false,
+}: {
+  id: string;
+  enquiry: Enquiry;
+  idempotencyKey: string;
+  test?: boolean;
+}): Promise<DeliveryResult> {
+  const label = test ? "test email" : "notification";
   const config = getEmailConfig();
   if (!config) {
-    console.info(`[enquiry] notification skipped ${id} (email not configured)`);
-    return "not-configured";
+    console.info(`[enquiry] ${label} skipped ${id} (email not configured)`);
+    return { outcome: "not-configured" };
   }
 
   const resend = new Resend(config.apiKey);
-  const { subject, html, text } = buildEnquiryNotification({
+  const built = buildEnquiryNotification({
     id,
     enquiry,
     receivedAt: new Date(),
@@ -57,12 +82,13 @@ export async function sendEnquiryNotification(
     to: config.to,
     // Validated by the server-side Zod schema before we get here.
     replyTo: enquiry.email,
-    subject,
-    html,
-    text,
+    subject: test ? `[Test] ${built.subject}` : built.subject,
+    html: built.html,
+    text: built.text,
   };
-  const options = { idempotencyKey: `enquiry-notification/${id}` };
+  const options = { idempotencyKey };
 
+  let lastError = "unknown error";
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
     try {
       const { data, error } = await withTimeout(
@@ -70,23 +96,25 @@ export async function sendEnquiryNotification(
         TIMEOUT_MS,
       );
       if (!error) {
-        console.info(`[enquiry] notification sent ${id}`, { emailId: data?.id, attempt });
-        return "sent";
+        console.info(`[enquiry] ${label} sent ${id}`, { emailId: data?.id, attempt });
+        return { outcome: "sent" };
       }
-      console.error(`[enquiry] notification failed ${id}`, {
+      lastError = `${error.name}: ${error.message}`;
+      console.error(`[enquiry] ${label} failed ${id}`, {
         attempt,
         code: error.name,
         message: error.message,
       });
-      if (!RETRYABLE.has(error.name)) return "failed";
+      if (!RETRYABLE.has(error.name)) return { outcome: "failed", error: lastError };
     } catch (error) {
-      console.error(`[enquiry] notification failed ${id}`, {
+      lastError = error instanceof Error ? error.message : String(error);
+      console.error(`[enquiry] ${label} failed ${id}`, {
         attempt,
         code: "exception",
-        message: error instanceof Error ? error.message : String(error),
+        message: lastError,
       });
     }
     if (attempt < ATTEMPTS) await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  return "failed";
+  return { outcome: "failed", error: lastError };
 }

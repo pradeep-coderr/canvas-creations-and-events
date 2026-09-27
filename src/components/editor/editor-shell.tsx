@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Eye, PencilLine } from "lucide-react";
+import { AlertCircle, Check, Eye, Loader2, PencilLine } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -58,11 +58,18 @@ function Toolbar() {
     }
   };
 
-  const summary = unsaved
-    ? `${unsaved} unsaved change${unsaved === 1 ? "" : "s"}`
-    : status?.kind === "success"
-      ? status.text
-      : "All changes saved";
+  // Saving… → Saved / Not saved; Unsaved changes while there are drafts.
+  // Only a server-confirmed save ever says "Saved".
+  const count = `${unsaved} unsaved change${unsaved === 1 ? "" : "s"}`;
+  const state: { icon: "saving" | "dot" | "error" | "check"; title: string; detail?: string } = editor.saving
+    ? { icon: "saving", title: "Saving…" }
+    : unsaved && status?.kind === "error"
+      ? { icon: "error", title: "Not saved", detail: `${count}, still on the page` }
+      : unsaved
+        ? { icon: "dot", title: "Unsaved changes", detail: `${count}, not on the website yet` }
+        : status?.kind === "success"
+          ? { icon: "check", title: "Saved", detail: status.text }
+          : { icon: "check", title: "No unsaved changes", detail: status?.kind === "info" ? status.text : undefined };
 
   return (
     <div className="cc-toolbar" role="region" aria-label="Website editor">
@@ -71,13 +78,20 @@ function Toolbar() {
           <p className="truncate font-display text-lg leading-tight font-title">
             {preview ? "Previewing website" : "Editing website"}
           </p>
-          <p role="status" className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
-            {unsaved ? (
+          <p role="status" data-save-state={state.title} className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+            {state.icon === "saving" ? (
+              <Loader2 aria-hidden="true" className="size-3.5 shrink-0 motion-safe:animate-spin" />
+            ) : state.icon === "error" ? (
+              <AlertCircle aria-hidden="true" className="size-3.5 shrink-0 text-destructive" />
+            ) : state.icon === "dot" ? (
               <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-primary" />
             ) : (
               <Check aria-hidden="true" className="size-3.5 shrink-0 text-emphasis" />
             )}
-            <span className="truncate">{summary}</span>
+            <span className="truncate">
+              <span className="font-semibold text-foreground">{state.title}</span>
+              {state.detail && <> · {state.detail}</>}
+            </span>
           </p>
         </div>
         {/* Icon-only on phones (with a spoken label), text from sm up. */}
@@ -157,7 +171,7 @@ function Canvas({ children }: { children: React.ReactNode }) {
     const hash = href.includes("#") ? href.slice(href.indexOf("#") + 1) : "";
     const section = hash ? document.getElementById(hash) : null;
     if (section) section.scrollIntoView({ behavior: "smooth", block: "start" });
-    else announce("success", "Links are turned off while editing, so you stay in the editor.");
+    else announce("info", "Links are turned off while editing, so you stay in the editor.");
   };
 
   const onSubmitCapture = (event: React.SyntheticEvent<HTMLDivElement>) => {
@@ -166,7 +180,7 @@ function Canvas({ children }: { children: React.ReactNode }) {
     if (form.closest("[data-editor-control]")) return;
     event.preventDefault();
     event.stopPropagation();
-    announce("success", "The enquiry form doesn't send from the editor.");
+    announce("info", "The enquiry form doesn't send from the editor.");
   };
 
   return (

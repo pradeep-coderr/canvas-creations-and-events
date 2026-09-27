@@ -28,3 +28,34 @@ export function getEmailConfig(): EmailConfig | null {
   if (!apiKey || !from || to.length === 0) return null;
   return { apiKey, from, to };
 }
+
+export interface EmailStatus {
+  configured: boolean;
+  /** The From address (not a secret). */
+  sender: string | null;
+  /** Recipients, masked (e.g. "ow•••@example.com"). */
+  recipients: string[];
+  /** Names of the variables that are missing. */
+  missing: string[];
+}
+
+/** For Admin → Settings: what's set up, without revealing the API key or full addresses. */
+export function getEmailStatus(): EmailStatus {
+  const env = {
+    RESEND_API_KEY: process.env.RESEND_API_KEY?.trim(),
+    RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL?.trim(),
+    ENQUIRY_NOTIFICATION_EMAIL: process.env.ENQUIRY_NOTIFICATION_EMAIL?.trim(),
+  };
+  const mask = (address: string) => {
+    const [local, domain] = address.split("@");
+    return domain ? `${local.slice(0, 2)}•••@${domain}` : "•••";
+  };
+  return {
+    configured: getEmailConfig() !== null,
+    sender: env.RESEND_FROM_EMAIL || null,
+    recipients: (env.ENQUIRY_NOTIFICATION_EMAIL ?? "").split(",").map((a) => a.trim()).filter(Boolean).map(mask),
+    missing: Object.entries(env)
+      .filter(([, value]) => !value)
+      .map(([name]) => name),
+  };
+}

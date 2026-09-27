@@ -18,6 +18,7 @@ import {
 import { upsertVideoLink } from "@/lib/media/server";
 import { uploadedVideoConfigured } from "@/lib/media/video-providers";
 import { parseVideoLink } from "@/lib/media/video-url";
+import { sameJson } from "@/lib/stable-json";
 import { createClient } from "@/lib/supabase/server";
 import { CMS_CONTENT_TAG } from "@/lib/supabase/public";
 
@@ -214,16 +215,28 @@ export async function deleteItem(key: CollectionKey, id: string, confirmLastFaq 
 // Singletons (update the one existing row; never insert or delete)
 // ---------------------------------------------------------------------------
 
+/** Columns whose stored value differs from what was sent (null = missing row). */
+function mismatchedColumns(sent: Record<string, unknown>, stored: Record<string, unknown> | null) {
+  if (!stored) return null;
+  return Object.keys(sent).filter((key) => !sameJson(sent[key] ?? null, stored[key] ?? null));
+}
+
 async function saveSingleton(
   table: "home_content" | "about_content" | "video_story" | "site_settings",
   row: Record<string, unknown>,
   what: string,
 ): Promise<CmsResult> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from(table).update(row).eq("id", true).select("id").single();
+  const { data, error } = await supabase.from(table).update(row).eq("id", true).select(Object.keys(row).join(",")).single();
   if (error || !data) {
     console.error("[cms] singleton save failed", { table, code: error?.code });
     return { ok: false, error: describeDbError(error, `save the ${what}`) };
+  }
+  // Only report "saved" when the row that came back is what was sent.
+  const mismatched = mismatchedColumns(row, data as unknown as Record<string, unknown>);
+  if (mismatched?.length) {
+    console.error("[cms] singleton save not confirmed", { table, columns: mismatched });
+    return { ok: false, error: `The ${what} couldn't be confirmed as saved. Reload the editor and try again.` };
   }
   contentChanged();
   return { ok: true, message: `${what.charAt(0).toUpperCase()}${what.slice(1)} saved.` };
@@ -267,15 +280,19 @@ export async function savePageStyles(input: unknown): Promise<CmsResult & { styl
   if (!parsed.success) return { ok: false, error: "Those style choices aren't available. Refresh the editor and try again." };
   const styles = compactStyles(parsed.data);
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("page_styles")
     .update({ text_styles: styles.text, section_styles: styles.sections })
     .eq("id", true)
-    .select("id")
+    .select("text_styles, section_styles")
     .single();
-  if (error) {
-    console.error("[cms] page styles save failed", { code: error.code });
+  if (error || !data) {
+    console.error("[cms] page styles save failed", { code: error?.code });
     return { ok: false, error: describeDbError(error, "save the style") };
+  }
+  if (!sameJson(data.text_styles, styles.text) || !sameJson(data.section_styles, styles.sections)) {
+    console.error("[cms] page styles save not confirmed");
+    return { ok: false, error: "The style couldn't be confirmed as saved. Reload the editor and try again." };
   }
   contentChanged();
   return { ok: true, message: "Style saved.", styles };

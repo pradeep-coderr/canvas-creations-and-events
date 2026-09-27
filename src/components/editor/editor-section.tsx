@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState } from "react";
 import { PanelTop, SlidersHorizontal } from "lucide-react";
-import { sectionAttrs } from "@/lib/styles/schema";
+import { isStyleKey, sectionAttrs } from "@/lib/styles/schema";
 import type { HomeSectionKey } from "@/components/home/home-sections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +32,7 @@ import {
   type EditorScope,
   type SectionDef,
 } from "@/lib/editor/fields";
-import { useEditor } from "./editor-context";
+import { useEditor, type StyleRef } from "./editor-context";
 import { SectionStyleControls } from "./style-controls";
 import { EditorMediaField } from "./editor-media";
 
@@ -268,11 +268,20 @@ function SectionPanel({
     section === "video" ? ["provider", "videoUrl", "videoMediaId", "posterId", "videoTitle", "caption"] : photoField ? [photoField] : [];
   // The scope the photo/video fields belong to (the section's own record).
   const ownScope = section === "about" ? "about" : section === "video" ? "video" : "home";
-  const unsaved = new Set(
-    [...def.fields.map((f) => [f.scope, f.field] as const), ...extraFields.map((f) => [ownScope, f] as const)]
-      .filter(([scope, field]) => editor.hasDraft(scope, field))
-      .map(([scope, field]) => `${scope}.${field}`),
-  ).size;
+  // This section's style presets: its own, and those of its texts.
+  const styleRefs: StyleRef[] = [
+    ...(section ? [{ kind: "section", key: section } as const] : []),
+    ...def.fields
+      .map((f) => `${f.scope}.${f.field}`)
+      .filter(isStyleKey)
+      .map((key) => ({ kind: "text", key }) as const),
+  ];
+  const unsaved =
+    new Set(
+      [...def.fields.map((f) => [f.scope, f.field] as const), ...extraFields.map((f) => [ownScope, f] as const)]
+        .filter(([scope, field]) => editor.hasDraft(scope, field))
+        .map(([scope, field]) => `${scope}.${field}`),
+    ).size + styleRefs.filter((ref) => editor.hasStyleDraft(ref)).length;
 
   const save = async () => {
     let ok = true;
@@ -280,6 +289,7 @@ function SectionPanel({
       const fields = [...def.fields.filter((f) => f.scope === scope).map((f) => f.field), ...(scope === ownScope ? extraFields : [])];
       ok = (await editor.saveScope(scope, fields)) && ok;
     }
+    ok = (await editor.saveStyles(styleRefs)) && ok;
     if (ok) onOpenChange(false);
   };
 

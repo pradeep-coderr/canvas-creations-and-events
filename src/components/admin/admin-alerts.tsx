@@ -17,8 +17,10 @@ export function AdminAlerts() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     const onMessage = (event: MessageEvent) => {
-      const data = event.data as { type?: string; title?: string; url?: string } | null;
+      const data = event.data as { type?: string; title?: string; url?: string; testId?: string } | null;
       if (data?.type !== "cc-push" || typeof data.url !== "string" || !data.url.startsWith("/admin")) return;
+      // Settings shows its own result for a test notification.
+      if (data.testId) return;
       setAlert({ title: typeof data.title === "string" ? data.title : "New notification", url: data.url });
       window.clearTimeout(timer.current);
       timer.current = window.setTimeout(() => setAlert(null), 15000);

@@ -77,6 +77,9 @@ export function EditableText({ scope, field }: { scope: EditorScope; field: stri
     setOpen(false);
   };
 
+  const styleRef = isStyleKey(styleKey) ? ({ kind: "text", key: styleKey } as const) : null;
+  const styleDraft = styleRef ? editor.hasStyleDraft(styleRef) : false;
+
   const save = async () => {
     const problem = validateField(scope, field, value);
     if (problem) {
@@ -84,8 +87,11 @@ export function EditableText({ scope, field }: { scope: EditorScope; field: stri
       inputRef.current?.focus();
       return;
     }
-    if (!draft) return close();
-    if (await editor.saveScope(scope, [field])) close();
+    if (!draft && !styleDraft) return close();
+    // The text and its style are saved together by this one Save.
+    const textSaved = draft ? await editor.saveScope(scope, [field]) : true;
+    const styleSaved = textSaved && styleRef && styleDraft ? await editor.saveStyles([styleRef]) : textSaved;
+    if (styleSaved) close();
   };
 
   const cancel = () => {
@@ -111,7 +117,7 @@ export function EditableText({ scope, field }: { scope: EditorScope; field: stri
         ref={triggerRef}
         type="button"
         className="cc-editable"
-        data-unsaved={draft || undefined}
+        data-unsaved={draft || styleDraft || undefined}
         data-invalid={serverError ? true : undefined}
         data-editor-control=""
         onClick={() => setOpen(true)}
@@ -123,7 +129,7 @@ export function EditableText({ scope, field }: { scope: EditorScope; field: stri
         ) : (
           <Display kind={kind} value={value} />
         )}
-        {draft && <span className="sr-only"> (unsaved change)</span>}
+        {(draft || styleDraft) && <span className="sr-only"> (unsaved change)</span>}
         <span aria-hidden="true" className="cc-editable-badge">
           <Pencil />
         </span>

@@ -181,6 +181,8 @@ self.addEventListener("push", (event) => {
   }
   const title = typeof data.title === "string" ? data.title : "Canvas Admin";
   const url = safeAdminUrl(data.url);
+  // Settings "Send test notification": reported back once it's shown.
+  const testId = typeof data.testId === "string" ? data.testId : undefined;
   event.waitUntil(
     (async () => {
       await self.registration.showNotification(title, {
@@ -193,10 +195,11 @@ self.addEventListener("push", (event) => {
         vibrate: [200, 100, 200],
         data: { url },
       });
-      // An open admin window can also show an in-app alert.
+      // An open admin window can also show an in-app alert (or, for a test,
+      // confirm that this device really showed the notification).
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       for (const client of windows) {
-        if (new URL(client.url).pathname.startsWith("/admin")) client.postMessage({ type: "cc-push", title, url });
+        if (new URL(client.url).pathname.startsWith("/admin")) client.postMessage({ type: "cc-push", title, url, testId });
       }
     })(),
   );

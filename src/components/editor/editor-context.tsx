@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import {
   saveAboutContent,
   saveHomeContent,
@@ -16,7 +16,15 @@ import type { SiteValues } from "@/lib/cms/site-settings";
 import type { AboutValues, HomeValues, VideoValues } from "@/lib/cms/singletons";
 import { describeActionFailure } from "@/lib/admin/action-error";
 import { fieldDef, type EditorScope } from "@/lib/editor/fields";
-import type { PageStyles, SectionStyle, SectionStyleKey, StyleKey, TextStyle } from "@/lib/styles/schema";
+import { sameJson } from "@/lib/stable-json";
+import {
+  compactStyles,
+  type PageStyles,
+  type SectionStyle,
+  type SectionStyleKey,
+  type StyleKey,
+  type TextStyle,
+} from "@/lib/styles/schema";
 
 /*
  * Visual editor state. Page text lives in the four one-row CMS records
@@ -25,6 +33,10 @@ import type { PageStyles, SectionStyle, SectionStyleKey, StyleKey, TextStyle } f
  * Phase 14 server action, one call per record, so two open edits can never
  * overwrite each other. Collection items are saved by their own forms and
  * report unsaved changes here too.
+ *
+ * One rule for everything: a change is a draft (shown on the page, marked
+ * unsaved) until a Save action writes it. That includes style presets and
+ * photos; nothing is written to the database as it's chosen.
  */
 
 export type EditorMode = "edit" | "preview";
@@ -52,7 +64,7 @@ export interface EditorItemMeta {
 
 export interface EditorData {
   saved: SavedValues;
-  /** Style presets (text and section styles), saved as they're chosen. */
+  /** Saved style presets (text and section styles). */
   styles: PageStyles;
   items: Record<CollectionKey, EditorItemMeta[]>;
   /** The media library (signed URLs), for photo fields. */
@@ -65,7 +77,43 @@ export interface EditorData {
   hiddenInPreview: HomeSectionKey[];
 }
 
-type Status = { kind: "success" | "error"; text: string; at: number } | null;
+/** success/error: the result of a save; info: a notice that isn't about saving. */
+type StatusKind = "success" | "error" | "info";
+type Status = { kind: StatusKind; text: string; at: number } | null;
+
+/** One style preset: a text's style or a section's style. */
+export type StyleRef = { kind: "text"; key: StyleKey } | { kind: "section"; key: SectionStyleKey };
+
+const styleOf = (styles: PageStyles, ref: StyleRef) =>
+  ref.kind === "text" ? styles.text[ref.key] : styles.sections[ref.key];
+
+/** The style presets that differ between two maps. */
+function changedStyles(current: PageStyles, saved: PageStyles): StyleRef[] {
+  const a = compactStyles(current);
+  const b = compactStyles(saved);
+  const refs: StyleRef[] = [];
+  for (const key of new Set([...Object.keys(a.text), ...Object.keys(b.text)]) as Set<StyleKey>) {
+    if (!sameJson(a.text[key] ?? {}, b.text[key] ?? {})) refs.push({ kind: "text", key });
+  }
+  for (const key of new Set([...Object.keys(a.sections), ...Object.keys(b.sections)]) as Set<SectionStyleKey>) {
+    if (!sameJson(a.sections[key] ?? {}, b.sections[key] ?? {})) refs.push({ kind: "section", key });
+  }
+  return refs;
+}
+
+/** `base` with the given presets taken from `from`. */
+function withStyles(base: PageStyles, from: PageStyles, refs: StyleRef[]): PageStyles {
+  const next: PageStyles = { text: { ...base.text }, sections: { ...base.sections } };
+  for (const ref of refs) {
+    const value = styleOf(from, ref);
+    if (ref.kind === "text") {
+      if (value) next.text[ref.key] = value as TextStyle;
+      else delete next.text[ref.key];
+    } else if (value) next.sections[ref.key] = value as SectionStyle;
+    else delete next.sections[ref.key];
+  }
+  return next;
+}
 
 interface EditorContextValue {
   data: EditorData;
@@ -83,21 +131,24 @@ interface EditorContextValue {
    * a draft to be stored first.
    */
   saveScope: (scope: EditorScope, fields?: string[], values?: Record<string, unknown>) => Promise<boolean>;
-  /** Save everything unsaved: text drafts and open item forms. */
+  /** Save style drafts (only the given presets, or all of them). */
+  saveStyles: (refs?: StyleRef[]) => Promise<boolean>;
+  /** Save everything unsaved: text, photo and style drafts, and open item forms. */
   saveAll: () => Promise<boolean>;
   discardAll: () => void;
   unsavedCount: number;
   saving: boolean;
   status: Status;
-  announce: (kind: "success" | "error", text: string) => void;
+  announce: (kind: StatusKind, text: string) => void;
   /** Item forms report unsaved changes (submit = null when clean). */
   registerForm: (id: string, submit: (() => void) | null) => void;
-  /** Style presets: applied on the page at once and saved immediately. */
+  /** Style presets as shown: the saved ones plus any unsaved choices. */
   styles: PageStyles;
-  /** A style choice is being saved right now. */
-  stylesSaving: boolean;
-  setTextStyle: (key: StyleKey, style: TextStyle | undefined) => Promise<boolean>;
-  setSectionStyle: (key: SectionStyleKey, style: SectionStyle | undefined) => Promise<boolean>;
+  /** Is this preset changed but not saved? */
+  hasStyleDraft: (ref: StyleRef) => boolean;
+  /** Style choices are drafts, like text: applied on the page, saved by Save. */
+  setTextStyle: (key: StyleKey, style: TextStyle | undefined) => void;
+  setSectionStyle: (key: SectionStyleKey, style: SectionStyle | undefined) => void;
   findItem: (collection: CollectionKey, id: string) => EditorItemMeta | undefined;
 }
 
@@ -123,12 +174,15 @@ export function EditorProvider({ data, children }: { data: EditorData; children:
   const [drafts, setDrafts] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [forms, setForms] = useState<Record<string, () => void>>({});
-  const [saving, setSaving] = useState(false);
+  // Saves in flight (a Save can run several one after another).
+  const [savingCount, setSavingCount] = useState(0);
+  const saving = savingCount > 0;
   const [status, setStatus] = useState<Status>(null);
-  const [styles, setStyles] = useState<PageStyles>(data.styles);
-  // Style saves in flight (they run one after another).
-  const [stylesSaving, setStylesSaving] = useState(0);
-  const stylesRef = useRef(data.styles);
+  // Style presets: what the database has, and the draft on top of it.
+  const [savedStyles, setSavedStyles] = useState<PageStyles>(data.styles);
+  const [styleDraft, setStyleDraft] = useState<PageStyles | null>(null);
+  const styles = styleDraft ?? savedStyles;
+  const styleChanges = useMemo(() => changedStyles(styles, savedStyles), [styles, savedStyles]);
   // Values saved in this session, until the server's refreshed data arrives
   // (a new `data.saved` object replaces them).
   const [override, setOverride] = useState<{ base: SavedValues; values: Partial<SavedValues> } | null>(null);
@@ -139,7 +193,7 @@ export function EditorProvider({ data, children }: { data: EditorData; children:
   );
 
   const announce = useCallback(
-    (kind: "success" | "error", text: string) => setStatus({ kind, text, at: Date.now() }),
+    (kind: StatusKind, text: string) => setStatus({ kind, text, at: Date.now() }),
     [],
   );
 
@@ -203,14 +257,14 @@ export function EditorProvider({ data, children }: { data: EditorData; children:
       const values = { ...(saved[scope] as Record<string, unknown>) };
       for (const f of own) values[f] = direct && f in direct ? direct[f] : drafts[keyOf(scope, f)];
 
-      setSaving(true);
+      setSavingCount((n) => n + 1);
       let result: CmsResult;
       try {
         result = await actions[scope](values as never);
       } catch (error) {
         result = { ok: false, error: describeActionFailure(error).text };
       }
-      setSaving(false);
+      setSavingCount((n) => n - 1);
 
       if (result.ok) {
         setOverride((prev) => ({
@@ -241,20 +295,58 @@ export function EditorProvider({ data, children }: { data: EditorData; children:
     [drafts, saved, data.saved, announce],
   );
 
+  // Style drafts: one request with the saved map plus the chosen presets;
+  // the server returns what it stored, and that becomes the saved state.
+  const saveStyles = useCallback(
+    async (refs?: StyleRef[]) => {
+      const base = savedStyles;
+      const current = styles;
+      const changed = changedStyles(current, base);
+      const target = refs ? changed.filter((c) => refs.some((r) => r.kind === c.kind && r.key === c.key)) : changed;
+      if (target.length === 0) return true;
+      setSavingCount((n) => n + 1);
+      let result: Awaited<ReturnType<typeof savePageStyles>>;
+      try {
+        result = await savePageStyles(withStyles(base, current, target));
+      } catch (error) {
+        result = { ok: false, error: describeActionFailure(error).text };
+      }
+      setSavingCount((n) => n - 1);
+      if (!result.ok || !result.styles) {
+        announce("error", result.ok ? "The style couldn't be confirmed as saved. Try again." : result.error);
+        return false;
+      }
+      const stored = result.styles;
+      setSavedStyles(stored);
+      // Keep any other unsaved presets (including ones chosen while saving)
+      // as a draft on top of what's stored now.
+      setStyleDraft((prev) => {
+        const latest = prev ?? base;
+        const rest = changedStyles(latest, stored).filter((c) => !target.some((t) => t.kind === c.kind && t.key === c.key));
+        return rest.length ? withStyles(stored, latest, rest) : null;
+      });
+      announce("success", target.length === 1 ? "Style saved." : "Styles saved.");
+      return true;
+    },
+    [announce, savedStyles, styles],
+  );
+
   const saveAll = useCallback(async () => {
-    const scopes = (["home", "about", "video"] as const).filter((s) =>
+    const scopes = (["home", "about", "video", "site"] as const).filter((s) =>
       Object.keys(drafts).some((k) => k.startsWith(`${s}.`)),
     );
     let ok = true;
     for (const scope of scopes) ok = (await saveScope(scope)) && ok;
+    ok = (await saveStyles()) && ok;
     // Open item forms submit themselves (their own validation and messages).
     for (const submit of Object.values(forms)) submit();
     return ok;
-  }, [drafts, forms, saveScope]);
+  }, [drafts, forms, saveScope, saveStyles]);
 
   const discardAll = useCallback(() => {
     setDrafts({});
     setErrors({});
+    setStyleDraft(null);
   }, []);
 
   const registerForm = useCallback((id: string, submit: (() => void) | null) => {
@@ -267,58 +359,37 @@ export function EditorProvider({ data, children }: { data: EditorData; children:
     });
   }, []);
 
-  // Style presets save as they're chosen. Saves run one after another, each
-  // sending the whole (latest) map, so the database always ends up with the
-  // last choice; a failed save puts the previous style back.
-  const styleChain = useRef<Promise<unknown>>(Promise.resolve());
-  const saveStyles = useCallback(
-    (next: PageStyles) => {
-      const previous = stylesRef.current;
-      stylesRef.current = next;
-      setStyles(next);
-      setStylesSaving((n) => n + 1);
-      const run = styleChain.current.then(async () => {
-        try {
-          const result = await savePageStyles(next);
-          if (result.ok) {
-            announce("success", result.message);
-            return true;
-          }
-          announce("error", result.error);
-        } catch (error) {
-          announce("error", describeActionFailure(error).text);
-        }
-        if (stylesRef.current === next) {
-          stylesRef.current = previous;
-          setStyles(previous);
-        }
-        return false;
-      });
-      styleChain.current = run;
-      void run.finally(() => setStylesSaving((n) => n - 1));
-      return run;
-    },
-    [announce],
+  // A style choice only changes the draft; choosing the saved style again
+  // clears it.
+  const changeStyles = useCallback(
+    (change: (current: PageStyles) => PageStyles) =>
+      setStyleDraft((prev) => {
+        const next = change(prev ?? savedStyles);
+        return changedStyles(next, savedStyles).length ? next : null;
+      }),
+    [savedStyles],
   );
 
   const setTextStyle = useCallback(
-    (key: StyleKey, style: TextStyle | undefined) => {
-      const text = { ...stylesRef.current.text };
-      if (style && Object.values(style).some((v) => v !== undefined)) text[key] = style;
-      else delete text[key];
-      return saveStyles({ ...stylesRef.current, text });
-    },
-    [saveStyles],
+    (key: StyleKey, style: TextStyle | undefined) =>
+      changeStyles((current) => {
+        const text = { ...current.text };
+        if (style && Object.values(style).some((v) => v !== undefined)) text[key] = style;
+        else delete text[key];
+        return { ...current, text };
+      }),
+    [changeStyles],
   );
 
   const setSectionStyle = useCallback(
-    (key: SectionStyleKey, style: SectionStyle | undefined) => {
-      const sections = { ...stylesRef.current.sections };
-      if (style && Object.values(style).some((v) => v !== undefined)) sections[key] = style;
-      else delete sections[key];
-      return saveStyles({ ...stylesRef.current, sections });
-    },
-    [saveStyles],
+    (key: SectionStyleKey, style: SectionStyle | undefined) =>
+      changeStyles((current) => {
+        const sections = { ...current.sections };
+        if (style && Object.values(style).some((v) => v !== undefined)) sections[key] = style;
+        else delete sections[key];
+        return { ...current, sections };
+      }),
+    [changeStyles],
   );
 
   const ctx: EditorContextValue = {
@@ -331,16 +402,17 @@ export function EditorProvider({ data, children }: { data: EditorData; children:
     discardDraft,
     error: (scope, field) => errors[keyOf(scope, field)],
     saveScope,
+    saveStyles,
     saveAll,
     discardAll,
-    unsavedCount: Object.keys(drafts).length + Object.keys(forms).length,
+    unsavedCount: Object.keys(drafts).length + Object.keys(forms).length + styleChanges.length,
     saving,
     status,
     announce,
     registerForm,
     findItem: (collection, id) => data.items[collection].find((i) => i.id === id),
     styles,
-    stylesSaving: stylesSaving > 0,
+    hasStyleDraft: (ref) => styleChanges.some((c) => c.kind === ref.kind && c.key === ref.key),
     setTextStyle,
     setSectionStyle,
   };

@@ -1,7 +1,6 @@
 "use client";
 
 import { useId } from "react";
-import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   sectionSpacings,
@@ -18,12 +17,12 @@ import {
   type StyleKey,
   type TextStyle,
 } from "@/lib/styles/schema";
-import { useEditor } from "./editor-context";
+import { useEditor, type StyleRef } from "./editor-context";
 
 /*
  * Style presets in the visual editor. Every control is a choice from a
- * fixed list ("As designed" = no override), applied on the page at once and
- * saved immediately. Colours are theme colours that are readable on every
+ * fixed list ("As designed" = no override), shown on the page at once and
+ * kept as an unsaved draft until Save, like text. Colours are theme colours that are readable on every
  * background, so no combination here can make text unreadable.
  */
 
@@ -56,16 +55,12 @@ function Choice<K extends string>({
   );
 }
 
-/** "Saving style…" while a style choice is really being saved. */
-function StyleSaving() {
-  const { stylesSaving } = useEditor();
+/** "Unsaved" while this style differs from the saved one. */
+function StyleDraftMark({ styleRef }: { styleRef: StyleRef }) {
+  const { hasStyleDraft } = useEditor();
   return (
-    <span role="status" className="flex h-11 items-center gap-2 self-end text-sm text-muted-foreground">
-      {stylesSaving && (
-        <>
-          <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" /> Saving style…
-        </>
-      )}
+    <span role="status" className="flex h-11 items-center self-end text-xs font-medium text-primary">
+      {hasStyleDraft(styleRef) && "Unsaved"}
     </span>
   );
 }
@@ -75,7 +70,7 @@ export function TextStyleControls({ styleKey, label }: { styleKey: StyleKey; lab
   const editor = useEditor();
   const style: TextStyle = editor.styles.text[styleKey] ?? {};
   const set = <K extends keyof TextStyle>(key: K, value: TextStyle[K]) =>
-    void editor.setTextStyle(styleKey, { ...style, [key]: value });
+    editor.setTextStyle(styleKey, { ...style, [key]: value });
 
   return (
     <span className="cc-style-panel" role="group" aria-label={`Style: ${label}`}>
@@ -91,11 +86,11 @@ export function TextStyleControls({ styleKey, label }: { styleKey: StyleKey; lab
         variant="ghost"
         className="h-11 self-end"
         aria-disabled={Object.keys(style).length === 0 || undefined}
-        onClick={() => Object.keys(style).length > 0 && void editor.setTextStyle(styleKey, undefined)}
+        onClick={() => Object.keys(style).length > 0 && editor.setTextStyle(styleKey, undefined)}
       >
         Reset style
       </Button>
-      <StyleSaving />
+      <StyleDraftMark styleRef={{ kind: "text", key: styleKey }} />
     </span>
   );
 }
@@ -105,12 +100,12 @@ export function SectionStyleControls({ section, spacing = true }: { section: Sec
   const editor = useEditor();
   const style: SectionStyle = editor.styles.sections[section] ?? {};
   const set = <K extends keyof SectionStyle>(key: K, value: SectionStyle[K]) =>
-    void editor.setSectionStyle(section, { ...style, [key]: value });
+    editor.setSectionStyle(section, { ...style, [key]: value });
 
   return (
     <fieldset className="grid gap-3 border-t border-border pt-5">
       <legend className="text-sm font-semibold">Section style</legend>
-      <p className="-mt-1 text-sm text-muted-foreground">Applied on the page and saved as soon as you choose.</p>
+      <p className="-mt-1 text-sm text-muted-foreground">Shown on the page as you choose. Save section to put it on the website.</p>
       <div className="cc-style-panel">
         <Choice label="Background" value={style.tone} options={sectionTones} labels={styleLabels.tone} onChange={(v) => set("tone", v)} />
         {spacing && (
@@ -122,11 +117,11 @@ export function SectionStyleControls({ section, spacing = true }: { section: Sec
           variant="ghost"
           className="h-11 self-end"
           aria-disabled={Object.keys(style).length === 0 || undefined}
-          onClick={() => Object.keys(style).length > 0 && void editor.setSectionStyle(section, undefined)}
+          onClick={() => Object.keys(style).length > 0 && editor.setSectionStyle(section, undefined)}
         >
           Reset section style
         </Button>
-        <StyleSaving />
+        <StyleDraftMark styleRef={{ kind: "section", key: section }} />
       </div>
     </fieldset>
   );

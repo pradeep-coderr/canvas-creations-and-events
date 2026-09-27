@@ -26,6 +26,8 @@ export interface PushPayload {
   url: string;
   /** Notifications with the same tag replace each other. */
   tag: string;
+  /** Settings test only: the service worker reports back when it's shown. */
+  testId?: string;
 }
 
 const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -51,44 +53,82 @@ export interface Target {
   auth: string;
 }
 
-/** Send one payload to the given subscriptions; gone subscriptions are revoked. */
-export async function deliver(targets: Target[], payload: PushPayload): Promise<{ sent: number; failed: number }> {
-  if (!pushConfigured() || targets.length === 0) return { sent: 0, failed: 0 };
+/** The push service's host (e.g. fcm.googleapis.com): safe to log, unlike the endpoint. */
+export const pushService = (endpoint: string) => {
+  try {
+    return new URL(endpoint).host;
+  } catch {
+    return "invalid";
+  }
+};
+
+export interface DeliveryReport {
+  sent: number;
+  failed: number;
+  /** Why each failure happened (push service status or error), for diagnostics. */
+  errors: string[];
+}
+
+/**
+ * Send one payload to the given subscriptions; gone subscriptions are revoked.
+ * "Sent" means the browser's push service accepted it, not that the device
+ * showed it (the Settings test confirms that separately).
+ */
+export async function deliver(targets: Target[], payload: PushPayload): Promise<DeliveryReport> {
+  if (!pushConfigured()) {
+    console.warn("[push] not configured: nothing sent");
+    return { sent: 0, failed: 0, errors: ["push is not configured on the server"] };
+  }
+  if (targets.length === 0) return { sent: 0, failed: 0, errors: [] };
   ensureVapid();
   const body = JSON.stringify(payload);
   let sent = 0;
   let failed = 0;
+  const errors: string[] = [];
+  console.info("[push] dispatch attempted", { tag: payload.tag, targets: targets.length });
   await Promise.all(
     targets.map(async (t) => {
+      const service = pushService(t.endpoint);
       try {
-        await webpush.sendNotification({ endpoint: t.endpoint, keys: { p256dh: t.p256dh, auth: t.auth } }, body, {
-          TTL: 60 * 60 * 24,
-          urgency: "high",
-        });
+        const response = await webpush.sendNotification(
+          { endpoint: t.endpoint, keys: { p256dh: t.p256dh, auth: t.auth } },
+          body,
+          { TTL: 60 * 60 * 24, urgency: "high" },
+        );
         sent++;
+        console.info("[push] accepted by push service", { service, status: response.statusCode });
       } catch (error) {
         failed++;
         const status = (error as { statusCode?: number }).statusCode;
-        // Log the status only: never the endpoint (a capability) or the payload.
-        console.warn("[push] delivery failed", { status });
+        const reason = status ? `push service answered ${status}` : error instanceof Error ? error.message.slice(0, 120) : "unknown error";
+        errors.push(reason);
+        // The service host and status only: never the endpoint (a capability),
+        // the keys or the payload.
+        console.warn("[push] delivery failed", { service, status, reason: status ? undefined : reason });
         if (status === 404 || status === 410) {
           await createPublicClient().rpc("revoke_push_endpoint", { p_secret: dispatchSecret!, p_endpoint: t.endpoint });
+          console.info("[push] endpoint revoked (gone)", { service, status });
         }
       }
     }),
   );
-  return { sent, failed };
+  return { sent, failed, errors };
 }
 
 /** Send to every super admin subscribed to this kind of alert. */
 export async function pushToAdmins(kind: PushKind, payload: PushPayload) {
-  if (!pushConfigured()) return { sent: 0, failed: 0 };
+  if (!pushConfigured()) {
+    console.warn("[push] not configured: nothing sent", { kind });
+    return { sent: 0, failed: 0, errors: [] };
+  }
   const { data, error } = await createPublicClient().rpc("push_targets", { p_secret: dispatchSecret!, p_kind: kind });
   if (error) {
-    console.error("[push] targets unavailable", { code: error.code });
-    return { sent: 0, failed: 0 };
+    console.error("[push] targets unavailable", { kind, code: error.code });
+    return { sent: 0, failed: 0, errors: [] };
   }
-  return deliver((data ?? []) as Target[], payload);
+  const targets = (data ?? []) as Target[];
+  console.info("[push] targets", { kind, count: targets.length });
+  return deliver(targets, payload);
 }
 
 /** "New enquiry" — name and event date only; the message stays in the admin. */
@@ -103,10 +143,13 @@ export async function notifyNewEnquiry(enquiry: { id: string; name: string; even
       url: `/admin/enquiries/${enquiry.id}`,
       tag: `enquiry-${enquiry.id}`,
     });
-    console.info("[push] new enquiry alert", result);
+    console.info("[push] new enquiry alert", { enquiryId: enquiry.id, sent: result.sent, failed: result.failed });
   } catch (error) {
     // Never affects the stored enquiry.
-    console.error("[push] new enquiry alert failed", { message: error instanceof Error ? error.message.slice(0, 120) : "unknown" });
+    console.error("[push] new enquiry alert failed", {
+      enquiryId: enquiry.id,
+      message: error instanceof Error ? error.message.slice(0, 120) : "unknown",
+    });
   }
 }
 

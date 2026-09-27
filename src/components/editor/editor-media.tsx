@@ -50,9 +50,9 @@ export function EditorMediaField({
 }
 
 /**
- * "Edit photo" on a photo shown on the page (hero, About). Choosing a photo
- * in the picker saves it straight away (the picker's "Use this photo" is the
- * confirmation), through the same server action as the section panel.
+ * "Change photo" on a photo shown on the page (hero, About). Like every other
+ * editor change, the choice is a draft: the page shows it straight away (laid
+ * over the saved photo) and Save puts it on the website.
  */
 export function EditPhotoButton({
   scope,
@@ -69,19 +69,12 @@ export function EditPhotoButton({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [library, setLibrary] = useState<MediaImage[]>(editor.data.imageOptions);
-  const [savingPhoto, setSavingPhoto] = useState<"change" | "remove" | null>(null);
   const button = useRef<HTMLButtonElement>(null);
-  const savePhoto = async (kind: "change" | "remove", id: string) => {
-    setSavingPhoto(kind);
-    try {
-      await editor.saveScope(scope, [field], { [field]: id });
-    } finally {
-      setSavingPhoto(null);
-    }
-  };
-  if (editor.mode === "preview") return null;
+  if (editor.mode === "preview" && !editor.hasDraft(scope, field)) return null;
 
   const value = String(editor.value(scope, field) ?? "");
+  const draft = editor.hasDraft(scope, field);
+  const draftImage = draft && value ? library.find((i) => i.id === value) : undefined;
   const openPicker = async () => {
     setOpen(true);
     setLoading(true);
@@ -94,46 +87,59 @@ export function EditPhotoButton({
     }
   };
 
-  return (
-    <div className="absolute bottom-4 left-4 z-10 flex flex-wrap gap-2" data-editor-control="">
-      <Button
-        ref={button}
-        type="button"
-        variant="secondary"
-        className="shadow-soft"
-        pending={savingPhoto === "change"}
-        pendingLabel="Saving photo…"
-        onClick={() => void openPicker()}
-      >
-        <ImageIcon data-icon="inline-start" aria-hidden="true" />
-        {value ? "Change photo" : "Add photo"}
-        <span className="sr-only">: {label}</span>
-      </Button>
-      {value && (
-        <Button
-          type="button"
-          variant="secondary"
-          className="shadow-soft"
-          pending={savingPhoto === "remove"}
-          pendingLabel="Removing…"
-          onClick={() => void savePhoto("remove", "")}
-        >
-          Remove photo<span className="sr-only">: {label}</span>
-        </Button>
+  const preview = draft && (
+    // The unsaved choice, over the saved photo (which the server rendered).
+    <div className="absolute inset-0 bg-surface-ivory" aria-hidden="true">
+      {draftImage ? (
+        // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL of an admin-only draft
+        <img src={draftImage.url} alt="" className="size-full object-cover" />
+      ) : (
+        <p className="flex size-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
+          Photo removed. The website shows its placeholder once saved.
+        </p>
       )}
-      <MediaPicker
-        open={open}
-        onOpenChange={setOpen}
-        images={library}
-        loading={loading}
-        selectedId={value}
-        use={use}
-        title={`Choose a photo: ${label}`}
-        onUploaded={(image) => setLibrary((l) => [image, ...l.filter((i) => i.id !== image.id)])}
-        onSelect={(image) => void savePhoto("change", image.id)}
-        onDeleted={(deletedId) => setLibrary((l) => l.filter((i) => i.id !== deletedId))}
-        returnFocus={button}
-      />
     </div>
+  );
+  if (editor.mode === "preview") return preview;
+
+  return (
+    <>
+      {preview}
+      <div className="absolute bottom-4 left-4 z-10 flex flex-wrap items-center gap-2" data-editor-control="">
+        <Button ref={button} type="button" variant="secondary" className="shadow-soft" onClick={() => void openPicker()}>
+          <ImageIcon data-icon="inline-start" aria-hidden="true" />
+          {value ? "Change photo" : "Add photo"}
+          <span className="sr-only">: {label}</span>
+        </Button>
+        {value && (
+          <Button type="button" variant="secondary" className="shadow-soft" onClick={() => editor.setDraft(scope, field, "")}>
+            Remove photo<span className="sr-only">: {label}</span>
+          </Button>
+        )}
+        {draft && (
+          <>
+            <span className="rounded-sm bg-background px-2 py-1 text-xs font-medium text-primary shadow-soft">
+              Unsaved photo
+            </span>
+            <Button type="button" variant="ghost" className="bg-background/90 shadow-soft" onClick={() => editor.discardDraft(scope, field)}>
+              Undo<span className="sr-only"> photo change: {label}</span>
+            </Button>
+          </>
+        )}
+        <MediaPicker
+          open={open}
+          onOpenChange={setOpen}
+          images={library}
+          loading={loading}
+          selectedId={value}
+          use={use}
+          title={`Choose a photo: ${label}`}
+          onUploaded={(image) => setLibrary((l) => [image, ...l.filter((i) => i.id !== image.id)])}
+          onSelect={(image) => editor.setDraft(scope, field, image.id)}
+          onDeleted={(deletedId) => setLibrary((l) => l.filter((i) => i.id !== deletedId))}
+          returnFocus={button}
+        />
+      </div>
+    </>
   );
 }
