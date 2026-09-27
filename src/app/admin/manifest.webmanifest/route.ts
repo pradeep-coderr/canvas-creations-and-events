@@ -14,7 +14,7 @@ const manifest: MetadataRoute.Manifest = {
   id: "/admin",
   name: `${site.shortName} Admin`,
   short_name: "Canvas Admin",
-  description: `Enquiries admin for ${site.name}.`,
+  description: `Enquiries, calendar and website admin for ${site.name}.`,
   lang: "en-AU",
   dir: "ltr",
   // Not "/admin/": Next.js redirects that to "/admin", and a "/admin/" scope
@@ -32,9 +32,12 @@ const manifest: MetadataRoute.Manifest = {
     { src: "/icons/maskable-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
     { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
   ],
+  // Real routes only (long-press the app icon on Android; right-click on desktop).
   shortcuts: [
+    { name: "Enquiries", short_name: "Enquiries", url: "/admin", icons: shortcutIcons },
     { name: "New enquiries", short_name: "New", url: "/admin?status=new", icons: shortcutIcons },
-    { name: "All enquiries", short_name: "All", url: "/admin", icons: shortcutIcons },
+    { name: "Calendar", short_name: "Calendar", url: "/admin/calendar", icons: shortcutIcons },
+    { name: "New reminder", short_name: "Reminder", url: "/admin/calendar?new=reminder", icons: shortcutIcons },
   ],
 };
 

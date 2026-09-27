@@ -95,10 +95,14 @@ export const siteSchema = z.object({
   footerFollowHeading: line(),
   basedInLabel: line(),
   phoneDisplay: phone,
-  addressStreet: line(),
+  addressStreet: optionalLine(),
   addressLocality: line(),
   addressRegion: line(),
-  addressPostcode: z.string().trim().regex(/^[0-9]{4}$/, "Use a 4-digit postcode."),
+  addressPostcode: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || /^[0-9]{4}$/.test(v), "Use a 4-digit postcode, or leave it empty.")
+    .transform((v) => v || null),
   instagramUrl: social(/^https:\/\/(www\.)?instagram\.com\/\S*$/, "Instagram"),
   facebookUrl: social(/^https:\/\/(www\.|m\.)?facebook\.com\/\S*$/, "Facebook"),
   tiktokUrl: social(/^https:\/\/(www\.)?tiktok\.com\/\S*$/, "TikTok"),
@@ -158,7 +162,7 @@ export interface SiteSettings {
   footerHeadings: { explore: string; contact: string; follow: string };
   basedInLabel: string;
   phone: { display: string; href: string };
-  address: { street: string; locality: string; region: string; postcode: string };
+  address: { street: string | null; locality: string; region: string; postcode: string | null };
   socials: { platform: "instagram" | "facebook" | "tiktok"; label: string; href: string }[];
   form: {
     name: string;
@@ -202,7 +206,12 @@ export function settingsFromValues(v: SiteValues): SiteSettings {
     footerHeadings: { explore: v.footerExploreHeading, contact: v.footerContactHeading, follow: v.footerFollowHeading },
     basedInLabel: v.basedInLabel,
     phone: { display: v.phoneDisplay, href: phoneHref(v.phoneDisplay) },
-    address: { street: v.addressStreet, locality: v.addressLocality, region: v.addressRegion, postcode: v.addressPostcode },
+    address: {
+      street: v.addressStreet || null,
+      locality: v.addressLocality,
+      region: v.addressRegion,
+      postcode: v.addressPostcode || null,
+    },
     socials,
     form: {
       name: v.formNameLabel,
@@ -241,10 +250,10 @@ export const defaultSiteValues: SiteValues = {
   footerFollowHeading: "Follow",
   basedInLabel: "Based in",
   phoneDisplay: site.contact.phone.display,
-  addressStreet: site.contact.address.street,
+  addressStreet: site.contact.address.street ?? "",
   addressLocality: site.contact.address.locality,
   addressRegion: site.contact.address.region,
-  addressPostcode: site.contact.address.postcode,
+  addressPostcode: site.contact.address.postcode ?? "",
   instagramUrl: site.socials.find((s) => s.platform === "instagram")?.href ?? "",
   facebookUrl: site.socials.find((s) => s.platform === "facebook")?.href ?? "",
   tiktokUrl: site.socials.find((s) => s.platform === "tiktok")?.href ?? "",

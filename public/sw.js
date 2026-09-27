@@ -165,3 +165,66 @@ function offlinePage() {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
   });
 }
+
+/*
+ * Web Push (Phase 20) — separate from the caching above, which still never
+ * touches /admin. Payloads are minimal ({ title, body, url, tag }). We ask
+ * for a normal, non-silent notification; whether it makes a sound or
+ * vibrates is decided by the browser and the device's settings.
+ */
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = {};
+  }
+  const title = typeof data.title === "string" ? data.title : "Canvas Admin";
+  const url = safeAdminUrl(data.url);
+  event.waitUntil(
+    (async () => {
+      await self.registration.showNotification(title, {
+        body: typeof data.body === "string" ? data.body : "",
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        tag: typeof data.tag === "string" ? data.tag : undefined,
+        renotify: true,
+        silent: false,
+        vibrate: [200, 100, 200],
+        data: { url },
+      });
+      // An open admin window can also show an in-app alert.
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of windows) {
+        if (new URL(client.url).pathname.startsWith("/admin")) client.postMessage({ type: "cc-push", title, url });
+      }
+    })(),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = safeAdminUrl(event.notification.data && event.notification.data.url);
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const admin = windows.find((client) => new URL(client.url).pathname.startsWith("/admin"));
+      if (admin) {
+        await admin.focus();
+        if ("navigate" in admin) return admin.navigate(url);
+        return undefined;
+      }
+      return self.clients.openWindow(url);
+    })(),
+  );
+});
+
+// Only same-site admin pages can be opened from a notification.
+function safeAdminUrl(value) {
+  try {
+    const url = new URL(typeof value === "string" ? value : "/admin", self.location.origin);
+    return url.origin === self.location.origin && url.pathname.startsWith("/admin") ? url.pathname + url.search : "/admin";
+  } catch {
+    return "/admin";
+  }
+}

@@ -26,10 +26,10 @@ export function SiteSettingsForm({ defaultValues }: { defaultValues: SiteValues 
 
           <FormSection title="Contact details" description="Used in the header, footer, Contact section, enquiry form and Google's business details.">
             <TextField form={form} name="phoneDisplay" label="Phone number" hint={PHONE_HINT} />
-            <TextField form={form} name="addressStreet" label="Street" />
-            <TextField form={form} name="addressLocality" label="Suburb" />
+            <TextField form={form} name="addressStreet" label="Street" optional hint="Leave empty to show only the area, e.g. “Adelaide, South Australia”." />
+            <TextField form={form} name="addressLocality" label="City or suburb" />
             <TextField form={form} name="addressRegion" label="State" />
-            <TextField form={form} name="addressPostcode" label="Postcode" />
+            <TextField form={form} name="addressPostcode" label="Postcode" optional />
             <TextField form={form} name="instagramUrl" label="Instagram link" optional hint="Leave empty to hide Instagram everywhere." />
             <TextField form={form} name="facebookUrl" label="Facebook link" optional hint="Leave empty to hide Facebook everywhere." />
             <TextField form={form} name="tiktokUrl" label="TikTok link" optional hint="Leave empty to hide TikTok everywhere." />

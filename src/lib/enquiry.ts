@@ -31,12 +31,16 @@ export const enquirySchema = z.object({
     .min(1, "Please enter your email address.")
     .max(254, "Please enter a shorter email address.")
     .pipe(z.email("Please enter a valid email address.")),
-  phone: optionalText(30, "your phone number").refine(
-    (value) =>
-      value === "" ||
-      (/^[+()\d\s-]+$/.test(value) && value.replace(/\D/g, "").length >= 8),
-    "Please enter a valid phone number, or leave it blank.",
-  ),
+  // Required (Phase 20): the database insert policy requires it too.
+  phone: z
+    .string()
+    .trim()
+    .min(1, "Please enter your phone number.")
+    .max(30, "Please keep your phone number under 30 characters.")
+    .refine(
+      (value) => /^[+()\d\s-]+$/.test(value) && value.replace(/\D/g, "").length >= 8,
+      "Please enter a valid phone number.",
+    ),
   eventType: optionalText(100, "the event type"),
   eventDate: z
     .string()

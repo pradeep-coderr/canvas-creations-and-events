@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,12 @@ export function LoginForm() {
         <Input id="login-email" name="email" type="email" autoComplete="username" required />
       </Field>
       <Field>
-        <FieldLabel htmlFor="login-password">Password</FieldLabel>
+        <div className="flex items-baseline justify-between gap-4">
+          <FieldLabel htmlFor="login-password">Password</FieldLabel>
+          <Link href="/admin/forgot-password" className="text-sm font-semibold underline underline-offset-4">
+            Forgot password?
+          </Link>
+        </div>
         <Input
           id="login-password"
           name="password"

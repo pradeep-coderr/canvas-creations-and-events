@@ -1,6 +1,8 @@
 "use server";
 
+import { after } from "next/server";
 import { sendEnquiryNotification } from "@/lib/email/send-enquiry-notification";
+import { notifyNewEnquiry } from "@/lib/push/server";
 import { enquirySchema, type Enquiry, type EnquiryResult } from "@/lib/enquiry";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -17,7 +19,7 @@ function toRow(id: string, enquiry: Enquiry) {
     id,
     name: enquiry.name,
     email: enquiry.email,
-    phone: optional(enquiry.phone),
+    phone: enquiry.phone,
     event_type: optional(enquiry.eventType),
     event_date: optional(enquiry.eventDate),
     venue: optional(enquiry.venue),
@@ -34,6 +36,7 @@ function toRow(id: string, enquiry: Enquiry) {
  *   3. Zod re-validation   → the browser is never trusted
  *   4. insert              → the database is the source of truth
  *   5. notification email  → best effort; never undoes a stored enquiry
+ *   6. push alert          → after the response (next/server after()), best effort
  *
  * The id is generated here (public roles can't read rows back, so the insert
  * can't return it) and becomes the row's primary key and the notification's
@@ -79,7 +82,11 @@ export async function submitEnquiry(
   console.info(`[enquiry] stored ${id}`);
 
   // Stored — from here on the visitor is told it was received, whatever
-  // happens to the email.
+  // happens to the email or the push alert.
+  // Push alert to subscribed super admins, after the response is sent: it
+  // never delays or fails the enquiry, and only name + event date go out.
+  const { name, eventDate } = parsed.data;
+  after(() => notifyNewEnquiry({ id, name, eventDate: eventDate || null }));
   const outcome = await sendEnquiryNotification(id, parsed.data);
   return { status: "sent", notified: outcome === "sent" };
 }

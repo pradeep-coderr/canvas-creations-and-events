@@ -54,7 +54,7 @@ interface FieldConfig {
 const fields: FieldConfig[] = [
   { name: "name", autoComplete: "name" },
   { name: "email", type: "email", autoComplete: "email" },
-  { name: "phone", optional: true, type: "tel", autoComplete: "tel", inputMode: "tel" },
+  { name: "phone", type: "tel", autoComplete: "tel", inputMode: "tel" },
   { name: "eventType", optional: true },
   { name: "eventDate", optional: true },
   { name: "venue", optional: true },

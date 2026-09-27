@@ -3,6 +3,7 @@ import { Section } from "@/components/layout/section";
 import { Reveal } from "@/components/motion/reveal";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { contactSection, type ContactCopy } from "@/data/home";
+import { AddressText } from "@/components/shared/address-text";
 import { defaultSiteSettings, type SiteCopy } from "@/lib/cms/site-settings";
 
 const linkClass =
@@ -44,7 +45,7 @@ export function Contact({
               <div className="border-b border-foreground/15 py-6">
                 <dt className="text-eyebrow font-semibold text-emphasis uppercase" data-sk="site.basedInLabel">{settings.basedInLabel}</dt>
                 <dd className="mt-2 font-display text-display-sm">
-                  {address.street}, {address.locality} {address.region} {address.postcode}
+                  <AddressText address={address} />
                 </dd>
               </div>
               <div className="border-b border-foreground/15 py-6">

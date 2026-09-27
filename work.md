@@ -2803,3 +2803,174 @@ The owner saw a save refused (white text on `#FF7A91`: 2.48:1). Charcoal text on
 - No console errors.
 
 `e2e19.mjs` rerun: **28/28**.
+
+## Phase 20 — Admin Security, Super Admin PWA, Enquiry Alerts, Required Phone, Address Update & Admin Calendar
+
+Everything below was built and tested **locally**: a production build (`next start`) against the local Supabase stack, with Mailpit for email and pg_cron/pg_net running. **Nothing in this phase has been deployed or tested on the live site yet.** The migration hasn't been pushed to the hosted database, and the push keys aren't in Vercel. See "Production steps still needed".
+
+### Migration `20260927055717_admin_operations.sql`
+
+1. **Phone required in the database.** The "Public can submit new enquiries" insert policy now also requires `phone is not null and char_length(btrim(phone)) between 6 and 30`. Existing rows without a phone are untouched and can still have their status updated. Only new public inserts need one.
+2. **Roles.**
+   - `admin_users.role` is `'admin' | 'super_admin'` (default `'admin'`).
+   - **Every existing admin becomes `super_admin`**, so the owner keeps full access.
+   - `private.is_super_admin()` is added. New admins added later are plain `admin` unless promoted:
+     ```sql
+     update public.admin_users set role = 'super_admin' where user_id = '…';
+     ```
+3. **Address.**
+   - `address_street` and `address_postcode` are now optional, and the postcode check allows null.
+   - The settings row is set to locality `Adelaide`, region `South Australia`, street and postcode null.
+   - The seeded FAQ answer "We are based in Munno Para, South Australia." becomes "…Adelaide, South Australia.". This only happens if the answer is still the untouched seed text, so an admin's own edit is never overwritten.
+4. **`push_subscriptions`** (endpoint unique and https-only, keys, user agent, `notify_enquiries` / `notify_reminders`, `revoked_at`). RLS: a super admin can manage only their own rows.
+5. **`admin_reminders`**:
+   - Columns: title, notes, `due_at`, `all_day`, optional `related_enquiry_id` (set null if the enquiry is deleted), `completed_at`, `notified_at`, timestamps with an `updated_at` trigger.
+   - RLS: any admin (`is_admin()`).
+   - Also adds an index on `enquiries.event_date` for the calendar.
+6. **Push dispatch without a Supabase secret key in the app.**
+   - `private.app_config` (no grants) holds `push_dispatch_secret` and `reminder_webhook_url` per environment. These values are **not** in the migration or the repo.
+   - Three `SECURITY DEFINER` RPCs refuse unless given that secret (≥ 32 chars):
+     - `push_targets(secret, kind)`: subscribed super admins' endpoints;
+     - `revoke_push_endpoint(secret, endpoint)`: for 404/410;
+     - `claim_due_reminders(secret)`: marks reminders due within 10 min (or overdue ≤ 1 day) as notified and returns them, so each is pushed once.
+7. **Scheduling.**
+   - `pg_net` + `pg_cron` job `canvas-reminder-dispatch` runs every minute.
+   - It POSTs to `reminder_webhook_url` with `Authorization: Bearer <secret>`, but **only when a reminder is actually due**, so there's no request every minute otherwise.
+   - It does nothing until both config values are set.
+
+`supabase db lint`: no schema errors.
+
+### A. Password reset
+
+- **Login:** "Forgot password?" next to the password label.
+- **`/admin/forgot-password`:** email field with "Sending reset link…" pending.
+  - Always shows the same message ("If an account exists for that address, a password reset link has been sent…"), so it doesn't reveal which emails exist.
+  - An invalid email gets a field message.
+- **Link handling:**
+  - Supabase sends the link to `/admin/auth/confirm` (a route handler). It handles both `code` (PKCE `exchangeCodeForSession`) and `token_hash` (`verifyOtp`, type `recovery`).
+  - `next` is only followed if it's under `/admin/`.
+  - A bad, expired or reused link goes to `/admin/forgot-password?link=invalid` ("That reset link has expired or was already used. Request a new one below.").
+- **`/admin/reset-password`:** needs the recovery session (otherwise redirects).
+  - Fields: new password + confirmation; policy: 8–72 characters, letters and numbers.
+  - Handles Supabase's `same_password` / `weak_password`.
+  - Pending "Updating password…"; on success it signs out and goes to `/admin/login?reset=done` ("Your password was updated. Sign in with your new password.").
+- `supabase/config.toml` redirect URLs gained the local origins, for local testing only.
+
+### B. Design save on production
+
+**Not re-tested on the live site this phase** (the owner asked for local testing in Phase 19). The Phase 19 fixes (verified save, stale-page detection) are unchanged, and `e2e19.mjs` still passes 28/28 locally.
+
+### C. Kind words removed from the website
+
+The Testimonials section is no longer rendered on the home page, and no nav or link points at it. **The CMS data is kept.** The Content → Testimonials description says it isn't shown on the website, so it can be brought back later.
+
+### D. Roles
+
+- `requireSuperAdmin()` (`src/lib/admin/session.ts`) redirects a plain admin to `/admin` on the server. It's used by the Settings page and by every push action.
+- Plain admins keep everything else, including the Calendar.
+- The nav only shows **Settings** to super admins. The header install button and in-app alerts are only rendered for super admins.
+
+### E. Install app (super admins)
+
+- **Settings → Install the app**, plus a compact header button (icon-only on phones). It uses `beforeinstallprompt` where the browser offers it.
+- iOS Safari gets Share → Add to Home Screen steps; other browsers get the browser-menu instructions.
+- Hidden once installed (`display-mode: standalone`).
+- Manifest shortcuts, all real admin routes: Enquiries `/admin`, New enquiries `/admin?status=new`, Calendar `/admin/calendar`, New reminder `/admin/calendar?new=reminder`.
+
+### F–H. Push notifications (super admins)
+
+- **Settings → Notifications:**
+  - Permission is only requested when **Turn on notifications** is clicked, never on load.
+  - It registers `/sw.js`, subscribes with the VAPID public key and stores the subscription.
+  - Duplicate subscribes are upserted on the endpoint.
+  - Controls: "Notify me about" **New enquiries** / **Calendar reminders**, **Send test notification**, **Turn off notifications** (revokes).
+  - States: "Notifications are not enabled on this device." / "…enabled…", with honest errors when blocked or unsupported.
+  - The page says whether a notification makes a sound depends on the browser and device settings. We send it non-silent (`silent: false`, `renotify`, vibrate), and that's all we can control.
+- **New enquiry:**
+  - After the enquiry is stored, `after()` sends "New enquiry — <name> · <event date>". It carries no email, phone or message, and opens `/admin/enquiries/<id>` when tapped.
+  - It runs after the response, so **a push failure can never fail the enquiry** (tested with a dead endpoint).
+  - 404/410 endpoints are revoked.
+- **In-app alert:** if the admin app is open, the service worker posts the push to the page, which shows a "New enquiry received" toast with a **View** link.
+- **Keys:**
+  - `VAPID_PRIVATE_KEY` and `PUSH_DISPATCH_SECRET` are server-only.
+  - Only `NEXT_PUBLIC_VAPID_PUBLIC_KEY` reaches the browser.
+  - No Supabase secret key is used by the app.
+- **Limitations:**
+  - iOS delivers web push only to the **installed** app (iOS 16.4+), not to a Safari tab.
+  - Delivery timing and sound are up to Apple, Google or Mozilla's push services and the device's focus/do-not-disturb settings.
+
+### I. Phone is required
+
+- The form no longer marks Phone optional (`aria-required`).
+- Zod: empty → "Please enter your phone number."; not digits, spaces, `+ ( ) -` with at least 8 digits → "Please enter a valid phone number."
+- Enforced again by the server action and by the database policy (see migration).
+
+### J. Address: "Adelaide, South Australia"
+
+- `src/data/site.ts` defaults, the Contact section and the footer (the new `AddressText` skips empty parts), and the admin site settings (street and postcode now optional; "City or suburb").
+- JSON-LD `PostalAddress` now has only `addressLocality`, `addressRegion` and `addressCountry`. There's no invented street, postcode or geo.
+
+### K. Admin Calendar `/admin/calendar` (all admins)
+
+- **Month view** (Monday first) shows enquiries on their event dates (with status; archived enquiries hidden) and reminders.
+  - Days outside the month are dimmed; today is marked with text, not just colour.
+  - "+" per day adds a reminder; chips truncate inside their cell.
+  - On phones it becomes a day list instead of a squeezed grid.
+- **Agenda view:** next 60 days, grouped by day.
+- **Overdue** section at the top.
+- **Reminders:**
+  - create, edit, mark done / not done, delete (confirm dialog);
+  - optional time (all-day = 9:00 am for notifications), notes, linked enquiry;
+  - pending labels "Saving reminder…".
+- All times are Adelaide time (`src/lib/calendar.ts`, DST-safe). Editing a reminder clears `notified_at`, so a moved reminder notifies again.
+- **Reminder notifications:** pg_cron → pg_net → `POST /api/push/reminders` (Bearer secret; 401 otherwise) → claim → push "Reminder — <title>, In N minutes (time)" to super admins who enabled reminders. This works with the app closed; the browser isn't involved in scheduling.
+
+### Tests actually run (local only)
+
+| Suite | Result |
+| --- | --- |
+| `e2e20.mjs` (new, headless Chrome + local Supabase + Mailpit) | **66/67.** The one "fail" is a test assumption: the scheduler claimed 2 due reminders in one batch (the run's own overdue test reminder too) where the assertion expected exactly 1. The pipeline itself worked: `cron.job_run_details` succeeded, `net._http_response` 200, and the app logged `reminders dispatched { reminders: 2, sent: 2 }`. The assertion was fixed afterwards. |
+| `e2e19.mjs` (Phase 19 regression, now fills Phone) | 28/28 |
+| `disabled19.mjs` | 17/17 |
+| Admin smoke (extended with Calendar/Settings, role checks) | 33/33 |
+
+`e2e20.mjs` covers:
+- Kind words gone; address in Contact, footer and JSON-LD.
+- Phone: UI, Zod, server, plus RLS refusing a missing or blank phone.
+- Enquiry push logged after the response.
+- The full reset flow via Mailpit: no enumeration, one email, too short, mismatch, pending, success, new password works, link can't be reused.
+- Roles:
+  - a plain admin gets no Settings, a server-side redirect, and a refused push action;
+  - with no session, or as a non-admin, actions are refused.
+- RLS on reminders and subscriptions; the RPC and endpoint refuse without the secret.
+- Push:
+  - permission not requested on load;
+  - a real Chrome subscription is stored and duplicates are handled;
+  - a dead endpoint doesn't fail the enquiry;
+  - the in-app alert and View link work.
+- Calendar: event on its date, today marked, overdue, reminder CRUD with Adelaide time, agenda, mobile list, the `?new=reminder` shortcut, manifest shortcut URLs.
+- No console errors.
+
+Final gate (hosted env): `bun install --frozen-lockfile`, typecheck, lint, build, `git diff --check`, `supabase db lint`: all clean.
+
+**Not tested:** real phones (Android/iOS notification sound, installed iOS app), the live site, and the production Design save.
+
+### Production steps still needed (in order)
+
+1. **Push the migration** to the hosted database: `supabase db push` (dry-run first). This also switches existing admins to `super_admin`, sets the address, and updates the FAQ answer. The home page picks it up within its 1-hour revalidation, or on the next deploy or CMS save.
+2. **Generate production keys:** `bunx web-push generate-vapid-keys`, plus a random secret of 32+ characters (don't reuse the local ones).
+3. **Vercel env (Production):**
+   - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:` the owner's address), `PUSH_DISPATCH_SECRET`;
+   - then redeploy.
+4. **Hosted DB config** (SQL editor):
+   ```sql
+   insert into private.app_config (key, value) values
+     ('push_dispatch_secret', '<same as PUSH_DISPATCH_SECRET>'),
+     ('reminder_webhook_url', 'https://canvas-creations-and-events.vercel.app/api/push/reminders');
+   ```
+5. **Supabase Auth → URL configuration:** Site URL is the live site; add `https://canvas-creations-and-events.vercel.app/admin/auth/confirm` (or `/**`) to Redirect URLs.
+6. **On a phone:**
+   - install the admin app, turn on notifications, send a test;
+   - submit a test enquiry and create a reminder a few minutes ahead;
+   - try a password reset;
+   - re-check a Design save.

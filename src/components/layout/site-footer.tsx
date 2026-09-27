@@ -2,6 +2,7 @@ import Image from "next/image";
 import { Eyebrow } from "@/components/shared/eyebrow";
 import { SiteLink } from "@/components/shared/site-link";
 import { site } from "@/data/site";
+import { AddressText } from "@/components/shared/address-text";
 import type { SiteCopy } from "@/lib/cms/site-settings";
 import { Container } from "./container";
 
@@ -52,7 +53,7 @@ export function SiteFooter({ settings }: { settings: SiteCopy }) {
                 </a>
               </p>
               <p className="text-muted-foreground">
-                {address.locality} {address.region} {address.postcode}
+                <AddressText address={address} />
               </p>
             </address>
           </div>

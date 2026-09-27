@@ -4,9 +4,13 @@ import { redirect } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
+export type AdminRole = "admin" | "super_admin";
+
 export interface AdminSession {
   userId: string;
   email: string | null;
+  /** super_admin: also PWA install and notification management (Phase 20). */
+  role: AdminRole;
 }
 
 /**
@@ -24,14 +28,28 @@ export const getAdmin = cache(async (): Promise<AdminSession | null> => {
 
   const { data: membership } = await supabase
     .from("admin_users")
-    .select("user_id")
+    .select("user_id, role")
     .eq("user_id", userId)
     .maybeSingle();
   if (!membership) return null;
 
   const email = data.claims.email;
-  return { userId, email: typeof email === "string" ? email : null };
+  return {
+    userId,
+    email: typeof email === "string" ? email : null,
+    role: membership.role === "super_admin" ? "super_admin" : "admin",
+  };
 });
+
+/**
+ * Super-admin-only pages and actions. Normal admins are sent to the admin
+ * home (they're signed in, just not allowed here); RLS enforces the same.
+ */
+export async function requireSuperAdmin(): Promise<AdminSession> {
+  const admin = await requireAdmin();
+  if (admin.role !== "super_admin") redirect("/admin");
+  return admin;
+}
 
 /** Redirects to the sign-in page unless the request is from an admin. */
 export async function requireAdmin(): Promise<AdminSession> {

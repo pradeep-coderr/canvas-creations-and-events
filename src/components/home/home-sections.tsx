@@ -10,7 +10,6 @@ import { Intro } from "@/components/sections/intro";
 import type { ItemSlots } from "@/components/sections/item-slots";
 import { Process } from "@/components/sections/process";
 import { Services } from "@/components/sections/services";
-import { Testimonials } from "@/components/sections/testimonials";
 import { VideoStory } from "@/components/sections/video-story";
 import { WhyCanvas } from "@/components/sections/why-canvas";
 import type { Category } from "@/data/categories";
@@ -125,10 +124,7 @@ export function HomeSections({ content, slots }: { content: HomeContent; slots?:
       <S section="process" styles={ss}>
         <Process steps={content.processSteps} copy={copy.process} itemSlots={slots?.process} />
       </S>
-      {/* Trust right after "how we work"; renders nothing until real testimonials exist. */}
-      <S section="testimonials" styles={ss}>
-        <Testimonials testimonials={content.testimonials} copy={copy.testimonials} itemSlots={slots?.testimonials} />
-      </S>
+      {/* The testimonials ("Kind words") section is not shown (Phase 20); the CMS list is kept. */}
       <S section="whyCanvas" styles={ss}>
         <WhyCanvas principles={content.principles} copy={copy.whyCanvas} itemSlots={slots?.principles} />
       </S>

@@ -26,10 +26,11 @@ export function localBusinessJsonLd(settings: SiteSettings) {
     image: logo,
     address: {
       "@type": "PostalAddress",
-      streetAddress: address.street,
+      // Only the parts that are set: no invented street or postcode.
+      ...(address.street ? { streetAddress: address.street } : {}),
       addressLocality: address.locality,
       addressRegion: address.region,
-      postalCode: address.postcode,
+      ...(address.postcode ? { postalCode: address.postcode } : {}),
       addressCountry: site.contact.address.countryCode,
     },
     sameAs: settings.socials.map((social) => social.href),

@@ -214,7 +214,7 @@ export const collections = {
     title: "Testimonials",
     singular: "testimonial",
     plural: "testimonials",
-    description: "Real, client-approved words only. Up to three featured testimonials appear on the homepage.",
+    description: "Real, client-approved words only. Kept here for later: the testimonials (Kind words) section is not shown on the website.",
     featured: true,
     listSelect: "id, author_name, event_type, quote, is_published, is_featured, sort_order, created_at",
     schema: testimonialSchema,

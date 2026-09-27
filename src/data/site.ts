@@ -45,11 +45,12 @@ export const site = {
     },
     // Not provided yet — do not invent one.
     email: null as string | null,
+    // Business area (Phase 20). No street or postcode is published.
     address: {
-      street: "Duffield Avenue",
-      locality: "Munno Para",
-      region: "SA",
-      postcode: "5115",
+      street: null as string | null,
+      locality: "Adelaide",
+      region: "South Australia",
+      postcode: null as string | null,
       country: "Australia",
       countryCode: "AU",
     },
