@@ -2419,7 +2419,7 @@ Public "/"            → photos via next/image from signed URLs; gallery opens 
 ## Phase 17 — Global Theme Engine + Client Design Editor + Rose Pink Refresh
 
 **Date:** Saturday 26 September 2026 · **Timezone:** NPT (UTC+05:45)
-**Result:** Not committed (awaiting instruction). Not pushed to GitHub. **Both theme migrations were pushed to hosted with the owner's approval.** A hosted admin Design save was **not** tested.
+**Result:** Committed as `feat: add global theme and design editor`. **Both theme migrations were pushed to hosted with the owner's approval.** A hosted admin Design save was **not** tested.
 
 ### Objective
 
@@ -2600,7 +2600,7 @@ The photo picker (content forms and the visual editor) only allowed choosing or 
 ## Phase 18 — Everything Editable + Style Presets
 
 **Date:** Saturday 26 September 2026 · **Timezone:** NPT (UTC+05:45)
-**Result:** Committed (see git log). Not pushed to GitHub. **Both Phase 18 migrations were pushed to hosted** with the owner's approval.
+**Result:** Committed as `feat: make site details editable and add style presets`. **Both Phase 18 migrations were pushed to hosted** with the owner's approval.
 
 ### Why
 
@@ -2687,3 +2687,31 @@ Local production build (local Supabase; temporary test users, all removed afterw
 - **Still in code:** the form's error and status messages, the 500 error page's wording, the business name, and link destinations.
 - **Hero spacing:** no spacing option (its padding is part of the hero layout).
 - **FAQ answers** are free text: if they mention the phone number, update them in the FAQ list when the phone changes.
+
+## First deployment — GitHub + Vercel
+
+**Date:** 26–27 September 2026 · **Timezone:** NPT (UTC+05:45)
+
+- **Repository:** the owner created the private GitHub repo `pradeep-coderr/canvas-creations-and-events` and pushed `main`.
+  - Verified: the remote matches local.
+  - The only env file tracked is `.env.example` (no values; its one "secret" match is a comment). `.env.local` is not in the repo.
+- **Commit authorship cleanup (owner's request):**
+  - All 20 commits carried a `Co-Authored-By: Claude …` trailer. They were rewritten locally to remove it (messages only).
+  - Authors, dates and the code snapshot are unchanged: the tree hash is identical before and after.
+  - The owner force-pushed with `--force-with-lease` pinned to the previous head (`3688a22` → `ee5fd74`).
+  - Verified on GitHub: 0 mentions of Claude, and the only author is `pradeep-coderr`.
+  - The local backup branch and the `refs/original` copy were deleted afterwards, at the owner's request.
+  - **From now on, commits carry no AI attribution lines.**
+- **Vercel (Hobby):**
+  - Project imported from GitHub with the Next.js preset and root `./`.
+  - Required environment variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (publishable key only) and `NEXT_PUBLIC_SITE_URL` (the Vercel URL until a domain is added; redeploy after changing it).
+  - The three Resend variables are optional. The local `.env.local` has an API key but no sender or recipient, so email stays off until a Resend domain is verified; enquiries are still stored and shown in `/admin`.
+  - Vercel's Supabase and Resend integrations were **not** used (the existing hosted database is connected through the variables).
+- **Hosted database:** all migrations are applied, including `site_theme`, `site_theme_button_color`, `site_settings` and `page_styles`.
+- **Not yet verified:** the live deployment itself (URL not yet shared), and admin saves on hosted as the real admin.
+- **Before go-live:**
+  - Confirm the owner's login is in `admin_users`.
+  - Turn off Supabase sign-ups.
+  - Unpublish the extra test service if it isn't real.
+  - Upload real photos through the Media library.
+  - Set up Resend for email notifications.
