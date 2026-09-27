@@ -2992,3 +2992,162 @@ Final gate (hosted env): `bun install --frozen-lockfile`, typecheck, lint, build
    - submit a test enquiry and create a reminder a few minutes ahead;
    - try a password reset;
    - re-check a Design save.
+
+## Phase 21 — Fix Website Save UX, Enable Enquiry Email Delivery & Make Production Push Notifications Reliable
+
+**Date:** Sunday 27 September 2026, about 6 pm Adelaide time (08:37 UTC).
+**Code commit:** `cee177d`.
+**Migration:** `20260927080139_notification_checks.sql`, pushed to the hosted database.
+
+**Where it stands:**
+- Everything below was built and tested **locally**.
+- In production:
+  - the migration is pushed;
+  - the live push secret and reminder URL are set in `private.app_config`;
+  - the Vercel environment variables, the Resend key and all real-device tests are **still pending** (see the end of this entry).
+
+### 1. Website editor: one explicit-save model
+
+**Before:** text was already a draft until Save, but two things wrote to the database the moment they were chosen:
+- style presets (a text's style, a section's background/spacing);
+- the on-page **Change photo / Remove photo** buttons.
+
+**Now:** every editor change is a draft until a Save action writes it.
+
+- **Style presets are drafts** (`editor-context.tsx`).
+  - They're kept as a draft map over the saved styles, applied live on the page and marked "Unsaved".
+  - Choosing the saved style again clears the draft.
+  - Saved by:
+    - the text's inline **Save**: the text and its style in one go;
+    - **Save section**: the section's own style and its texts' styles, and only those;
+    - toolbar **Save** / **Save and leave**: everything.
+  - A style save sends the saved map plus only the chosen presets; the server returns what it stored, and that becomes the saved state. Other unsaved presets stay drafts.
+- **Photos on the page are drafts** (`editor-media.tsx`).
+  - The choice shows at once, laid over the server-rendered photo (the preview uses the photo's signed URL), with "Unsaved photo" and **Undo**.
+  - Removing shows a note that the placeholder appears once saved.
+- **Toolbar states** (`editor-shell.tsx`), exactly these four:
+  - **Unsaved changes** — "N unsaved changes, not on the website yet"
+  - **Saving…** — while a save runs
+  - **Saved** — only after the server confirmed
+  - **Not saved** — "still on the page", with the reason in the alert line
+  - Link and form notices ("Links are turned off while editing") are their own kind, so they never show as "Saved".
+- **Server confirms what it stored** (`content/actions.ts`):
+  - Singleton saves select back the columns they wrote and compare them (`stableJson`, key-order-safe).
+  - Style saves compare the stored jsonb.
+  - A mismatch returns "couldn't be confirmed as saved" instead of success.
+  - Cache invalidation is unchanged (`updateTag("cms-content")` plus the editor path).
+- **Unchanged:**
+  - drafts are discarded on reload, with the browser's leave warning;
+  - the Exit dialog;
+  - Preview mode, keyboard shortcuts and focus return;
+  - Save is disabled only when there's nothing unsaved;
+  - collection-item forms keep their own Save.
+- **Still immediate, as explicit buttons:** Publish/Unpublish, Move, Delete (confirm dialog) and media upload/delete.
+
+### 2. Enquiry email
+
+- The existing Resend path is kept.
+  - Order: store first, then email.
+  - The visitor always gets success once stored.
+  - Reply-To is the visitor.
+  - The sender and recipient come only from server env.
+  - HTML is escaped.
+  - The idempotency key is `enquiry-notification/<id>`, with one retry on transient errors using the same key.
+- `deliverEnquiryEmail()` is now the single delivery function, used by enquiries and by the Settings test. It returns Resend's error text (never the key).
+- **Settings → Email notifications** (super admins only) shows:
+  - Configured / Not configured (with the names of any missing variables);
+  - the sender;
+  - recipients, masked (`ow•••@example.com`);
+  - the last test (stored in the new `notification_checks` table).
+- **Send test enquiry email**:
+  - sends a real email through the same path;
+  - "[Test]" subject, sample details, a `test-<uuid>` reference;
+  - Reply-To is the signed-in admin;
+  - creates **no enquiry**;
+  - shows Sending… → Sent / Failed with Resend's reason.
+- **Finding:** Resend rejects the `RESEND_API_KEY` in `.env.local` with **"API key is invalid"**, and the account has **no verified domain**. So production email can't work until a new key is created. The owner chose Resend's test sender (`onboarding@resend.dev`) for now, which only delivers to the Resend account's own address.
+
+### 3–6. Push notifications
+
+- **Settings → Push notifications:**
+  - Turn on (the permission prompt only after the click);
+  - Notify me about **New enquiries** / **Calendar reminders**;
+  - **Send test notification**;
+  - Turn off;
+  - **Diagnostics for this device**: browser support, service worker registered, permission (Granted / Denied / Not asked yet), push subscription Active/Missing, subscription stored, push keys configured, last test (Delivered / Sent, not confirmed / Failed / Never tested, stored per device in `push_subscriptions.last_test_*`).
+- **The test is end to end:**
+  1. It checks every step on the device and names the failing step.
+  2. The server sends a real push carrying a `testId` and records "sent" only if the push service accepted it.
+  3. The service worker reports back once `showNotification()` ran.
+  4. Only then does the page say **"Delivered: the test notification was shown on this device."** and record it.
+  5. With no confirmation within 20 s it says so and points at the device's notification settings.
+  - An expired subscription (404/410) is revoked and explained.
+- **New-enquiry push:** unchanged architecture ("New enquiry", name · date, opens `/admin/enquiries/<id>`, sent after the response).
+  - Test pushes don't raise the in-app "New enquiry" toast.
+- **Sound:** notifications stay non-silent (`silent: false`, `renotify`, vibrate). The Settings text explains that sound, volume, Focus/Do Not Disturb and battery limits are the device's decision, and that a custom sound isn't possible.
+- **Logging:**
+  - What's logged: subscription saved; targets per kind with count; dispatch attempted; accepted by the push service; delivery failed with status; endpoint revoked; new enquiry alert with the enquiry id; test result; reminders.
+  - Only the push service host (e.g. `fcm.googleapis.com`), status codes and ids.
+  - Never endpoints, keys, secrets, emails, phones or messages (tested).
+
+### 7. Phone
+
+Unchanged. The Phase 20 rules are still enforced in the form, Zod, the server action and RLS. Tested again: `+61 (400) 123-456` is stored as typed.
+
+### Tests actually run (local: production build + local Supabase)
+
+For these runs, Resend was replaced by a local mock API (`RESEND_BASE_URL`, which records the exact request). Push used the **real** Chrome push service for the headless browser, plus a local HTTPS mock push service for the dispatch and 410 checks.
+
+| Suite | Result | Covers |
+| --- | --- | --- |
+| `e2e21.mjs` (new) | **69/69** | See the breakdown below. |
+| `miss21.mjs` (new; a second server with no email settings) | **5/5** | The enquiry is still stored and successful; no email attempted; logged as skipped with the id only; Settings says Not configured and lists the three missing variables. |
+| `stale21.mjs` (new) | **3/3** | The editor Save is sent with an unknown action id (the real server "action not found" path) → "Not saved" plus "This page is out of date… Reload the page"; the draft is kept; the DB is unchanged. |
+| `e2e20.mjs` (Phase 20 regression) | 66/67 | The one failure was the Phase 20 assertion on the old push log format (the line now includes the enquiry id). The assertion was updated and matches this run's log; the full suite wasn't re-run afterwards. |
+| `e2e19.mjs` | 28/28 | Phase 19 regression. |
+| `disabled19.mjs` | 17/17 | Phase 19 regression. |
+| Admin smoke | 33/33 | Every admin page loads for the right roles. |
+
+`e2e21.mjs` covers:
+- **Editor:**
+  - editing: Unsaved changes, no request, DB and public page unchanged;
+  - reload: warning, then the draft is discarded;
+  - editing back to the saved value: Save disabled;
+  - Save: Saving…, repeated clicks send 1 request, Saved only after confirmation, DB and public page updated;
+  - offline save: Not saved with the reason, draft kept, Save available, DB unchanged, retry succeeds;
+  - text and section styles stay drafts (no request, DB and public unchanged) until Save section or Save;
+  - no editor/Settings strings in the public bundle.
+- **Email:**
+  - status with the recipient masked; the API key never in the page;
+  - test email: Sending…, "[Test]" subject, to the business, Reply-To the admin, every row including the event date, no enquiry created, result recorded; failure shows Resend's reason and survives a reload;
+  - public enquiry: stored with the phone; exactly one email keyed by the enquiry id; Reply-To the visitor; full content; HTML escaped; the configured sender;
+  - a failing email still gives the visitor success; the retry reuses the same key.
+- **Push:**
+  - no permission request on load; diagnostics before and after;
+  - subscription stored, with no duplicate on reload;
+  - test: the push service accepted it and the page said Delivered via the service worker (the real push service reached headless Chrome);
+  - new-enquiry push is encrypted (aes128gcm), VAPID-signed, urgency high;
+  - a 410 endpoint is revoked;
+  - logs contain the expected lines and no personal or secret data.
+- **Roles:**
+  - a plain admin is refused test email and test push server-side and sees no controls;
+  - with no session, requests are refused.
+- No console errors.
+
+Final gate: `bun install --frozen-lockfile`, typecheck, lint, build, `git diff --check`, `supabase db lint`: all clean.
+
+### Production: done so far
+
+- Migration `20260927080139_notification_checks.sql` pushed (after a dry run).
+- Fresh production VAPID keys and a 64-character dispatch secret generated (not the local ones), kept outside the repo.
+- The live `private.app_config` now has `push_dispatch_secret` (the same value as Vercel's `PUSH_DISPATCH_SECRET`, once set) and `reminder_webhook_url` = `https://canvas-creations-and-events.vercel.app/api/push/reminders`.
+
+### Production: still needed (not done yet, so not claimed)
+
+1. A **new Resend API key** (the old one is invalid), added to Vercel as `RESEND_API_KEY`, plus `RESEND_FROM_EMAIL=Canvas Creations <onboarding@resend.dev>` and `ENQUIRY_NOTIFICATION_EMAIL=<the Resend login email>`.
+2. Vercel env: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `PUSH_DISPATCH_SECRET`, then a deploy.
+3. **Live tests:**
+   - editor draft / reload / Save / style;
+   - test email and a real enquiry email (content, Reply-To);
+   - on a real phone: install, turn on notifications, test notification with the app open and closed, a real enquiry push (tap opens it), a calendar reminder;
+   - on iOS, only from the Home Screen app.
