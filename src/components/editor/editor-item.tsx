@@ -160,7 +160,14 @@ export function EditorItem({
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button type="button" variant="outline" size="icon" className="cc-item-button" aria-label={`More actions for “${label}”`}>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="cc-item-button"
+              aria-label={`More actions for “${label}”`}
+              pending={actions.isActive(id, "up") || actions.isActive(id, "down") || actions.isActive(id, "publish")}
+            >
               <MoreHorizontal aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>

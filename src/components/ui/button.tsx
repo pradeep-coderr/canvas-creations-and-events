@@ -2,6 +2,7 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 import { Slot } from "radix-ui"
+import { Loader2 } from "lucide-react"
 
 // Canvas Creations button system. Variant/size keys match shadcn's so other
 // shadcn components that use them keep working.
@@ -60,26 +61,70 @@ const buttonVariants = cva(
   }
 )
 
+/*
+ * Pending state (one pattern for every async action): pass `pending` while a
+ * REAL request runs and `pendingLabel` for what's happening ("Saving…").
+ * The spinner and pending label are laid over the normal label in the same
+ * grid cell, so the button keeps its width; the normal label is hidden (and
+ * leaves the accessible name) while pending. The button stays focusable
+ * (aria-disabled, not disabled), is marked aria-busy, and ignores clicks and
+ * submits until the request finishes, so nothing is sent twice. The spinner
+ * only turns with motion allowed (reduced motion: a still icon + the label).
+ */
 function Button({
   className,
   variant = "default",
   size = "default",
   asChild = false,
+  pending = false,
+  pendingLabel,
+  children,
+  onClick,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
+    /** A real request is running: show the spinner + pendingLabel, block repeat clicks. */
+    pending?: boolean
+    /** What's happening, e.g. "Saving…". Without it, the spinner replaces the icon/label in place. */
+    pendingLabel?: string
   }) {
   const Comp = asChild ? Slot.Root : "button"
+  const busy = pending && !asChild
 
   return (
     <Comp
       data-slot="button"
       data-variant={variant}
       data-size={size}
+      data-pending={busy || undefined}
+      aria-busy={busy || undefined}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
-    />
+      aria-disabled={busy ? true : props["aria-disabled"]}
+      onClick={
+        busy
+          ? (event: React.MouseEvent<HTMLButtonElement>) => {
+              event.preventDefault()
+              event.stopPropagation()
+            }
+          : onClick
+      }
+    >
+      {busy ? (
+        <span className="grid place-items-center [&>*]:col-start-1 [&>*]:row-start-1">
+          <span aria-hidden="true" className="invisible inline-flex items-center gap-2">
+            {children}
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <Loader2 aria-hidden="true" className="motion-safe:animate-spin" />
+            {pendingLabel ?? <span className="sr-only">Working…</span>}
+          </span>
+        </span>
+      ) : (
+        children
+      )}
+    </Comp>
   )
 }
 

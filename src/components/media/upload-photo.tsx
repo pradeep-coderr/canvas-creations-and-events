@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { finalizeImageUpload } from "@/app/admin/(portal)/content/media/actions";
 import { Button } from "@/components/ui/button";
+import { describeActionFailure } from "@/lib/admin/action-error";
 import { Textarea } from "@/components/ui/textarea";
 import { ALT_MAX, CMS_MEDIA_BUCKET, IMAGE_MAX_BYTES, imageTypes, type ImageUse, type MediaImage } from "@/lib/media/types";
 import { createClient } from "@/lib/supabase/client";
@@ -63,7 +64,7 @@ export function UploadPhoto({
     if (fileError) return fileRef.current?.focus();
     if (altError) return altRef.current?.focus();
 
-    setStatus({ kind: "working", text: "Uploading…" });
+    setStatus({ kind: "working", text: "Uploading photo…" });
     const incomingPath = `incoming/${crypto.randomUUID()}`;
     const upload = await createClient()
       .storage.from(CMS_MEDIA_BUCKET)
@@ -73,12 +74,12 @@ export function UploadPhoto({
       return;
     }
 
-    setStatus({ kind: "working", text: "Checking and preparing the photo…" });
+    setStatus({ kind: "working", text: "Processing photo…" });
     let result: Awaited<ReturnType<typeof finalizeImageUpload>>;
     try {
       result = await finalizeImageUpload({ incomingPath, alt, use, originalFilename: file!.name });
-    } catch {
-      setStatus({ kind: "error", text: "This image could not be uploaded. Check your connection and try again." });
+    } catch (error) {
+      setStatus({ kind: "error", text: describeActionFailure(error).text });
       return;
     }
     if (!result.ok) {
@@ -157,8 +158,8 @@ export function UploadPhoto({
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Button type="submit" aria-disabled={working || undefined}>
-          {working ? status.text : "Upload photo"}
+        <Button type="submit" pending={working} pendingLabel={working ? status.text : undefined}>
+          Upload photo
         </Button>
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel}>

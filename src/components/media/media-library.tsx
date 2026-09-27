@@ -8,6 +8,7 @@ import { ArrowUpRight, Plus } from "lucide-react";
 import { addVideoLink, deleteMedia, updateImageAlt } from "@/app/admin/(portal)/content/media/actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { describeActionFailure } from "@/lib/admin/action-error";
 import {
   Dialog,
   DialogContent,
@@ -271,8 +272,8 @@ export function MediaLibrary({
           let result: Awaited<ReturnType<typeof deleteMedia>>;
           try {
             result = await deleteMedia(deleting.id);
-          } catch {
-            return "Couldn't reach the server, so nothing changed. Try again.";
+          } catch (error) {
+            return describeActionFailure(error).text;
           }
           if (!result.ok) return result.error;
           returnFocus.current = headingRef.current;
@@ -337,9 +338,9 @@ function EditDescription({
             e.stopPropagation();
             if (!image || saving) return;
             setSaving(true);
-            const result = await updateImageAlt(image.id, value).catch(() => ({
+            const result = await updateImageAlt(image.id, value).catch((error: unknown) => ({
               ok: false as const,
-              error: "Couldn't reach the server, so nothing was saved.",
+              error: describeActionFailure(error).text,
             }));
             setSaving(false);
             if (!result.ok) return setError(result.error);
@@ -371,8 +372,8 @@ function EditDescription({
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" aria-disabled={saving || undefined}>
-              {saving ? "Saving…" : "Save description"}
+            <Button type="submit" pending={saving} pendingLabel="Saving…">
+              Save description
             </Button>
           </div>
         </form>
@@ -407,9 +408,9 @@ function VideosTab({
           e.preventDefault();
           if (saving) return;
           setSaving(true);
-          const result = await addVideoLink({ url, title }).catch(() => ({
+          const result = await addVideoLink({ url, title }).catch((error: unknown) => ({
             ok: false as const,
-            error: "Couldn't reach the server, so nothing was saved.",
+            error: describeActionFailure(error).text,
             fieldErrors: undefined,
           }));
           setSaving(false);
@@ -466,8 +467,8 @@ function VideosTab({
             </p>
           )}
         </div>
-        <Button type="submit" className="justify-self-start" aria-disabled={saving || undefined}>
-          {saving ? "Adding…" : "Add video"}
+        <Button type="submit" className="justify-self-start" pending={saving} pendingLabel="Adding video…">
+          Add video
         </Button>
       </form>
 

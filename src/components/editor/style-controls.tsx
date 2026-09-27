@@ -1,6 +1,7 @@
 "use client";
 
 import { useId } from "react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   sectionSpacings,
@@ -55,6 +56,20 @@ function Choice<K extends string>({
   );
 }
 
+/** "Saving style…" while a style choice is really being saved. */
+function StyleSaving() {
+  const { stylesSaving } = useEditor();
+  return (
+    <span role="status" className="flex h-11 items-center gap-2 self-end text-sm text-muted-foreground">
+      {stylesSaving && (
+        <>
+          <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" /> Saving style…
+        </>
+      )}
+    </span>
+  );
+}
+
 /** Size, font, weight, colour, italic and alignment for one text on the page. */
 export function TextStyleControls({ styleKey, label }: { styleKey: StyleKey; label: string }) {
   const editor = useEditor();
@@ -80,6 +95,7 @@ export function TextStyleControls({ styleKey, label }: { styleKey: StyleKey; lab
       >
         Reset style
       </Button>
+      <StyleSaving />
     </span>
   );
 }
@@ -110,6 +126,7 @@ export function SectionStyleControls({ section, spacing = true }: { section: Sec
         >
           Reset section style
         </Button>
+        <StyleSaving />
       </div>
     </fieldset>
   );

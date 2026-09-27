@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { describeActionFailure } from "@/lib/admin/action-error";
 import { deleteItem, moveItem, setItemPublished, type CmsResult } from "@/app/admin/(portal)/content/actions";
 import { collections, type CollectionKey } from "@/lib/cms/collections";
 import { ConfirmDialog } from "./confirm-dialog";
@@ -37,33 +38,39 @@ export function useItemActions({
 }) {
   const { singular } = collections[collection];
   const [isPending, startTransition] = useTransition();
+  // Which control started the running request (shows its spinner).
+  const [active, setActive] = useState<{ id: string; kind: "up" | "down" | "publish" } | null>(null);
   const [confirm, setConfirm] = useState<Pending>(null);
   // Where focus goes when a dialog closes: the button that opened it.
   const returnFocus = useRef<HTMLElement | null>(null);
 
   const isLastPublishedFaq = (item: ActionItem) => collection === "faqs" && item.published && publishedFaqs === 1;
 
-  const OFFLINE = "Couldn't reach the server, so nothing changed. Try again.";
-
   // Controls stay enabled while an action runs (disabling them would drop
   // keyboard focus); a second action is simply ignored until it finishes.
-  const run = (action: () => Promise<CmsResult>, after?: (r: CmsResult) => void) => {
+  const run = (
+    action: () => Promise<CmsResult>,
+    after?: (r: CmsResult) => void,
+    started?: { id: string; kind: "up" | "down" | "publish" },
+  ) => {
     if (isPending) return false;
+    setActive(started ?? null);
     startTransition(async () => {
       let result: CmsResult;
       try {
         result = await action();
-      } catch {
-        result = { ok: false, error: OFFLINE };
+      } catch (error) {
+        result = { ok: false, error: describeActionFailure(error).text };
       }
       onResult(result);
       after?.(result);
+      setActive(null);
     });
     return true;
   };
 
   const move = (item: ActionItem, dir: "up" | "down", after?: (r: CmsResult) => void) =>
-    run(() => moveItem(collection, item.id, dir), after);
+    run(() => moveItem(collection, item.id, dir), after, { id: item.id, kind: dir });
 
   const togglePublish = (item: ActionItem, button: HTMLElement) => {
     if (isPending) return;
@@ -72,7 +79,7 @@ export function useItemActions({
       setConfirm({ type: "unpublish", item });
       return;
     }
-    run(() => setItemPublished(collection, item.id, !item.published));
+    run(() => setItemPublished(collection, item.id, !item.published), undefined, { id: item.id, kind: "publish" });
   };
 
   const requestDelete = (item: ActionItem, button: HTMLElement) => {
@@ -92,8 +99,8 @@ export function useItemActions({
         type === "delete"
           ? await deleteItem(collection, item.id, lastFaq)
           : await setItemPublished(collection, item.id, false, true);
-    } catch {
-      return OFFLINE;
+    } catch (error) {
+      return describeActionFailure(error).text;
     }
     if (!result.ok && result.needsConfirmation) {
       // Someone else unpublished the other FAQs meanwhile: ask again, explicitly.
@@ -138,5 +145,8 @@ export function useItemActions({
     />
   );
 
-  return { isPending, move, togglePublish, requestDelete, dialog };
+  /** Is this item's control the one whose request is running? */
+  const isActive = (id: string, kind: "up" | "down" | "publish") => isPending && active?.id === id && active.kind === kind;
+
+  return { isPending, isActive, move, togglePublish, requestDelete, dialog };
 }

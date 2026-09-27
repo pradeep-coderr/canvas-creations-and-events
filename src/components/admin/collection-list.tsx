@@ -40,7 +40,7 @@ export function CollectionList({
   const focusAfter = useRef<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
-  const { isPending, move, togglePublish, requestDelete, dialog } = useItemActions({
+  const { isPending, isActive, move, togglePublish, requestDelete, dialog } = useItemActions({
     collection,
     publishedFaqs: items.filter((i) => i.published).length,
     onResult: (result: CmsResult) =>
@@ -126,6 +126,7 @@ export function CollectionList({
                   size="icon"
                   aria-label={`Move “${item.label}” up`}
                   disabled={i === 0}
+                  pending={isActive(item.id, "up")}
                   onClick={() => moveWithFocus(item, "up")}
                 >
                   <ArrowUp aria-hidden="true" />
@@ -136,11 +137,17 @@ export function CollectionList({
                   size="icon"
                   aria-label={`Move “${item.label}” down`}
                   disabled={i === items.length - 1}
+                  pending={isActive(item.id, "down")}
                   onClick={() => moveWithFocus(item, "down")}
                 >
                   <ArrowDown aria-hidden="true" />
                 </Button>
-                <Button variant="outline" onClick={(e) => togglePublish(item, e.currentTarget)}>
+                <Button
+                  variant="outline"
+                  pending={isActive(item.id, "publish")}
+                  pendingLabel={item.published ? "Unpublishing…" : "Publishing…"}
+                  onClick={(e) => togglePublish(item, e.currentTarget)}
+                >
                   {item.published ? "Unpublish" : "Publish"}
                   <span className="sr-only"> “{item.label}”</span>
                 </Button>

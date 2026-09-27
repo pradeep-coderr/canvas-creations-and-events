@@ -94,10 +94,12 @@ function Toolbar() {
         </Button>
         <Button
           type="button"
-          aria-disabled={!unsaved || editor.saving || undefined}
+          aria-disabled={!unsaved || undefined}
+          pending={editor.saving}
+          pendingLabel="Saving…"
           onClick={() => unsaved && !editor.saving && void editor.saveAll()}
         >
-          {editor.saving ? "Saving…" : "Save"}
+          Save
         </Button>
         <Button ref={exitRef} type="button" variant="ghost" className="max-sm:px-3" onClick={exit} aria-disabled={leaving || undefined}>
           Exit

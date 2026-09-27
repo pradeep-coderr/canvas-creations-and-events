@@ -6,6 +6,7 @@ import { useForm, type DefaultValues, type FieldValues, type Path, type UseFormR
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { describeActionFailure } from "@/lib/admin/action-error";
 import type { CmsResult } from "@/app/admin/(portal)/content/actions";
 import { ConfirmDialog } from "./confirm-dialog";
 
@@ -73,8 +74,8 @@ export function CmsForm<TIn extends FieldValues, TOut>({
     let result: CmsResult;
     try {
       result = await save(values, confirmLastFaq);
-    } catch {
-      const text = "Couldn't reach the server, so nothing was saved. Check your connection and try again.";
+    } catch (error) {
+      const { text } = describeActionFailure(error);
       setStatus({ kind: "error", text });
       return text;
     }
@@ -129,10 +130,11 @@ export function CmsForm<TIn extends FieldValues, TOut>({
         <Button
           ref={submitRef}
           type="submit"
-          aria-disabled={form.formState.isSubmitting || undefined}
+          pending={form.formState.isSubmitting}
+          pendingLabel="Saving…"
           className="w-full sm:w-auto"
         >
-          {form.formState.isSubmitting ? "Saving…" : submitLabel}
+          {submitLabel}
         </Button>
         {onCancel && (
           <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={onCancel}>

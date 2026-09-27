@@ -69,7 +69,16 @@ export function EditPhotoButton({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [library, setLibrary] = useState<MediaImage[]>(editor.data.imageOptions);
+  const [savingPhoto, setSavingPhoto] = useState<"change" | "remove" | null>(null);
   const button = useRef<HTMLButtonElement>(null);
+  const savePhoto = async (kind: "change" | "remove", id: string) => {
+    setSavingPhoto(kind);
+    try {
+      await editor.saveScope(scope, [field], { [field]: id });
+    } finally {
+      setSavingPhoto(null);
+    }
+  };
   if (editor.mode === "preview") return null;
 
   const value = String(editor.value(scope, field) ?? "");
@@ -87,7 +96,15 @@ export function EditPhotoButton({
 
   return (
     <div className="absolute bottom-4 left-4 z-10 flex flex-wrap gap-2" data-editor-control="">
-      <Button ref={button} type="button" variant="secondary" className="shadow-soft" onClick={() => void openPicker()}>
+      <Button
+        ref={button}
+        type="button"
+        variant="secondary"
+        className="shadow-soft"
+        pending={savingPhoto === "change"}
+        pendingLabel="Saving photo…"
+        onClick={() => void openPicker()}
+      >
         <ImageIcon data-icon="inline-start" aria-hidden="true" />
         {value ? "Change photo" : "Add photo"}
         <span className="sr-only">: {label}</span>
@@ -97,7 +114,9 @@ export function EditPhotoButton({
           type="button"
           variant="secondary"
           className="shadow-soft"
-          onClick={() => void editor.saveScope(scope, [field], { [field]: "" })}
+          pending={savingPhoto === "remove"}
+          pendingLabel="Removing…"
+          onClick={() => void savePhoto("remove", "")}
         >
           Remove photo<span className="sr-only">: {label}</span>
         </Button>
@@ -111,7 +130,7 @@ export function EditPhotoButton({
         use={use}
         title={`Choose a photo: ${label}`}
         onUploaded={(image) => setLibrary((l) => [image, ...l.filter((i) => i.id !== image.id)])}
-        onSelect={(image) => void editor.saveScope(scope, [field], { [field]: image.id })}
+        onSelect={(image) => void savePhoto("change", image.id)}
         onDeleted={(deletedId) => setLibrary((l) => l.filter((i) => i.id !== deletedId))}
         returnFocus={button}
       />

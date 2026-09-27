@@ -25,6 +25,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
+  pendingLabel,
   destructive = false,
   onConfirm,
   returnFocus,
@@ -34,6 +35,8 @@ export function ConfirmDialog({
   title: string;
   description: React.ReactNode;
   confirmLabel: string;
+  /** Shown with a spinner while the action runs, e.g. "Deleting…". */
+  pendingLabel?: string;
   destructive?: boolean;
   /** Returns an error message to show, or nothing on success. */
   onConfirm: () => Promise<string | void>;
@@ -52,7 +55,12 @@ export function ConfirmDialog({
   const confirm = async () => {
     setPending(true);
     setError(null);
-    const message = await onConfirm();
+    let message: string | void;
+    try {
+      message = await onConfirm();
+    } catch {
+      message = "Couldn't reach the server, so nothing changed. Try again.";
+    }
     setPending(false);
     if (message) setError(message);
     else onOpenChange(false);
@@ -82,8 +90,13 @@ export function ConfirmDialog({
         )}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
-          <Button variant={destructive ? "destructive" : "default"} onClick={confirm} disabled={pending}>
-            {pending ? "Working…" : confirmLabel}
+          <Button
+            variant={destructive ? "destructive" : "default"}
+            onClick={() => void confirm()}
+            pending={pending}
+            pendingLabel={pendingLabel ?? (destructive ? "Deleting…" : "Working…")}
+          >
+            {confirmLabel}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -194,8 +194,8 @@ export function EditableText({ scope, field }: { scope: EditorScope; field: stri
         </span>
       )}
       <span className="cc-edit-actions">
-        <Button type="button" size="sm" className="h-11" onClick={() => void save()} aria-disabled={editor.saving || undefined}>
-          {editor.saving ? "Saving…" : "Save"}
+        <Button type="button" size="sm" className="h-11" onClick={() => void save()} pending={editor.saving} pendingLabel="Saving…">
+          Save
         </Button>
         <Button type="button" size="sm" variant="outline" className="h-11" onClick={cancel}>
           Cancel

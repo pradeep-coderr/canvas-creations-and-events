@@ -14,6 +14,7 @@ import type { CategoryOption, CollectionKey } from "@/lib/cms/collections";
 import type { MediaImage, MediaVideo } from "@/lib/media/types";
 import type { SiteValues } from "@/lib/cms/site-settings";
 import type { AboutValues, HomeValues, VideoValues } from "@/lib/cms/singletons";
+import { describeActionFailure } from "@/lib/admin/action-error";
 import { fieldDef, type EditorScope } from "@/lib/editor/fields";
 import type { PageStyles, SectionStyle, SectionStyleKey, StyleKey, TextStyle } from "@/lib/styles/schema";
 
@@ -93,6 +94,8 @@ interface EditorContextValue {
   registerForm: (id: string, submit: (() => void) | null) => void;
   /** Style presets: applied on the page at once and saved immediately. */
   styles: PageStyles;
+  /** A style choice is being saved right now. */
+  stylesSaving: boolean;
   setTextStyle: (key: StyleKey, style: TextStyle | undefined) => Promise<boolean>;
   setSectionStyle: (key: SectionStyleKey, style: SectionStyle | undefined) => Promise<boolean>;
   findItem: (collection: CollectionKey, id: string) => EditorItemMeta | undefined;
@@ -123,6 +126,8 @@ export function EditorProvider({ data, children }: { data: EditorData; children:
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<Status>(null);
   const [styles, setStyles] = useState<PageStyles>(data.styles);
+  // Style saves in flight (they run one after another).
+  const [stylesSaving, setStylesSaving] = useState(0);
   const stylesRef = useRef(data.styles);
   // Values saved in this session, until the server's refreshed data arrives
   // (a new `data.saved` object replaces them).
@@ -202,8 +207,8 @@ export function EditorProvider({ data, children }: { data: EditorData; children:
       let result: CmsResult;
       try {
         result = await actions[scope](values as never);
-      } catch {
-        result = { ok: false, error: "Couldn't reach the server, so nothing was saved. Check your connection and try again." };
+      } catch (error) {
+        result = { ok: false, error: describeActionFailure(error).text };
       }
       setSaving(false);
 
@@ -271,6 +276,7 @@ export function EditorProvider({ data, children }: { data: EditorData; children:
       const previous = stylesRef.current;
       stylesRef.current = next;
       setStyles(next);
+      setStylesSaving((n) => n + 1);
       const run = styleChain.current.then(async () => {
         try {
           const result = await savePageStyles(next);
@@ -279,8 +285,8 @@ export function EditorProvider({ data, children }: { data: EditorData; children:
             return true;
           }
           announce("error", result.error);
-        } catch {
-          announce("error", "The style couldn't be saved. Check your connection and try again.");
+        } catch (error) {
+          announce("error", describeActionFailure(error).text);
         }
         if (stylesRef.current === next) {
           stylesRef.current = previous;
@@ -289,6 +295,7 @@ export function EditorProvider({ data, children }: { data: EditorData; children:
         return false;
       });
       styleChain.current = run;
+      void run.finally(() => setStylesSaving((n) => n - 1));
       return run;
     },
     [announce],
@@ -333,6 +340,7 @@ export function EditorProvider({ data, children }: { data: EditorData; children:
     registerForm,
     findItem: (collection, id) => data.items[collection].find((i) => i.id === id),
     styles,
+    stylesSaving: stylesSaving > 0,
     setTextStyle,
     setSectionStyle,
   };

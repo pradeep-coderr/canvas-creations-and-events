@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, X } from "lucide-react";
+import { AlertTriangle, Check, RotateCw, X } from "lucide-react";
 import { saveSiteTheme } from "@/app/admin/(portal)/design/actions";
 import {
   AlertDialog,
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { describeActionFailure } from "@/lib/admin/action-error";
 import { checkTheme, readableOn } from "@/lib/theme/palette";
 import { colorLabels, defaultTheme, optionLabels, type ColorKey, type SiteTheme } from "@/lib/theme/schema";
 import { ColorField, OptionGroup } from "./design-controls";
@@ -29,7 +30,7 @@ import { ThemePreview } from "./theme-preview";
  * Reloading the page discards the draft.
  */
 
-type Status = { kind: "success" | "error"; text: string } | null;
+type Status = { kind: "success" | "error"; text: string; stale?: boolean } | null;
 
 const colorGroups: { title: string; keys: ColorKey[] }[] = [
   { title: "Buttons", keys: ["button", "buttonForeground"] },
@@ -106,8 +107,10 @@ export function DesignEditor({ saved: initialSaved }: { saved: SiteTheme }) {
       } else {
         setStatus({ kind: "error", text: result.error });
       }
-    } catch {
-      setStatus({ kind: "error", text: "The design couldn't be saved. Check your connection and try again." });
+    } catch (error) {
+      // No result came back: nothing was saved (e.g. the page is out of date after an update).
+      const failure = describeActionFailure(error);
+      setStatus({ kind: "error", text: failure.text, stale: failure.stale });
     } finally {
       setSaving(false);
     }
@@ -124,6 +127,25 @@ export function DesignEditor({ saved: initialSaved }: { saved: SiteTheme }) {
           website changes for every visitor.
         </p>
       </header>
+
+      {/* A refused save must be impossible to miss: the preview shows the draft, but the website can't use it yet. */}
+      {dirty && failing.length > 0 && (
+        <div className="mt-6 flex max-w-3xl items-start gap-3 border-l-2 border-destructive bg-background p-4 text-sm">
+          <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-destructive" />
+          <p>
+            <span className="font-semibold">Not saved yet.</span> {failing.length} colour combination
+            {failing.length === 1 ? " is" : "s are"} too hard to read, so these changes can&apos;t be saved and the website
+            keeps its current design. The preview shows your draft.{" "}
+            <button
+              type="button"
+              className="font-semibold underline underline-offset-4"
+              onClick={() => checksRef.current?.focus()}
+            >
+              Show what to fix
+            </button>
+          </p>
+        </div>
+      )}
 
       {/* Phones: settings → preview → readability. Desktop: settings and readability on the left, the preview sticky on the right. */}
       <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start xl:gap-x-14">
@@ -330,6 +352,12 @@ export function DesignEditor({ saved: initialSaved }: { saved: SiteTheme }) {
         </p>
         <p role="alert" className="text-sm font-semibold text-destructive empty:hidden sm:order-last sm:basis-full">
           {status?.kind === "error" ? status.text : ""}
+          {status?.kind === "error" && status.stale && (
+            <Button type="button" variant="outline" size="sm" className="ml-3 h-11" onClick={() => window.location.reload()}>
+              <RotateCw data-icon="inline-start" aria-hidden="true" />
+              Reload page
+            </Button>
+          )}
         </p>
         <div className="flex flex-wrap gap-2">
           {dirty && (
@@ -343,8 +371,8 @@ export function DesignEditor({ saved: initialSaved }: { saved: SiteTheme }) {
           <Button type="button" variant="outline" onClick={() => setResetOpen(true)}>
             Reset to defaults
           </Button>
-          <Button type="button" aria-disabled={!dirty || saving || undefined} onClick={save}>
-            {saving ? "Saving…" : "Save changes"}
+          <Button type="button" aria-disabled={!dirty || undefined} pending={saving} pendingLabel="Saving design…" onClick={save}>
+            Save changes
           </Button>
         </div>
       </div>

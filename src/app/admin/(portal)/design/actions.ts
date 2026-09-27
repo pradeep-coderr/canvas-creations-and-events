@@ -46,8 +46,15 @@ export async function saveSiteTheme(input: unknown): Promise<ThemeResult> {
     .single();
   const saved = rowToTheme(data as unknown as Record<string, unknown> | null);
   if (error || !saved) {
-    console.error("[theme] save failed", { code: error?.code });
+    // No row back = nothing was updated (e.g. RLS refused it): never report success.
+    console.error("[theme] save failed", { code: error?.code, message: error?.message?.slice(0, 200), row: !!data });
     return { ok: false, error: describeDbError(error, "save the design") };
+  }
+  // Success only when the stored row is exactly what was submitted.
+  const mismatch = (Object.keys(parsed.data) as (keyof SiteTheme)[]).filter((k) => saved[k] !== parsed.data[k]);
+  if (mismatch.length) {
+    console.error("[theme] saved row differs from the submitted theme", { fields: mismatch });
+    return { ok: false, error: "The design couldn't be saved correctly. Please try again." };
   }
 
   // The theme is part of every public page: expire the public cache now.

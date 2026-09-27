@@ -262,9 +262,10 @@ export function EnquiryForm({
           type="submit"
           size="lg"
           className="w-full sm:w-auto"
-          disabled={status === "submitting"}
+          pending={status === "submitting"}
+          pendingLabel="Sending…"
         >
-          {status === "submitting" ? "Sending…" : text.submit}
+          {text.submit}
         </Button>
         <p className="text-sm text-muted-foreground">
           Or call{" "}

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { AdminNav } from "@/components/admin/admin-nav";
+import { SubmitButton } from "@/components/admin/submit-button";
 import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/lib/admin/session";
@@ -33,9 +34,9 @@ export default async function AdminPortalLayout({ children }: LayoutProps<"/admi
               <span className="hidden text-sm text-muted-foreground sm:inline">{admin.email}</span>
             )}
             <form action={signOut}>
-              <Button type="submit" variant="outline">
+              <SubmitButton variant="outline" pendingLabel="Signing out…">
                 Sign out
-              </Button>
+              </SubmitButton>
             </form>
           </div>
         </Container>

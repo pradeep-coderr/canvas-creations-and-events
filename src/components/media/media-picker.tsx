@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { ImageUse, MediaImage } from "@/lib/media/types";
 import { cn } from "@/lib/utils";
 import { UploadPhoto } from "./upload-photo";
@@ -123,7 +124,20 @@ export function MediaPicker({
             <p role="status" className="text-sm text-muted-foreground empty:hidden">
               {loading ? "Loading photos…" : message}
             </p>
-            {!loading && images.length === 0 ? (
+            {loading && images.length === 0 ? (
+              // The library is being fetched: placeholders shaped like photo cards.
+              <ul aria-hidden="true" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {[0, 1, 2, 3].map((i) => (
+                  <li key={i} className="overflow-hidden rounded-md border border-border">
+                    <Skeleton className="aspect-square rounded-none" />
+                    <div className="grid gap-1.5 p-2">
+                      <Skeleton className="h-4 w-4/5" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : !loading && images.length === 0 ? (
               <div className="rounded-md border border-dashed border-border p-8 text-center">
                 <p className="font-display text-display-sm">No photos yet</p>
                 <p className="mt-2 text-sm text-muted-foreground">

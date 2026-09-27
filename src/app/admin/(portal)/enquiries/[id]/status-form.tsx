@@ -32,8 +32,8 @@ export function StatusForm({ id, status }: { id: string; status: EnquiryStatus }
           ))}
         </SelectContent>
       </Select>
-      <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "Saving…" : "Update status"}
+      <Button type="submit" className="w-full" pending={pending} pendingLabel="Saving…">
+        Update status
       </Button>
       <p role="status" aria-live="polite" className="min-h-5 text-sm">
         {state.ok && state.status && (

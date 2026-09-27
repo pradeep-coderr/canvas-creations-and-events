@@ -327,8 +327,8 @@ function SectionPanel({
           )}
         </div>
         <SheetFooter className="flex-col gap-2 sm:flex-row">
-          <Button type="button" onClick={() => void save()} aria-disabled={editor.saving || undefined}>
-            {editor.saving ? "Saving…" : unsaved ? `Save section (${unsaved} change${unsaved === 1 ? "" : "s"})` : "Save section"}
+          <Button type="button" onClick={() => void save()} pending={editor.saving} pendingLabel="Saving section…">
+            {unsaved ? `Save section (${unsaved} change${unsaved === 1 ? "" : "s"})` : "Save section"}
           </Button>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Close

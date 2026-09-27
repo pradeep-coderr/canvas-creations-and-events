@@ -2726,3 +2726,59 @@ Local production build (local Supabase; temporary test users, all removed afterw
   - Unpublish the extra test service if it isn't real.
   - Upload real photos through the Media library.
   - Set up Resend for email notifications.
+
+## Phase 19 — Fix Global Design Persistence + Add Complete Loading States
+
+**Date:** 27 September 2026 · **Timezone:** NPT (UTC+05:45)
+**Result:** Committed. No database changes (no migration). Tested **locally** (production build + local Supabase), as the owner asked; the live site was **not** changed or tested with an admin save.
+
+### A. Design persistence: what was actually happening
+
+- **Diagnosis on hosted (read-only; the owner didn't want live testing):**
+  - The `site_theme` row was last updated at **26 Sep 10:57 UTC**, when the button-colour migration ran. **No Design save had ever reached the hosted database**, and the live HTML matched the database exactly. So the problem was never caching.
+  - Other admin saves from the same account **did** persist (`page_styles` 14:26, `home_content` 14:00), so auth and sessions work.
+  - Running the exact update as the admin inside a rolled-back transaction: 1 row updated, `is_admin() = true`, row untouched afterwards. Hosted RLS and the singleton are correct.
+- **Reproduced locally** (the save path works end to end: button colour saved → DB → fresh public HTML). Two ways a save silently doesn't reach the DB:
+  1. **A refused save was easy to miss.** Choosing a light pink (e.g. `#F7889A`) as the rose text colour updates the live preview, but Save is refused ("4 colour combinations are too hard to read"). The message only appeared in the bottom bar, so the preview made it look saved.
+  2. **Stale admin page after a deploy.** After each Vercel deploy (Hobby has no skew protection), or a dev-server code reload, an open admin tab calls server-action ids that no longer exist. The save failed with a misleading "check your connection" and nothing was written.
+- **Fixes:**
+  - A **"Not saved yet"** banner at the top of the Design page whenever the draft can't be saved, explaining the website keeps its current design and linking to what to fix.
+  - `describeActionFailure()` (`src/lib/admin/action-error.ts`) recognises Next's "Server Action … not found / Failed to find Server Action" and says: "This page is out of date because the website was just updated, so nothing was saved. Reload the page, then save again." The Design page adds a **Reload page** button. It's used by every admin save path (Design, CMS forms, item actions, visual editor, styles, media).
+  - **`saveSiteTheme` hardening:** success only if the updated row comes back **and** equals the submitted theme field by field; otherwise an error, and server logs with code/message and mismatched fields.
+- **Cache path unchanged and verified:** `updateTag("cms-content")` → the next public request renders the new theme, `/` stays ISR, and the service worker's `no-cache` page fetches don't hold an old theme.
+
+### B. Loading states: one system
+
+- **`Button` `pending` / `pendingLabel`** (`src/components/ui/button.tsx`):
+  - A spinner plus e.g. "Saving design…", laid over the normal label in the same grid cell, so the width doesn't jump.
+  - Marked `aria-busy` and `aria-disabled` (not `disabled`), so **focus stays**; clicks and submits are ignored while pending, so there's no double submit.
+  - The spinner only turns with motion allowed (reduced motion: a still icon plus the text).
+  - Tied only to real requests: `useActionState`/`useFormStatus` pending, React Hook Form `isSubmitting`, `useTransition`, and request promises. No timers.
+- **Applied to:**
+  - Sign in, Sign out (`SubmitButton` + `useFormStatus`), enquiry status update.
+  - CMS forms ("Saving…"), Publish/Unpublish, Move up/down (a spinner on the pressed arrow; other actions ignored until done), and confirm dialogs (the dialog stays open with "Deleting…" / "Working…").
+  - Visual editor: inline Save, Save section, toolbar Save, photo change/remove ("Saving photo…", "Removing…"), the item menu trigger while its action runs, and "Saving style…" for style presets.
+  - Media: upload ("Uploading photo…" → "Processing photo…", the real stages), delete, description save, add video.
+  - Design: "Saving design…".
+  - Enquiry form: "Sending…", focus kept.
+- **Skeletons (shadcn `Skeleton`, token-tinted, pulse only with motion allowed)**, used only where content really loads:
+  - the media picker while the library is fetched (photo-card shapes);
+  - `src/app/admin/(portal)/loading.tsx` for admin page navigation (heading and list shapes).
+  - Not used for the Design preview: it's local draft state and renders instantly.
+- **Public bundle:** the public page gets only the small `Button` pending code and the enquiry "Sending…". The public HTML and 18 scripts contain none of the Design, admin loading or pending strings (checked).
+
+### Tests actually run (local)
+
+| Suite | Result | Covers |
+| --- | --- | --- |
+| `e2e19.mjs` (new, headless Chrome, 1.2 s network latency so pending states are real and observable) | **28/28** | **Persistence:** preview updates without a save → Save shows "Saving design…" (busy, focus kept, stable width) → repeated clicks send **1** request → success only after the server confirms → DB updated → fresh public request and rendered button use it → admin reload shows it → an unsaved draft is discarded on reload. **Refused save:** banner + message, DB unchanged. **Offline save:** "nothing was saved", DB unchanged. Reset restores. **Pending states:** Sign in; Unpublish (1 request); Move down; CMS form Save; upload stages; delete dialog stays open with "Deleting…"; enquiry "Sending…" (1 submission, success); reduced motion stops the spinner. No console errors |
+| Stale-page detection | 3/3 | Both Next "action not found" messages → the reload message; a network error → not stale |
+| Bundle isolation | 10/10 | No admin, Design or pending strings in the public HTML or scripts |
+| Admin smoke | **23/23** | All 11 admin pages load for an admin with no error page, redirect a non-admin to login; public `/` ISR with theme and site details |
+
+**Not re-run this phase:** the earlier regression suites (Phases 10–18). Their test scripts lived in a temporary folder that's no longer available to this session. The changes are UI-level (button states, messages, skeletons); they don't touch data, auth or RLS. Typecheck, lint, build and the suites above pass.
+
+### Known limitations
+
+- **Hosted:** no admin save was tested on the live site (the owner chose local testing). After deploying, an admin tab opened **before** the deploy will show the "page is out of date" message on its next save; reloading fixes it.
+- **Deploy skew:** Vercel Skew Protection (paid plans) would remove the stale-page case entirely.
