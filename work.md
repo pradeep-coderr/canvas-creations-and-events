@@ -2806,7 +2806,7 @@ The owner saw a save refused (white text on `#FF7A91`: 2.48:1). Charcoal text on
 
 ## Phase 20 — Admin Security, Super Admin PWA, Enquiry Alerts, Required Phone, Address Update & Admin Calendar
 
-Everything below was built and tested **locally**: a production build (`next start`) against the local Supabase stack, with Mailpit for email and pg_cron/pg_net running. **Nothing in this phase has been deployed or tested on the live site yet.** The migration hasn't been pushed to the hosted database, and the push keys aren't in Vercel. See "Production steps still needed".
+Everything below was built and tested **locally**: a production build (`next start`) against the local Supabase stack, with Mailpit for email and pg_cron/pg_net running. The code (`77a97df`) is deployed and the migration is on the hosted database. What was checked on the live site is under "Production: what was done". The push keys aren't in Vercel yet, and no feature was tested on a real device. See "Production steps still needed".
 
 ### Migration `20260927055717_admin_operations.sql`
 
@@ -2953,11 +2953,29 @@ The Testimonials section is no longer rendered on the home page, and no nav or l
 
 Final gate (hosted env): `bun install --frozen-lockfile`, typecheck, lint, build, `git diff --check`, `supabase db lint`: all clean.
 
-**Not tested:** real phones (Android/iOS notification sound, installed iOS app), the live site, and the production Design save.
+**Not tested:** real phones (Android/iOS notification sound, installed iOS app), password reset and push on the live site, and the production Design save.
+
+### Production: what was done
+
+- **Code:** the owner pushed `77a97df`, and Vercel deployed it. Checked on the live site: Kind words is gone and `/admin/forgot-password` loads.
+- **Migration pushed** (`supabase db push`, after a dry run that listed only `20260927055717_admin_operations.sql`). `supabase migration list` shows local and remote in sync. Checked on the hosted database:
+  - the existing admin is now `super_admin`;
+  - the address is Adelaide / South Australia with no street or postcode (also confirmed through the public REST API);
+  - the FAQ answer says Adelaide;
+  - the cron job `canvas-reminder-dispatch` is scheduled;
+  - RLS is on for `admin_reminders` and `push_subscriptions`;
+  - `private.app_config` is empty, so the job does nothing until step 3 below.
+- **Stale address on the live site after the migration, and how it was fixed:**
+  - The home page kept showing "Duffield Avenue, Munno Para, SA 5115" in Contact, the footer and the FAQ.
+  - **Why:** the page was prerendered at deploy time, before the migration. Vercel's data cache survives deploys and is cleared only when an admin save expires the `cms-content` tag; a migration doesn't do that.
+  - **First try:** purging Vercel's caches (Settings → Caches, "All content") didn't help. The page was rebuilt before the data cache was cleared.
+  - **Fix:** a second purge of **CDN, ISR, and Image Cache**. The live page now shows "Adelaide, South Australia" everywhere (checked: 0 × "Munno Para", 8 × "Adelaide").
+  - **Lesson for future data migrations:** purge **Runtime and Data Cache** first, then **CDN, ISR, and Image Cache**, or make a small admin save.
+  - A code change adding `revalidate` to the public Supabase fetches was considered and dropped: the same client also runs the push-dispatch RPC calls (POST), and an explicit `revalidate` would make those cacheable.
 
 ### Production steps still needed (in order)
 
-1. **Push the migration** to the hosted database: `supabase db push` (dry-run first). This also switches existing admins to `super_admin`, sets the address, and updates the FAQ answer. The home page picks it up within its 1-hour revalidation, or on the next deploy or CMS save.
+1. ~~Push the migration~~: done (above).
 2. **Generate production keys:** `bunx web-push generate-vapid-keys`, plus a random secret of 32+ characters (don't reuse the local ones).
 3. **Vercel env (Production):**
    - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:` the owner's address), `PUSH_DISPATCH_SECRET`;
