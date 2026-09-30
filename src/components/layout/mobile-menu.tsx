@@ -12,10 +12,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { scrollHomeToTop } from "@/components/shared/scroll-home";
 import type { SiteCopy } from "@/lib/cms/site-settings";
 
 // Scroll to an in-page anchor, or navigate normally if it isn't on this page.
 function goTo(href: string) {
+  // Home, while on the homepage: back to the top (no reload).
+  if (href === "/" && scrollHomeToTop()) return;
   const url = new URL(href, window.location.href);
   const target =
     url.pathname === window.location.pathname && url.hash

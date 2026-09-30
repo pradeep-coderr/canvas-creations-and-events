@@ -3357,3 +3357,20 @@ The owner approved it. After a dry run (listing only this migration), it was pus
 - The filter hides at fewer than three categories, by design.
 - Uploaded video ("stream") still isn't configured, so films are YouTube/Vimeo only.
 - The portfolio shows up to 24 photos on the homepage.
+
+### Follow-up: Home link and logo scroll back to the top (owner's report)
+
+**Problem:** on the homepage, clicking the logo or "Home" did nothing. The header, logo and footer used Next's `<Link href="/">`, which ignores a link to the page you're already on (for example at `/#gallery`, or after scrolling). The mobile menu's Home did a full page reload instead.
+
+**Fix:**
+- `SiteLink` now renders `HomeLink` (`src/components/shared/home-link.tsx`) for `/`. On the homepage it scrolls to the top: smoothly, or instantly with reduced motion, following the page's existing `scroll-behavior`.
+- It also drops any `#section` from the address. From any other page it navigates normally.
+- The mobile menu uses the same helper (`scroll-home.ts`) after the menu closes.
+
+**Tested locally** (`home22.mjs`, 6/6):
+- logo, header Home and footer Home, from a scrolled `/#gallery`: top, address `/`, no reload;
+- mobile menu Home from `/#faq`: menu closes, top, no reload;
+- logo from another page: goes to the homepage;
+- keyboard Enter on the logo.
+
+Typecheck, lint and build are clean. Not yet checked on the live site; it needs the next deploy.
