@@ -3140,12 +3140,26 @@ Final gate: `bun install --frozen-lockfile`, typecheck, lint, build, `git diff -
 
 - Migration `20260927080139_notification_checks.sql` pushed (after a dry run).
 - Fresh production VAPID keys and a 64-character dispatch secret generated (not the local ones), kept outside the repo.
-- The live `private.app_config` now has `push_dispatch_secret` (the same value as Vercel's `PUSH_DISPATCH_SECRET`, once set) and `reminder_webhook_url` = `https://canvas-creations-and-events.vercel.app/api/push/reminders`.
+- The live `private.app_config` now has `push_dispatch_secret` (the same value as Vercel's `PUSH_DISPATCH_SECRET`) and `reminder_webhook_url` = `https://canvas-creations-and-events.vercel.app/api/push/reminders`.
+- **Vercel CLI:** the owner logged in and the project was linked (`vercel link`).
+  - The link appended a `VERCEL_OIDC_TOKEN` line to `.env.local`; existing values are untouched and the file is still ignored.
+  - It also appended `.vercel` / `.env*` to `.gitignore`. Those were reverted: the existing rules already cover them, and the extra `.env*` would have cancelled the `!.env.example` exception.
+- **Vercel Production env, set through the CLI (values piped in, never printed):**
+  - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`;
+  - `VAPID_PRIVATE_KEY` (sensitive);
+  - `PUSH_DISPATCH_SECRET` (sensitive);
+  - `RESEND_FROM_EMAIL` = `Canvas Creations <onboarding@resend.dev>` (Resend's test sender, the owner's choice until a domain is verified).
+- **Findings in Vercel:**
+  - **`RESEND_API_KEY` was never set in Production**, so production could never send enquiry emails (on top of the local key being invalid).
+  - `ENQUIRY_NOTIFICATION_EMAIL` exists (Production and Preview), but its value is hidden and hasn't been checked.
+- These variables only take effect after the next deploy. **Nothing has been redeployed yet.**
 
 ### Production: still needed (not done yet, so not claimed)
 
-1. A **new Resend API key** (the old one is invalid), added to Vercel as `RESEND_API_KEY`, plus `RESEND_FROM_EMAIL=Canvas Creations <onboarding@resend.dev>` and `ENQUIRY_NOTIFICATION_EMAIL=<the Resend login email>`.
-2. Vercel env: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `PUSH_DISPATCH_SECRET`, then a deploy.
+1. **From the owner:**
+   - the Resend login email → it becomes `ENQUIRY_NOTIFICATION_EMAIL` and `VAPID_SUBJECT` (`mailto:`);
+   - a **new Resend API key**, added by the owner in Vercel as `RESEND_API_KEY` (Production, sensitive), so it never passes through the chat.
+2. Then `git push` (deploys `cee177d` / `6ea24e9` and later commits with the new variables).
 3. **Live tests:**
    - editor draft / reload / Save / style;
    - test email and a real enquiry email (content, Reply-To);
