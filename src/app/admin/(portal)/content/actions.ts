@@ -15,9 +15,6 @@ import {
   videoSchema,
   videoToRow,
 } from "@/lib/cms/singletons";
-import { upsertVideoLink } from "@/lib/media/server";
-import { uploadedVideoConfigured } from "@/lib/media/video-providers";
-import { parseVideoLink } from "@/lib/media/video-url";
 import { sameJson } from "@/lib/stable-json";
 import { createClient } from "@/lib/supabase/server";
 import { CMS_CONTENT_TAG } from "@/lib/supabase/public";
@@ -302,22 +299,5 @@ export async function saveVideoStory(input: unknown): Promise<CmsResult> {
   await requireAdmin();
   const parsed = videoSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
-  const v = parsed.data;
-
-  // Resolve the video to its media library entry (created for a new link).
-  let videoMediaId: string | null = null;
-  if (v.provider === "youtube" || v.provider === "vimeo") {
-    const link = parseVideoLink(v.videoUrl, v.provider);
-    if (!link.ok) return { ok: false, error: link.error, fieldErrors: { videoUrl: link.error } };
-    const media = await upsertVideoLink(await createClient(), link.link, v.videoTitle ?? "Video");
-    if ("error" in media) return { ok: false, error: media.error };
-    videoMediaId = media.id;
-  } else if (v.provider === "stream") {
-    if (!uploadedVideoConfigured()) {
-      const error = "Uploaded video is not configured yet. Add a YouTube or Vimeo link instead.";
-      return { ok: false, error, fieldErrors: { provider: error } };
-    }
-    videoMediaId = v.videoMediaId;
-  }
-  return saveSingleton("video_story", videoToRow(v, videoMediaId), "video section");
+  return saveSingleton("video_story", videoToRow(parsed.data), "films section");
 }

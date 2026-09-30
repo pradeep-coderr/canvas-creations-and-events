@@ -3,17 +3,19 @@ import type { EditorData, EditorItemMeta } from "@/components/editor/editor-cont
 import type { HomeSectionKey } from "@/components/home/home-sections";
 import type { Category } from "@/data/categories";
 import type { FaqItem } from "@/data/faq";
+import type { Film } from "@/data/films";
 import type { GalleryItem } from "@/data/gallery";
-import type { EditorialImage, Principle, ProcessStep, VideoContent } from "@/data/home";
+import type { EditorialImage, Principle, ProcessStep } from "@/data/home";
+import type { PricingPackage } from "@/data/pricing";
 import type { Service } from "@/data/services";
 import type { Testimonial } from "@/data/testimonials";
-import { collectionKeys, collections, type CollectionKey } from "@/lib/cms/collections";
+import { collectionKeys, collections, type CollectionKey, type PriceType } from "@/lib/cms/collections";
 import { SITE_SETTINGS_SELECT, siteToValues } from "@/lib/cms/site-settings";
 import { rowToStyles } from "@/lib/styles/schema";
 import { VIDEO_STORY_SELECT, aboutToValues, homeToValues, videoToValues } from "@/lib/cms/singletons";
+import { PORTFOLIO_LIMIT } from "@/lib/content/public";
 import { ADMIN_URL_TTL, signImagePaths } from "@/lib/media/server";
 import { videoAdapters, uploadedVideoConfigured } from "@/lib/media/video-providers";
-import type { VideoProvider } from "@/lib/media/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCategoryOptions, getImageLibrary, getVideoLibrary } from "./cms";
 
@@ -31,8 +33,10 @@ const MEDIA = "storage_path, alt, width, height";
 
 export interface EditorCollections {
   services: Service[];
+  pricing: PricingPackage[];
   categories: Category[];
   gallery: GalleryItem[];
+  films: Film[];
   testimonials: Testimonial[];
   faqs: FaqItem[];
   process: ProcessStep[];
@@ -44,7 +48,8 @@ export interface EditorPageData {
   collections: EditorCollections;
   heroImage: EditorialImage | null;
   aboutImage: EditorialImage | null;
-  video: VideoContent | null;
+  /** Categories that have photos in the portfolio (drafts included). */
+  galleryCategories: { id: string; label: string }[];
   /** Whether a founder name is saved (the credit line appears once saved). */
   hasFounder: boolean;
   hasFounderRole: boolean;
@@ -59,19 +64,24 @@ const image = (m: Media, urls: Urls): EditorialImage | null => {
 
 const selects: Record<CollectionKey, string> = {
   services: `*, image:media_assets!services_image_fkey(${MEDIA})`,
+  pricing: "*",
   categories: "*",
-  gallery: `*, media:media_assets!gallery_items_media_fkey(${MEDIA}), category:categories(slug, label)`,
+  gallery: `*, media:media_assets!gallery_items_media_fkey(${MEDIA}), category:categories(slug, label, sort_order)`,
+  films: "*, video:media_assets!films_video_fkey(provider, external_id, poster_media_id)",
   testimonials: "*",
   faqs: "*",
   process: "*",
   principles: "*",
 };
 
-// The homepage shows only featured items, and at most this many.
-const homepageLimit: Partial<Record<CollectionKey, number>> = { gallery: 5, testimonials: 3 };
+// On the homepage these lists show only their featured items; the others
+// show every published item ("featured" there means first / larger).
+const featuredOnlyKeys = new Set<CollectionKey>(["services", "testimonials"]);
+// ...and at most this many.
+const homepageLimit: Partial<Record<CollectionKey, number>> = { gallery: PORTFOLIO_LIMIT, testimonials: 3 };
 
 function visibility(key: CollectionKey, rows: Row[]) {
-  const featuredOnly = collections[key].featured;
+  const featuredOnly = featuredOnlyKeys.has(key);
   let shown = 0;
   return rows.map((row) => {
     const published = row.is_published === true;
@@ -95,6 +105,34 @@ function toDomain(key: CollectionKey, row: Row, urls: Urls) {
         title: str(row.title),
         summary: str(row.summary),
         image: img ? { src: String(img.src), alt: img.alt, width: img.width, height: img.height } : undefined, order: Number(row.sort_order), featured: row.is_featured === true } satisfies Service;
+    }
+    case "pricing":
+      return {
+        id,
+        title: str(row.title),
+        description: str(row.description) || undefined,
+        priceType: str(row.price_type) as PriceType,
+        price: row.price === null || row.price === undefined ? null : Number(row.price),
+        pricePrefix: str(row.price_prefix) || undefined,
+        priceSuffix: str(row.price_suffix) || undefined,
+        features: Array.isArray(row.features) ? (row.features as string[]) : [],
+        ctaLabel: str(row.cta_label) || undefined,
+        featured: row.is_featured === true,
+        order: Number(row.sort_order),
+      } satisfies PricingPackage;
+    case "films": {
+      const video = row.video as { provider: "youtube" | "vimeo"; external_id: string; poster: Media } | null;
+      const poster = image(video?.poster ?? null, urls);
+      return {
+        id,
+        provider: video?.provider ?? "youtube",
+        title: str(row.title),
+        caption: str(row.caption) || undefined,
+        playerUrl: video ? (videoAdapters[video.provider].playerUrl(video.external_id) ?? "") : "",
+        poster: poster ? { src: String(poster.src), alt: poster.alt } : null,
+        featured: row.is_featured === true,
+        order: Number(row.sort_order),
+      } satisfies Film;
     }
     case "categories":
       return { id, label: str(row.label), order: Number(row.sort_order) } satisfies Category;
@@ -141,11 +179,7 @@ export async function loadEditorPage(): Promise<EditorPageData | null> {
   const [homeRes, aboutRes, videoRes, siteRes, stylesRes, imageOptions, videoOptions, categoryOptions, ...lists] = await Promise.all([
     supabase.from("home_content").select(`*, hero_image:media_assets!home_content_hero_image_fkey(${MEDIA})`).eq("id", true).single(),
     supabase.from("about_content").select(`*, image:media_assets!about_content_image_fkey(${MEDIA})`).eq("id", true).single(),
-    supabase
-      .from("video_story")
-      .select(`${VIDEO_STORY_SELECT}, media:media_assets!video_story_video_provider_fkey(provider, external_id), poster:media_assets!video_story_poster_fkey(${MEDIA})`)
-      .eq("id", true)
-      .single(),
+    supabase.from("video_story").select(VIDEO_STORY_SELECT).eq("id", true).single(),
     supabase.from("site_settings").select(SITE_SETTINGS_SELECT).eq("id", true).single(),
     supabase.from("page_styles").select("text_styles, section_styles").eq("id", true).single(),
     getImageLibrary(),
@@ -162,6 +196,26 @@ export async function loadEditorPage(): Promise<EditorPageData | null> {
     return null;
   }
 
+  // Film covers (PostgREST can't embed media_assets in itself): one query,
+  // then attached to each film's video as `poster`.
+  const filmRows = (lists[collectionKeys.indexOf("films")].data ?? []) as unknown as Row[];
+  const posterIds = [
+    ...new Set(
+      filmRows.flatMap((row) => {
+        const id = (row.video as { poster_media_id?: string | null } | null)?.poster_media_id;
+        return id ? [id] : [];
+      }),
+    ),
+  ];
+  if (posterIds.length) {
+    const { data: posterRows } = await supabase.from("media_assets").select(`id, ${MEDIA}`).in("id", posterIds);
+    const byId = new Map((posterRows ?? []).map((p) => [p.id as string, p as unknown as Media]));
+    for (const row of filmRows) {
+      const video = row.video as { poster_media_id?: string | null; poster?: Media } | null;
+      if (video?.poster_media_id) video.poster = byId.get(video.poster_media_id) ?? null;
+    }
+  }
+
   const home = homeRes.data as Row;
   const about = aboutRes.data as Row;
   const video = videoRes.data as Row;
@@ -173,9 +227,11 @@ export async function loadEditorPage(): Promise<EditorPageData | null> {
     [
       (home.hero_image as Media)?.storage_path,
       (about.image as Media)?.storage_path,
-      (video.poster as Media)?.storage_path,
       ...collectionKeys.flatMap((key, i) =>
-        rowsOf(i).map((row) => ((row.image ?? row.media) as Media)?.storage_path),
+        rowsOf(i).map(
+          (row) =>
+            ((row.image ?? row.media ?? (row.video as { poster?: Media } | null)?.poster) as Media)?.storage_path,
+        ),
       ),
     ],
     ADMIN_URL_TTL,
@@ -185,6 +241,8 @@ export async function loadEditorPage(): Promise<EditorPageData | null> {
   const domain = {} as Record<CollectionKey, unknown[]>;
   const hidden: HomeSectionKey[] = [];
   const sectionOf: Partial<Record<CollectionKey, HomeSectionKey>> = {
+    pricing: "pricing",
+    films: "video",
     categories: "categories",
     testimonials: "testimonials",
     process: "process",
@@ -210,9 +268,19 @@ export async function loadEditorPage(): Promise<EditorPageData | null> {
     if (section && !vis.some((v) => v.visible)) hidden.push(section);
   });
 
-  const media = video.media as { provider: VideoProvider; external_id: string } | null;
-  const playerUrl = media ? videoAdapters[media.provider].playerUrl(media.external_id) : null;
-  const poster = image(video.poster as Media, urls);
+  // Portfolio (feature-first, like the public page) and its categories.
+  const galleryRows = rowsOf(collectionKeys.indexOf("gallery"));
+  const categoryMap = new Map<string, { label: string; order: number }>();
+  for (const row of galleryRows) {
+    const c = row.category as { slug: string; label: string; sort_order: number } | null;
+    if (c) categoryMap.set(c.slug, { label: c.label, order: c.sort_order });
+  }
+  const featuredFirst = <T extends { featured: boolean }>(list: T[]) =>
+    [...list].sort((a, b) => Number(b.featured) - Number(a.featured));
+  domain.gallery = featuredFirst(domain.gallery as GalleryItem[]);
+  domain.films = featuredFirst(domain.films as Film[]);
+  items.gallery = featuredFirst(items.gallery);
+  items.films = featuredFirst(items.films);
 
   return {
     data: {
@@ -233,16 +301,9 @@ export async function loadEditorPage(): Promise<EditorPageData | null> {
     collections: domain as unknown as EditorCollections,
     heroImage: image(home.hero_image as Media, urls),
     aboutImage: image(about.image as Media, urls),
-    video:
-      media && playerUrl && video.video_title
-        ? {
-            provider: media.provider,
-            title: str(video.video_title),
-            caption: str(video.caption) || undefined,
-            playerUrl,
-            poster: poster ? { src: String(poster.src), alt: poster.alt } : null,
-          }
-        : null,
+    galleryCategories: [...categoryMap.entries()]
+      .sort((a, b) => a[1].order - b[1].order)
+      .map(([id, c]) => ({ id, label: c.label })),
     hasFounder: Boolean(about.founder_name),
     hasFounderRole: Boolean(about.founder_role),
   };

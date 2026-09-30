@@ -2,7 +2,9 @@ import "server-only";
 import { cache } from "react";
 import { sortedCategories, type Category } from "@/data/categories";
 import { sortedFaqs, type FaqItem } from "@/data/faq";
+import { films as localFilms, type Film } from "@/data/films";
 import { galleryPreview, type GalleryItem } from "@/data/gallery";
+import { pricingPackages, type PricingPackage } from "@/data/pricing";
 import {
   about,
   categoriesSection,
@@ -12,6 +14,7 @@ import {
   gallerySection,
   hero,
   intro,
+  pricingSection,
   processSection,
   servicesSection,
   testimonialsSection,
@@ -25,18 +28,19 @@ import {
   type GalleryCopy,
   type HeroCopy,
   type IntroCopy,
+  type PricingCopy,
   type Principle,
   type ProcessCopy,
   type ProcessStep,
   type ServicesCopy,
   type TestimonialsCopy,
-  type VideoContent,
   type VideoStoryCopy,
   type WhyCanvasCopy,
 } from "@/data/home";
 import { featuredServices, type Service } from "@/data/services";
 import { featuredTestimonials, type Testimonial } from "@/data/testimonials";
 import {
+  withSectionLinks,
   defaultSiteSettings,
   settingsFromValues,
   SITE_SETTINGS_SELECT,
@@ -48,7 +52,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createPublicClient } from "@/lib/supabase/public";
 import { PUBLIC_URL_TTL, signImagePaths } from "@/lib/media/server";
 import { videoAdapters } from "@/lib/media/video-providers";
-import type { VideoProvider } from "@/lib/media/types";
+import type { PriceType } from "@/lib/cms/collections";
 
 /*
  * Public website content from the CMS (Supabase), mapped to the application
@@ -154,52 +158,183 @@ export function getCategories(): Promise<Category[]> {
   );
 }
 
-/** Up to five featured images for the homepage preview. */
-export function getGalleryPreview(): Promise<GalleryItem[]> {
-  return fromCms(
+/** The most photos the homepage portfolio shows. */
+export const PORTFOLIO_LIMIT = 24;
+
+/** A category that has photos in the portfolio (for the optional filter). */
+export interface PortfolioCategory {
+  id: string;
+  label: string;
+}
+
+export interface Portfolio {
+  items: GalleryItem[];
+  /** Published categories that have at least one photo shown, in their order. */
+  categories: PortfolioCategory[];
+}
+
+/**
+ * The homepage portfolio: published photos, featured ones first (the first
+ * is the large lead image), then by the chosen order.
+ */
+export function getPortfolio(): Promise<Portfolio> {
+  return fromCms<Portfolio>(
     "gallery",
     async (db) => {
       const { data, error } = await db
         .from("gallery_items")
         .select(
-          `id, title, sort_order, media:media_assets!gallery_items_media_fkey(${MEDIA}), category:categories(slug)`,
+          `id, title, sort_order, is_featured, media:media_assets!gallery_items_media_fkey(${MEDIA}), category:categories(slug, label, sort_order)`,
         )
         .eq("is_published", true)
-        .eq("is_featured", true)
+        .order("is_featured", { ascending: false })
         .order("sort_order")
         .order("created_at")
-        .limit(5)
+        .limit(PORTFOLIO_LIMIT)
         .overrideTypes<
           {
             id: string;
             title: string | null;
             sort_order: number;
+            is_featured: boolean;
             media: MediaRow | null;
             // null when the category is unpublished (RLS) or unset.
-            category: { slug: string } | null;
+            category: { slug: string; label: string; sort_order: number } | null;
           }[],
           { merge: false }
         >();
       if (error) throw error;
       const urls = await signed(db, data.map((row) => row.media));
       // An item whose photo can't be shown is left out rather than rendered broken.
-      return data.flatMap((row) => {
+      const shown = data.flatMap((row) => {
         const image = toImage(row.media, urls);
-        return image
-          ? [
-              {
-                id: row.id,
-                ...image,
-                title: row.title ?? undefined,
-                categoryId: row.category?.slug,
-                featured: true,
-                order: row.sort_order,
-              },
-            ]
-          : [];
+        return image ? [{ row, image }] : [];
+      });
+      const categories = new Map<string, { label: string; order: number }>();
+      for (const { row } of shown) {
+        if (row.category) categories.set(row.category.slug, { label: row.category.label, order: row.category.sort_order });
+      }
+      return {
+        items: shown.map(({ row, image }) => ({
+          id: row.id,
+          ...image,
+          title: row.title ?? undefined,
+          categoryId: row.category?.slug,
+          featured: row.is_featured,
+          order: row.sort_order,
+        })),
+        categories: [...categories.entries()]
+          .sort((a, b) => a[1].order - b[1].order)
+          .map(([id, c]) => ({ id, label: c.label })),
+      };
+    },
+    { items: galleryPreview, categories: [] },
+  );
+}
+
+export function getPricingPackages(): Promise<PricingPackage[]> {
+  return fromCms(
+    "pricing",
+    async (db) => {
+      const { data, error } = await db
+        .from("pricing_packages")
+        .select("id, title, description, price_type, price, price_prefix, price_suffix, features, cta_label, is_featured, sort_order")
+        .eq("is_published", true)
+        .order("sort_order")
+        .order("created_at")
+        .overrideTypes<
+          {
+            id: string;
+            title: string;
+            description: string | null;
+            price_type: PriceType;
+            price: number | string | null;
+            price_prefix: string | null;
+            price_suffix: string | null;
+            features: string[] | null;
+            cta_label: string | null;
+            is_featured: boolean;
+            sort_order: number;
+          }[],
+          { merge: false }
+        >();
+      if (error) throw error;
+      return data.map((row) => ({
+        id: row.id,
+        title: row.title,
+        description: row.description ?? undefined,
+        priceType: row.price_type,
+        price: row.price === null ? null : Number(row.price),
+        pricePrefix: row.price_prefix ?? undefined,
+        priceSuffix: row.price_suffix ?? undefined,
+        features: row.features ?? [],
+        ctaLabel: row.cta_label ?? undefined,
+        featured: row.is_featured,
+        order: row.sort_order,
+      }));
+    },
+    pricingPackages,
+  );
+}
+
+export function getFilms(): Promise<Film[]> {
+  return fromCms(
+    "films",
+    async (db) => {
+      const { data, error } = await db
+        .from("films")
+        .select(
+          "id, title, caption, is_featured, sort_order, video:media_assets!films_video_fkey(provider, external_id, poster_media_id)",
+        )
+        .eq("is_published", true)
+        .order("is_featured", { ascending: false })
+        .order("sort_order")
+        .order("created_at")
+        .overrideTypes<
+          {
+            id: string;
+            title: string;
+            caption: string | null;
+            is_featured: boolean;
+            sort_order: number;
+            video: { provider: "youtube" | "vimeo"; external_id: string; poster_media_id: string | null } | null;
+          }[],
+          { merge: false }
+        >();
+      if (error) throw error;
+      // Covers in a second query (PostgREST can't embed media_assets in itself).
+      const posterIds = [...new Set(data.flatMap((row) => (row.video?.poster_media_id ? [row.video.poster_media_id] : [])))];
+      const posters = new Map<string, MediaRow>();
+      if (posterIds.length) {
+        const res = await db
+          .from("media_assets")
+          .select(`id, ${MEDIA}`)
+          .in("id", posterIds)
+          .overrideTypes<(MediaRow & { id: string })[], { merge: false }>();
+        if (res.error) throw res.error;
+        for (const p of res.data) posters.set(p.id, p);
+      }
+      const posterOf = (id: string | null | undefined) => (id ? posters.get(id) : undefined);
+      const urls = await signed(db, data.map((row) => posterOf(row.video?.poster_media_id)));
+      return data.flatMap((row) => {
+        const playerUrl = row.video ? videoAdapters[row.video.provider].playerUrl(row.video.external_id) : null;
+        if (!row.video || !playerUrl) return [];
+        const poster = toImage(posterOf(row.video.poster_media_id), urls);
+        return [
+          {
+            id: row.id,
+            provider: row.video.provider,
+            title: row.title,
+            caption: row.caption ?? undefined,
+            playerUrl,
+            poster: poster ? { src: poster.src, alt: poster.alt } : null,
+            featured: row.is_featured,
+            order: row.sort_order,
+          },
+        ];
       });
     },
-    galleryPreview,
+    localFilms,
   );
 }
 
@@ -310,6 +445,7 @@ export interface HomeCopy {
   intro: IntroCopy;
   services: ServicesCopy;
   categories: CategoriesCopy;
+  pricing: PricingCopy;
   gallery: GalleryCopy;
   process: ProcessCopy;
   whyCanvas: WhyCanvasCopy;
@@ -324,6 +460,7 @@ const localHomeCopy: HomeCopy = {
   intro,
   services: servicesSection,
   categories: categoriesSection,
+  pricing: pricingSection,
   gallery: gallerySection,
   process: processSection,
   whyCanvas,
@@ -353,6 +490,11 @@ interface HomeRow {
   gallery_empty_title: string;
   gallery_empty_text: string;
   gallery_instagram_cta: string;
+  gallery_intro: string | null;
+  gallery_filter_all: string;
+  pricing_eyebrow: string;
+  pricing_title: string;
+  pricing_description: string | null;
   process_eyebrow: string;
   process_title: string;
   why_eyebrow: string;
@@ -397,12 +539,15 @@ export function getHomeCopy(): Promise<HomeCopy> {
           enquiry: { title: r.services_enquiry_title, text: r.services_enquiry_text },
         },
         categories: { eyebrow: r.categories_eyebrow, title: r.categories_title },
+        pricing: { eyebrow: r.pricing_eyebrow, title: r.pricing_title, description: r.pricing_description },
         gallery: {
           eyebrow: r.gallery_eyebrow,
           title: r.gallery_title,
           emptyTitle: r.gallery_empty_title,
           emptyText: r.gallery_empty_text,
           instagramCta: r.gallery_instagram_cta,
+          intro: r.gallery_intro,
+          filterAll: r.gallery_filter_all,
         },
         process: { eyebrow: r.process_eyebrow, title: r.process_title },
         whyCanvas: { eyebrow: r.why_eyebrow, titleLines: r.why_title_lines },
@@ -455,86 +600,54 @@ export function getAboutCopy(): Promise<AboutCopy> {
   );
 }
 
-export interface VideoSection {
-  copy: VideoStoryCopy;
-  video: VideoContent | null;
-}
-
-export function getVideoSection(): Promise<VideoSection> {
-  return fromCms<VideoSection>(
+/** The Films section's wording (the videos are the films list). */
+export function getVideoCopy(): Promise<VideoStoryCopy> {
+  return fromCms<VideoStoryCopy>(
     "video section",
     async (db) => {
-      const { data, error } = await db
-        .from("video_story")
-        .select(
-          `eyebrow, title, empty_text, tiktok_cta, provider, video_title, caption, media:media_assets!video_story_video_provider_fkey(provider, external_id), poster:media_assets!video_story_poster_fkey(${MEDIA})`,
-        )
-        .eq("id", true)
-        .single();
+      const { data, error } = await db.from("video_story").select("eyebrow, title, empty_text, tiktok_cta").eq("id", true).single();
       if (error) throw error;
-      const r = data as unknown as {
-        eyebrow: string;
-        title: string;
-        empty_text: string;
-        tiktok_cta: string;
-        video_title: string | null;
-        caption: string | null;
-        media: { provider: VideoProvider; external_id: string } | null;
-        poster: MediaRow | null;
-      };
-      // The provider adapter decides how the video plays; an unconfigured
-      // provider (e.g. uploaded video) gives no player and the section keeps
-      // its honest empty state.
-      const playerUrl = r.media ? videoAdapters[r.media.provider].playerUrl(r.media.external_id) : null;
-      const poster = toImage(r.poster, await signed(db, [r.poster]));
-      const video: VideoContent | null =
-        r.media && playerUrl && r.video_title
-          ? {
-              provider: r.media.provider,
-              title: r.video_title,
-              caption: r.caption ?? undefined,
-              playerUrl,
-              poster: poster ? { src: poster.src, alt: poster.alt } : null,
-            }
-          : null;
-      return {
-        copy: { eyebrow: r.eyebrow, title: r.title, emptyText: r.empty_text, tiktokCta: r.tiktok_cta },
-        video,
-      };
+      const r = data as { eyebrow: string; title: string; empty_text: string; tiktok_cta: string };
+      return { eyebrow: r.eyebrow, title: r.title, emptyText: r.empty_text, tiktokCta: r.tiktok_cta };
     },
-    { copy: videoStory, video: videoStory.video },
+    { eyebrow: videoStory.eyebrow, title: videoStory.title, emptyText: videoStory.emptyText, tiktokCta: videoStory.tiktokCta },
   );
 }
 
 /** Everything the homepage shows from the CMS, fetched in parallel. */
 export const getHomepageContent = cache(async () => {
-  const [services, categories, gallery, testimonials, faqs, processSteps, principles, copy, aboutCopy, video, settings, styles] =
+  const [services, categories, portfolio, pricing, films, testimonials, faqs, processSteps, principles, copy, aboutCopy, videoCopy, settings, styles] =
     await Promise.all([
       getFeaturedServices(),
       getCategories(),
-      getGalleryPreview(),
+      getPortfolio(),
+      getPricingPackages(),
+      getFilms(),
       getFeaturedTestimonials(),
       getFaqs(),
       getProcessSteps(),
       getPrinciples(),
       getHomeCopy(),
       getAboutCopy(),
-      getVideoSection(),
+      getVideoCopy(),
       getSiteSettings(),
       getPageStyles(),
     ]);
   return {
     services,
     categories,
-    gallery,
+    gallery: portfolio.items,
+    galleryCategories: portfolio.categories,
+    pricing,
+    films,
     testimonials,
     faqs,
     processSteps,
     principles,
     copy,
     about: aboutCopy,
-    video,
-    settings,
+    video: { copy: videoCopy },
+    settings: withSectionLinks(settings, { pricing: pricing.length > 0, films: films.length > 0 }),
     sectionStyles: styles.sections,
   };
 });
@@ -555,6 +668,25 @@ export const getSiteSettings = cache(() =>
     defaultSiteSettings,
   ),
 );
+
+/**
+ * Whether the optional sections have published content (menu links to
+ * Pricing and Films appear only then). Counts only: no rows are read.
+ */
+export const getSectionAvailability = cache(async () => {
+  const count = (table: "pricing_packages" | "films") =>
+    fromCms(
+      table,
+      async (db) => {
+        const { count, error } = await db.from(table).select("id", { count: "exact", head: true }).eq("is_published", true);
+        if (error) throw error;
+        return (count ?? 0) > 0;
+      },
+      false,
+    );
+  const [pricing, films] = await Promise.all([count("pricing_packages"), count("films")]);
+  return { pricing, films };
+});
 
 /** Style presets (text and section styles) set in the visual editor. */
 export const getPageStyles = cache(() =>

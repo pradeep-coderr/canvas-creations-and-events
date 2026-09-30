@@ -25,6 +25,8 @@ export const siteColumns = {
   navAbout: "nav_about",
   navFaq: "nav_faq",
   navContact: "nav_contact",
+  navPricing: "nav_pricing",
+  navFilms: "nav_films",
   enquireLabel: "enquire_label",
   mobileEnquireLabel: "mobile_enquire_label",
   mobileCallLabel: "mobile_call_label",
@@ -85,6 +87,8 @@ export const siteSchema = z.object({
   navAbout: line(),
   navFaq: line(),
   navContact: line(),
+  navPricing: line(),
+  navFilms: line(),
   enquireLabel: line(),
   mobileEnquireLabel: line(),
   mobileCallLabel: line(),
@@ -154,6 +158,8 @@ export interface SiteSettings {
   headline: { lead: string; emphasis: string | null };
   footerTagline: string;
   navigation: NavItem[];
+  /** Menu links added only when their section has published content (withSectionLinks). */
+  sectionLinks: { pricing: NavItem; films: NavItem };
   enquiry: NavItem;
   mobileEnquireLabel: string;
   mobileCallLabel: string;
@@ -198,6 +204,10 @@ export function settingsFromValues(v: SiteValues): SiteSettings {
     headline: { lead: v.headlineLead, emphasis: v.headlineEmphasis || null },
     footerTagline: v.footerTagline,
     navigation: (Object.keys(navHrefs) as (keyof typeof navHrefs)[]).map((k) => ({ label: v[k], href: navHrefs[k] })),
+    sectionLinks: {
+      pricing: { label: v.navPricing, href: "/#pricing" },
+      films: { label: v.navFilms, href: "/#films" },
+    },
     enquiry: { label: v.enquireLabel, href: site.enquiry.href },
     mobileEnquireLabel: v.mobileEnquireLabel,
     mobileCallLabel: v.mobileCallLabel,
@@ -240,6 +250,8 @@ export const defaultSiteValues: SiteValues = {
   navAbout: site.navigation[3].label,
   navFaq: site.navigation[4].label,
   navContact: site.navigation[5].label,
+  navPricing: "Pricing",
+  navFilms: "Films",
   enquireLabel: site.enquiry.label,
   mobileEnquireLabel: "Enquire",
   mobileCallLabel: "Call",
@@ -281,3 +293,17 @@ export type SiteCopy = Renderable<SiteSettings>;
 /** The full headline as one string (page title, structured data). */
 export const headlineText = (s: SiteSettings) =>
   s.headline.emphasis ? `${s.headline.lead} ${s.headline.emphasis}` : s.headline.lead;
+
+/**
+ * The menu with Pricing (after Services) and Films (after Gallery) added
+ * when those sections have published content, so the menu never points at
+ * a section that isn't there.
+ */
+export function withSectionLinks<T extends SiteCopy>(settings: T, available: { pricing: boolean; films: boolean }): T {
+  const navigation = settings.navigation.flatMap((item) => {
+    if (item.href === "/#services" && available.pricing) return [item, settings.sectionLinks.pricing];
+    if (item.href === "/#gallery" && available.films) return [item, settings.sectionLinks.films];
+    return [item];
+  });
+  return { ...settings, navigation };
+}

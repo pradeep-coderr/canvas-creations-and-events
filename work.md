@@ -3165,3 +3165,186 @@ Final gate: `bun install --frozen-lockfile`, typecheck, lint, build, `git diff -
    - test email and a real enquiry email (content, Reply-To);
    - on a real phone: install, turn on notifications, test notification with the app open and closed, a real enquiry push (tap opens it), a calendar reminder;
    - on iOS, only from the Home Screen app.
+
+## Phase 22 — Signature Motion, Pricing Packages, Portfolio Gallery & Video Experience
+
+**Date:** Thursday 1 October 2026, about 2:50 am Adelaide time (30 Sep 17:20 UTC).
+**Migration:** `20260930164505_pricing_films_portfolio.sql`.
+
+**Status:** built and tested **locally only** (production build + local Supabase).
+- The migration has had a **dry run** against the hosted database (it lists only this migration) but has **not been pushed**.
+- The code hasn't been deployed.
+- No pricing, photo or video content was added anywhere: the live site gets these sections only once the owner adds real content.
+
+### Database (`20260930164505_pricing_films_portfolio.sql`)
+
+- **`pricing_packages`** (new CMS collection).
+  - Fields: title, unique slug, optional description, and `price_type` (`fixed` | `starting_from` | `custom_quote`).
+  - `price` is `numeric(10,2)` in AUD, > 0 and ≤ 1,000,000. A quote has no price; a fixed or "from" price must have one (`pricing_packages_quote_price_check`).
+  - Optional `price_prefix` (≤ 40) and `price_suffix` (≤ 60).
+  - `features text[]`: 0–12 single lines of ≤ 200 characters, checked by `public.cms_line_list_ok`.
+  - Optional `cta_label`, `is_featured`, `sort_order`, `is_published`, timestamps.
+  - The brief's `order` / `published` / `featured` use the project's existing names (`sort_order` / `is_published` / `is_featured`).
+  - **Nothing is seeded.** No HTML/CSS is stored.
+- **`films`** (new collection): a YouTube/Vimeo library video plus a title, caption, featured flag, order and published flag.
+  - `unique (video_media_id)`: the same video can't be listed twice.
+  - A trigger copies the video's provider. A composite FK to `media_assets (id, kind, provider)` plus a check allows YouTube/Vimeo only. `on delete restrict`: a video in use can't be deleted.
+- **`media_assets.poster_media_id`**: a video's cover image, chosen from the library.
+  - FK to `(id, kind='image')`, `on delete restrict`; only allowed on videos.
+  - The cover belongs to the video, so it's the same wherever that video appears.
+- **Old single video:** a video set in `video_story` would be carried into `films` (published, featured) with its poster moved onto the video, and the old columns cleared. Hosted and local had no video, so this was a no-op; it's kept for safety. `video_story` now holds only the Films section's wording.
+- **RLS** for both new tables, identical to the other collections:
+  - visitors read published rows only;
+  - admins read/insert/update/delete;
+  - no public writes.
+- **Public media access** extended to films' videos, and to covers of *published* films via `private.is_published_film_poster()`. That helper is `SECURITY DEFINER` because a policy on `media_assets` can't query `media_assets` without recursing.
+- **New wording:**
+  - `home_content`: `pricing_eyebrow` ('Pricing'), `pricing_title` ('Packages'), `pricing_description` (null), `gallery_intro` (null), `gallery_filter_all` ('All');
+  - `site_settings`: `nav_pricing` ('Pricing'), `nav_films` ('Films').
+- **PostgREST limitation found:** it can't embed `media_assets` in itself through that composite FK (`PGRST200`), so covers are loaded with a second query by id (public loader, editor, media library).
+
+### A. Hero signature animation (pure CSS, `globals.css` "Hero signature")
+
+- **Sequence:**
+  - text rises in (existing `animate-rise`, staggered);
+  - the photo is revealed through a soft upward clip wipe while settling from scale 1.03 to 1;
+  - the gold hairline frame draws in from its corner;
+  - desktop only (≥ 1024 px, where scroll timelines are supported): the photo drifts up about 2 rem over the first 70 vh of scrolling. It's a scroll-driven CSS animation, with no scroll listeners.
+- **Mobile:** reveal and settle only, no parallax.
+- **Reduced motion:** none of it runs; everything is static and visible.
+- Only transform, opacity and clip-path are animated. The image loading strategy is unchanged (eager, high priority). The server HTML has no inline `opacity:0`, and the hero renders complete with JavaScript disabled.
+
+### B. Pricing
+
+- **Admin:** `/admin/content/pricing` comes from the existing generic collection pages, with list, add, edit, reorder, publish/unpublish, delete (confirm dialog), unsaved and pending states, and validation. Form (`PricingForm`):
+  - the price type select hides the amount for quotes;
+  - the amount is typed as text ("1,500", "$1,500.50");
+  - "included" takes one item per line;
+  - optional button text;
+  - "Highlight this package".
+- **Public** (`sections/pricing.tsx`), `#pricing` after Services:
+  - editorial columns: Cormorant titles and prices, Manrope text, hairline borders, one highlighted package (ivory with a gold inner hairline), no shadows or gradients;
+  - 2 packages sit side by side, 3+ in threes; one package gets a single two-column feature layout; zero packages render nothing;
+  - on phones everything stacks.
+- **Price rules** (`formatPackagePrice`): `$1,500` · `From $1,500` · `Custom quote`.
+  - Optional words go before/after; never `$0`.
+  - Amounts carry "(Australian dollars)" for screen readers.
+  - Every package links to `#enquire`.
+
+### C. Portfolio (gallery)
+
+- **Content:** every published photo (up to 24), featured first (the first is the large lead), from the media library with its alt text.
+  - "Featured" for gallery photos now means "shown first and larger", no longer "on the homepage".
+- **Layouts:**
+  - Desktop: lead photo (7 columns, 2 rows), two beside it, a pair beneath, then threes with varied shapes.
+  - Tablet and phone: lead full width, the rest in pairs; a trailing single photo spans the width.
+  - One photo: a centred single composition. Two photos: a pair.
+  - `next/image` with specific `sizes`; lazy below the fold.
+- **Category filter:**
+  - Only shown with **three or more** categories that actually have photos (none are seeded).
+  - `aria-pressed` buttons, 44 px targets, a live "Showing N photos: …" message.
+  - Filters in place without a reload (a CSS rule keyed to the chosen slug). While filtered the grid becomes even, so there are no gaps. Remaining photos fade in lightly (not with reduced motion).
+- **Wording:** the "All" label and an optional intro under the heading.
+
+### D. Lightbox (`sections/gallery-lightbox.tsx`, Radix dialog, no new library)
+
+- Accessible dialog:
+  - labelled "Photo N of M" plus the photo's title;
+  - visible Close; Escape closes;
+  - focus trap; focus returns to the photo that opened it;
+  - scroll lock.
+- **Navigation:**
+  - ArrowLeft/ArrowRight and Previous/Next (icon-only on phones, with spoken names, 44 px), wrapping from last to first;
+  - **swipe** on touch;
+  - steps only through the photos currently shown by the filter;
+  - each change is announced in a live region.
+- Only the current photo is loaded. A tap on the dim area closes it. The backdrop is now opaque (the page used to show through).
+
+### E. Films (`#films`)
+
+- The featured film is shown large and plays in place (existing click-to-load player).
+- Other films are cover cards. **Play** opens a dialog with the provider's player, 16:9, sized to fit both portrait and landscape phones.
+  - Closing it (button, Escape, backdrop) **unmounts the iframe**; focus returns to the card.
+- No iframe exists before Play. YouTube uses the privacy-enhanced domain, Vimeo uses `dnt=1`, and nothing autoplays with sound.
+- A film without a cover shows the Canvas monogram (no third-party thumbnail).
+- The section and its menu link only appear once a film is published.
+- The admin page `/admin/content/video` now edits only the section's wording, pointing to Content → Films.
+
+### F. Media library
+
+- **Photos:** new **Replace**. You upload a new file for the same library entry, so every use shows it. The alt text is kept (editable), and the old file is removed from storage.
+- **Videos:** each shows its cover, with **Choose/Change cover photo** (the existing media picker, including upload), **Remove cover** and **Edit title**.
+- **"Used by"** now includes `Homepage Films: <title>` (with "(draft)") and `Cover of the video "<title>"`. Delete stays blocked while anything uses an item, and the database enforces it too.
+
+### G–I. Editor, styles and menu
+
+- **Visual editor:**
+  - Pricing section: label, heading, optional text; packages edited in place like other lists.
+  - Portfolio: optional intro and the "All" label.
+  - Films: label, heading, and films edited in place.
+  - Section panels have **list-wide text styles**: package names, prices, package text, package buttons, film titles, film captions. They're drafts until **Save section** or the toolbar **Save** (the Phase 21 rule; nothing auto-saves).
+- **Style keys added:** `home.pricingEyebrow/Title/Description`, `pricing.packageTitle/Price/Body`, `pricing.cta`, `home.galleryIntro`, `gallery.filter`, `films.title`, `films.caption`; and section key `pricing`.
+- **Menu:** Pricing (after Services) and Films (after Gallery) appear only while they have published content.
+  - The public layout checks with two count-only queries (`getSectionAvailability`).
+  - The editor uses the same rule, and the labels are editable in Site details.
+
+### Tests actually run (local only)
+
+- **Test content:** created by `seed22.mjs` (local only): generated test-pattern images labelled "TEST n" (not photos), 3 "Test …" categories, 3 test packages, 3 test films on public YouTube/Vimeo ids. It was removed afterwards; local content is back to empty.
+- **Screenshots** were taken at 1440/768/390 for pricing, portfolio, filtered portfolio, films, the lightbox and the film dialog. The layout was reviewed from these. The only issue found (see-through dialog backdrop) was fixed.
+
+| Suite | Result |
+| --- | --- |
+| `e2e22.mjs` (new) | **74/74** — animation, pricing, portfolio, films, media library, editor, bundle (breakdown below) |
+| Phase 20 `e2e20.mjs` | 67/67 (server run without email settings, as that suite expects) |
+| Phase 19 `e2e19.mjs` / `disabled19.mjs` | 28/28 · 17/17 |
+| Admin smoke | 33/33 |
+| Stale action (`stale21.mjs`) | 3/3 |
+| Phase 21 `e2e21.mjs` | **not re-run**: it needs the local Resend and push stand-ins, which Claude Code stopped for low memory and which weren't restarted. The editor code it covers was re-tested through `e2e19`, `stale21` and `e2e22`. |
+
+`e2e22.mjs` covers:
+- **Animation:**
+  - desktop sequence (reveal, settle, frame, depth); ends at opacity 1 and scale 1;
+  - mobile has no parallax; reduced motion runs no animation;
+  - server HTML has the hero text; everything renders with JavaScript disabled;
+  - no overflow at 375/390/430/768/1024/1280/1440.
+- **Pricing:**
+  - 3 / 1 / 0 packages (and the menu link);
+  - fixed, from and quote formats, never `$0`; enquiry links; features as a list;
+  - RLS: drafts hidden and anon insert refused; a non-admin create is refused server-side; the database refuses a missing or 0 price;
+  - admin create with both validation messages, then edit, reorder, publish, delete, and the delete confirmation.
+- **Portfolio:**
+  - lead layout, alt text, lazy loading;
+  - filter (only that category, no reload, announced, even grid);
+  - lightbox: filtered count, label and count, close control, one image, focus inside, scroll lock, arrows both ways, wrap, Next button, Escape with focus restored;
+  - mobile swipe and fit;
+  - one photo and no photos.
+- **Films:**
+  - featured and cards, covers, Canvas cover fallback;
+  - YouTube player only after Play;
+  - Vimeo dialog, iframe removed on close, focus restored; phone fit at 16:9;
+  - duplicate link gives the same entry; invalid link refused; duplicate film refused;
+  - one film and no films (with menu); cover removed and re-set;
+  - anon sees a published film's cover but not unused images.
+- **Media library:** covers, "Used by", disabled delete; Replace keeps the id, stores a new file and deletes the old one.
+- **Editor:**
+  - pricing heading draft (no request, DB and public unchanged), reload discards, offline "Not saved", then Save reaches the DB and the public page;
+  - portfolio intro and films heading saved;
+  - a package edited in place;
+  - package-name style stays a draft until Save section, then appears in the public CSS.
+- **Bundle and console:** no admin/editor strings in the public bundle; no console errors.
+
+Final gate (hosted env): `bun install --frozen-lockfile`, typecheck, lint, build, `git diff --check`, `supabase db lint`: all clean.
+
+### Production: not done yet (not claimed)
+
+1. **Push the migration first**, then deploy the code. The new code reads the new columns (`nav_pricing`, `pricing_*`, `films`). Deployed without the migration, the site would fall back to its built-in wording.
+2. After deploy, check the live homepage, menu and editor. Pricing and Films stay hidden and the portfolio shows its empty state until the owner publishes real content.
+3. With real content, verify on a phone: gallery layout, lightbox (swipe), filter (once there are three or more categories), video playback, pricing layout, and the editor's Save behaviour.
+
+### Remaining limitations
+
+- The scroll-depth drift needs CSS scroll timelines. Browsers without them (e.g. Firefox today) simply don't drift; the entrance still runs. Tested in Chrome.
+- The filter hides at fewer than three categories, by design.
+- Uploaded video ("stream") still isn't configured, so films are YouTube/Vimeo only.
+- The portfolio shows up to 24 photos on the homepage.

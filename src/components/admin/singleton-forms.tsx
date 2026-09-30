@@ -1,19 +1,16 @@
 "use client";
 
-import { useWatch } from "react-hook-form";
 import { saveAboutContent, saveHomeContent, saveVideoStory } from "@/app/admin/(portal)/content/actions";
 import {
   aboutSchema,
   homeSchema,
   videoSchema,
-  videoSourceLabels,
-  videoSources,
   type AboutValues,
   type HomeValues,
   type VideoValues,
 } from "@/lib/cms/singletons";
-import type { MediaImage, MediaVideo } from "@/lib/media/types";
-import { FormSection, MediaFormField, SelectField, TextAreaField, TextField, type CmsFormApi } from "./cms-fields";
+import type { MediaImage } from "@/lib/media/types";
+import { FormSection, MediaFormField, TextAreaField, TextField, type CmsFormApi } from "./cms-fields";
 import { CmsForm } from "./cms-form";
 
 /*
@@ -32,6 +29,7 @@ const homeGroups = [
   ["home-hero", "Hero"],
   ["home-intro", "Introduction"],
   ["home-services", "Services"],
+  ["home-pricing", "Pricing"],
   ["home-categories", "Categories"],
   ["home-gallery", "Gallery"],
   ["home-process", "Process"],
@@ -117,12 +115,28 @@ export function HomeForm({ defaultValues, imageOptions }: { defaultValues: HomeV
             <TextField form={form} name="servicesEnquiryText" label="Enquiry prompt text" />
           </FormSection>
 
+          <FormSection
+            id="home-pricing"
+            title="Pricing section"
+            description="Only shown when at least one package is published. The packages themselves are edited under Content → Pricing."
+          >
+            <Heading form={form} prefix="pricing" />
+            <TextAreaField form={form} name="pricingDescription" label="Text under the heading" optional rows={2} />
+          </FormSection>
+
           <FormSection id="home-categories" title="Categories section" description="Only shown when at least one category is published.">
             <Heading form={form} prefix="categories" />
           </FormSection>
 
           <FormSection id="home-gallery" title="Gallery section">
             <Heading form={form} prefix="gallery" />
+            <TextAreaField form={form} name="galleryIntro" label="Text under the heading" optional rows={2} />
+            <TextField
+              form={form}
+              name="galleryFilterAll"
+              label="First filter button"
+              hint="Shown when photos are in three or more categories, e.g. All."
+            />
             <TextField form={form} name="galleryInstagramCta" label="Instagram link text" />
             <TextField
               form={form}
@@ -212,117 +226,22 @@ export function AboutForm({ defaultValues, imageOptions }: { defaultValues: Abou
 }
 
 // ---------------------------------------------------------------------------
-// Video / story
+// Films section wording (the films themselves: Content → Films)
 // ---------------------------------------------------------------------------
 
-function VideoFields({
-  form,
-  imageOptions,
-  videoOptions,
-  uploadConfigured,
-}: {
-  form: CmsFormApi<VideoValues>;
-  imageOptions: MediaImage[];
-  videoOptions: MediaVideo[];
-  uploadConfigured: boolean;
-}) {
-  const provider = useWatch({ control: form.control, name: "provider" });
-  // Uploaded video is only offered once a provider is configured (or if already chosen).
-  const choices = videoSources.filter((p) => p !== "stream" || uploadConfigured || provider === "stream");
-  const streamVideos = videoOptions.filter((v) => v.provider === "stream");
-
+export function VideoForm({ defaultValues }: { defaultValues: VideoValues }) {
   return (
-    <FormSection title="Video">
-      <SelectField
-        form={form}
-        name="provider"
-        label="Video"
-        options={choices.map((p) => ({ value: p, label: videoSourceLabels[p] }))}
-        hint={
-          uploadConfigured
-            ? undefined
-            : "Uploaded video is not configured yet. Add a YouTube or Vimeo link instead."
-        }
-      />
-
-      {(provider === "youtube" || provider === "vimeo") && (
-        <TextField
-          form={form}
-          name="videoUrl"
-          label={provider === "youtube" ? "YouTube link" : "Vimeo link"}
-          maxLength={500}
-          hint={
-            provider === "youtube"
-              ? "Copy it from the video's Share button, e.g. https://youtu.be/…"
-              : "Copy it from the video's Share button, e.g. https://vimeo.com/…"
-          }
-        />
-      )}
-
-      {provider === "stream" && (
-        <SelectField
-          form={form}
-          name="videoMediaId"
-          label="Uploaded video"
-          options={streamVideos.map((v) => ({ value: v.id, label: v.title }))}
-          disabled={streamVideos.length === 0}
-          hint={streamVideos.length === 0 ? "No uploaded videos yet." : undefined}
-        />
-      )}
-
-      {provider !== "none" && (
-        <>
-          <TextField
-            form={form}
-            name="videoTitle"
-            label="What the video shows"
-            hint="Read out by screen readers and shown on the play button, e.g. Styling highlights from a garden wedding."
-          />
-          <TextField form={form} name="caption" label="Caption" optional />
-          <MediaFormField
-            form={form}
-            name="posterId"
-            label="Cover photo"
-            optional
-            images={imageOptions}
-            use="posters"
-            hint="Shown before the video plays. The video player only loads when a visitor presses Play."
-            emptyText="No cover photo: a Canvas Creations cover is shown."
-          />
-        </>
-      )}
-    </FormSection>
-  );
-}
-
-export function VideoForm({
-  defaultValues,
-  imageOptions,
-  videoOptions,
-  uploadConfigured,
-}: {
-  defaultValues: VideoValues;
-  imageOptions: MediaImage[];
-  videoOptions: MediaVideo[];
-  uploadConfigured: boolean;
-}) {
-  return (
-    <CmsForm schema={videoSchema} defaultValues={defaultValues} save={(v) => saveVideoStory(v)} submitLabel="Save video section">
+    <CmsForm schema={videoSchema} defaultValues={defaultValues} save={(v) => saveVideoStory(v)} submitLabel="Save films section">
       {(form) => (
-        <>
-          <FormSection title="Text">
-            <TextField form={form} name="eyebrow" label={LABEL} hint={LABEL_HINT} />
-            <TextField form={form} name="title" label="Heading" />
-            <TextAreaField form={form} name="emptyText" label="Text while there's no video" rows={2} />
-            <TextField form={form} name="tiktokCta" label="TikTok link text" />
-          </FormSection>
-          <VideoFields
-            form={form}
-            imageOptions={imageOptions}
-            videoOptions={videoOptions}
-            uploadConfigured={uploadConfigured}
-          />
-        </>
+        <FormSection
+          title="Text"
+          description="The section is shown once a film is published. Add and order the films under Content → Films."
+        >
+          <TextField form={form} name="eyebrow" label={LABEL} hint={LABEL_HINT} />
+          <TextField form={form} name="title" label="Heading" />
+          <TextAreaField form={form} name="emptyText" label="Text in the editor while there are no films" rows={2} />
+          <TextField form={form} name="tiktokCta" label="TikTok link text (with that text)" />
+        </FormSection>
       )}
     </CmsForm>
   );

@@ -10,7 +10,7 @@ import { SiteFrame } from "@/components/layout/site-frame";
 import { SiteThemeStyle } from "@/components/theme/site-theme-style";
 import { about as localAbout, enquirySection, hero as localHero } from "@/data/home";
 import { loadEditorPage } from "@/lib/admin/editor-content";
-import { settingsFromValues, type SiteCopy } from "@/lib/cms/site-settings";
+import { settingsFromValues, withSectionLinks, type SiteCopy } from "@/lib/cms/site-settings";
 import { requireAdmin } from "@/lib/admin/session";
 import type { CollectionKey } from "@/lib/cms/collections";
 import type { EditorScope } from "@/lib/editor/fields";
@@ -63,11 +63,15 @@ export default async function EditorPage() {
   // link or a form label); links come from the saved values.
   const saved = settingsFromValues(page.data.saved.site);
   const navFields = ["navHome", "navServices", "navGallery", "navAbout", "navFaq", "navContact"];
-  const settings: SiteCopy = {
+  const base: SiteCopy = {
     ...saved,
     headline: { lead: t("site", "headlineLead"), emphasis: t("site", "headlineEmphasis") },
     footerTagline: t("site", "footerTagline"),
     navigation: saved.navigation.map((item, i) => ({ href: item.href, label: live("site", navFields[i]) })),
+    sectionLinks: {
+      pricing: { href: saved.sectionLinks.pricing.href, label: live("site", "navPricing") },
+      films: { href: saved.sectionLinks.films.href, label: live("site", "navFilms") },
+    },
     enquiry: { href: saved.enquiry.href, label: live("site", "enquireLabel") },
     mobileEnquireLabel: live("site", "mobileEnquireLabel"),
     mobileCallLabel: live("site", "mobileCallLabel"),
@@ -100,6 +104,11 @@ export default async function EditorPage() {
       successText: live("site", "formSuccessText"),
     },
   };
+  // Same menu as visitors get: Pricing and Films only while something is published.
+  const settings = withSectionLinks(base, {
+    pricing: page.data.items.pricing.some((i) => i.visibleOnSite),
+    films: page.data.items.films.some((i) => i.visibleOnSite),
+  });
 
   const content: HomeContent = {
     settings,
@@ -118,9 +127,17 @@ export default async function EditorPage() {
         enquiry: { title: live("home", "servicesEnquiryTitle"), text: live("home", "servicesEnquiryText") },
       },
       categories: { eyebrow: t("home", "categoriesEyebrow"), title: t("home", "categoriesTitle") },
+      pricing: {
+        eyebrow: t("home", "pricingEyebrow"),
+        title: t("home", "pricingTitle"),
+        description: t("home", "pricingDescription"),
+      },
       gallery: {
         eyebrow: t("home", "galleryEyebrow"),
         title: t("home", "galleryTitle"),
+        intro: t("home", "galleryIntro"),
+        // Inside the filter button: edited in the section panel.
+        filterAll: live("home", "galleryFilterAll"),
         emptyTitle: t("home", "galleryEmptyTitle"),
         emptyText: t("home", "galleryEmptyText"),
         instagramCta: live("home", "galleryInstagramCta"),
@@ -160,11 +177,13 @@ export default async function EditorPage() {
         emptyText: t("video", "emptyText"),
         tiktokCta: live("video", "tiktokCta"),
       },
-      video: page.video,
     },
     services: page.collections.services,
+    pricing: page.collections.pricing,
     categories: page.collections.categories,
     gallery: page.collections.gallery,
+    galleryCategories: page.galleryCategories,
+    films: page.collections.films,
     testimonials: page.collections.testimonials,
     faqs: page.collections.faqs,
     processSteps: page.collections.process,
@@ -176,8 +195,10 @@ export default async function EditorPage() {
     heroImage: <EditPhotoButton scope="home" field="heroImageId" label="Hero photo" use="hero" />,
     aboutImage: <EditPhotoButton scope="about" field="imageId" label="About photo" use="founder" />,
     services: itemSlots("services"),
+    pricing: itemSlots("pricing"),
     categories: itemSlots("categories"),
     gallery: itemSlots("gallery"),
+    films: itemSlots("films"),
     testimonials: itemSlots("testimonials"),
     faqs: itemSlots("faqs"),
     process: itemSlots("process"),

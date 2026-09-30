@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import type { HomeSectionKey } from "@/components/home/home-sections";
 import type { CollectionKey } from "@/lib/cms/collections";
+import type { StyleKey } from "@/lib/styles/schema";
 import { siteSchema } from "@/lib/cms/site-settings";
 import { aboutSchema, homeSchema, videoSchema } from "@/lib/cms/singletons";
 
@@ -35,6 +36,11 @@ export interface SectionDef {
   /** The list shown in this section, edited item by item on the page. */
   collection?: CollectionKey;
   note?: string;
+  /**
+   * Text styles for parts every item shares (package titles, film captions…),
+   * set once for the whole list in the section panel.
+   */
+  styleKeys?: { key: StyleKey; label: string }[];
 }
 
 const home = (field: string, label: string, kind: FieldKind = "line", hint?: string): EditableField => ({
@@ -97,12 +103,30 @@ export const sections: Record<HomeSectionKey, SectionDef> = {
     fields: [home("categoriesEyebrow", "Categories label"), home("categoriesTitle", "Categories heading")],
     note: "Only shown on the website when at least one category is published.",
   },
+  pricing: {
+    title: "Pricing",
+    collection: "pricing",
+    fields: [
+      home("pricingEyebrow", "Pricing label"),
+      home("pricingTitle", "Pricing heading"),
+      { ...home("pricingDescription", "Text under the heading", "text"), optional: true },
+    ],
+    note: "Visitors see this section only once a package is published. Prices are in Australian dollars.",
+    styleKeys: [
+      { key: "pricing.packageTitle", label: "Package names" },
+      { key: "pricing.packagePrice", label: "Prices" },
+      { key: "pricing.packageBody", label: "Package text and features" },
+      { key: "pricing.cta", label: "Package buttons" },
+    ],
+  },
   gallery: {
     title: "Gallery",
     collection: "gallery",
     fields: [
       home("galleryEyebrow", "Gallery label"),
       home("galleryTitle", "Gallery heading", "line", "Shown once there are photos."),
+      { ...home("galleryIntro", "Text under the heading", "text"), optional: true },
+      home("galleryFilterAll", "First filter button", "line", "Shown when photos are in three or more categories."),
       home("galleryEmptyTitle", "Heading while there are no photos"),
       home("galleryEmptyText", "Text while there are no photos", "text"),
       home("galleryInstagramCta", "Instagram link text"),
@@ -139,12 +163,18 @@ export const sections: Record<HomeSectionKey, SectionDef> = {
     fields: [home("whyEyebrow", "Why Canvas label"), home("whyTitleLines", "Why Canvas heading", "lines")],
   },
   video: {
-    title: "Video",
+    title: "Films",
+    collection: "films",
     fields: [
-      { scope: "video", field: "eyebrow", label: "Video label", kind: "line" },
-      { scope: "video", field: "title", label: "Video heading", kind: "line" },
-      { scope: "video", field: "emptyText", label: "Text while there's no video", kind: "text" },
+      { scope: "video", field: "eyebrow", label: "Films label", kind: "line" },
+      { scope: "video", field: "title", label: "Films heading", kind: "line" },
+      { scope: "video", field: "emptyText", label: "Text while there are no films (editor only)", kind: "text" },
       { scope: "video", field: "tiktokCta", label: "TikTok link text", kind: "line" },
+    ],
+    note: "Visitors see this section only once a film is published. Films use YouTube or Vimeo videos from the media library.",
+    styleKeys: [
+      { key: "films.title", label: "Film titles" },
+      { key: "films.caption", label: "Film captions" },
     ],
   },
   faq: {
@@ -198,7 +228,9 @@ export const chromeSection: SectionDef = {
   fields: [
     siteField("navHome", "Menu: Home"),
     siteField("navServices", "Menu: Services"),
+    siteField("navPricing", "Menu: Pricing", "Shown only while a package is published."),
     siteField("navGallery", "Menu: Gallery"),
+    siteField("navFilms", "Menu: Films", "Shown only while a film is published."),
     siteField("navAbout", "Menu: About"),
     siteField("navFaq", "Menu: FAQ"),
     siteField("navContact", "Menu: Contact"),

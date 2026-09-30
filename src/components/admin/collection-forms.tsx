@@ -1,17 +1,20 @@
 "use client";
 
+import Link from "next/link";
 import { useWatch, type FieldValues, type Path } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { saveCollectionItem } from "@/app/admin/(portal)/content/actions";
 import {
   collectionSchema,
   collections,
+  priceTypeLabels,
+  priceTypes,
   type CategoryOption,
   type CollectionKey,
   type CollectionValues,
 } from "@/lib/cms/collections";
 import { suggestSlug } from "@/lib/cms/fields";
-import type { MediaImage } from "@/lib/media/types";
+import { videoProviderLabels, type MediaImage, type MediaVideo } from "@/lib/media/types";
 import {
   CheckboxField,
   FormSection,
@@ -142,6 +145,104 @@ export function ServiceForm(props: ItemFormProps<"services"> & { imageOptions: M
   );
 }
 
+export function PricingForm(props: ItemFormProps<"pricing">) {
+  return (
+    <CmsForm {...formProps("pricing", props)}>
+      {(form) => <PricingFields form={form} />}
+    </CmsForm>
+  );
+}
+
+function PricingFields({ form }: { form: CmsFormApi<CollectionValues<"pricing">> }) {
+  const priceType = useWatch({ control: form.control, name: "priceType" });
+  const quote = priceType === "custom_quote";
+  return (
+    <>
+      <FormSection title="Package" description="Real packages only: what you actually offer, at the price you charge.">
+        <TextField form={form} name="title" label="Package name" />
+        <SlugField form={form} from="title" />
+        <TextAreaField form={form} name="description" label="Description" optional rows={3} />
+      </FormSection>
+      <FormSection title="Price" description="In Australian dollars.">
+        <SelectField
+          form={form}
+          name="priceType"
+          label="How the price is shown"
+          options={priceTypes.map((p) => ({ value: p, label: priceTypeLabels[p] }))}
+          hint={quote ? "Shows “Custom quote” instead of an amount." : "For example $1,500, or From $1,500."}
+        />
+        {!quote && (
+          <>
+            <TextField form={form} name="price" label="Amount (AUD)" maxLength={14} hint="Numbers only, e.g. 1500 or 1500.50." />
+            <TextField
+              form={form}
+              name="pricePrefix"
+              label="Words before the amount"
+              optional
+              maxLength={40}
+              hint={priceType === "starting_from" ? "Replaces “From” if set." : "Rarely needed."}
+            />
+            <TextField form={form} name="priceSuffix" label="Words after the amount" optional maxLength={60} hint="For example: per event." />
+          </>
+        )}
+      </FormSection>
+      <FormSection title="Included" description="One item per line, up to 12. Leave it empty to describe the package above instead.">
+        <TextAreaField form={form} name="features" label="Included" optional rows={6} maxLength={12 * 202} />
+      </FormSection>
+      <FormSection title="Button">
+        <TextField
+          form={form}
+          name="ctaLabel"
+          label="Button text"
+          optional
+          hint="Goes to the enquiry form. Empty: “Enquire about this package”."
+        />
+      </FormSection>
+      <VisibilitySection form={form} featuredLabel="Highlight this package" />
+    </>
+  );
+}
+
+export function FilmForm(props: ItemFormProps<"films"> & { videoOptions: MediaVideo[] }) {
+  // Films play YouTube or Vimeo links from the media library.
+  const videos = props.videoOptions.filter((v) => v.provider === "youtube" || v.provider === "vimeo");
+  return (
+    <CmsForm {...formProps("films", props)}>
+      {(form) => (
+        <>
+          <FormSection title="Film">
+            <SelectField
+              form={form}
+              name="videoMediaId"
+              label="Video"
+              options={videos.map((v) => ({ value: v.id, label: `${v.title} (${videoProviderLabels[v.provider]})` }))}
+              disabled={videos.length === 0}
+              hint={
+                <>
+                  {videos.length === 0 ? "No YouTube or Vimeo videos yet. " : "Each video can be used once. "}
+                  Add videos and their cover photos in the{" "}
+                  <Link href="/admin/content/media?tab=videos" className="font-semibold underline underline-offset-4">
+                    media library
+                  </Link>
+                  .
+                </>
+              }
+            />
+            <TextField
+              form={form}
+              name="title"
+              label="Title"
+              hint="Shown under the video and read out on the Play button, e.g. Styling highlights from a garden wedding."
+            />
+            <TextAreaField form={form} name="caption" label="Caption" optional rows={2} />
+          </FormSection>
+          <VisibilitySection form={form} featuredLabel="Featured (shown first and largest)" />
+        </>
+      )}
+    </CmsForm>
+  );
+}
+
 export function CategoryForm(props: ItemFormProps<"categories">) {
   return (
     <CmsForm {...formProps("categories", props)}>
@@ -188,7 +289,7 @@ export function GalleryItemForm(
               hint={props.categoryOptions.length === 0 ? "No categories yet. Add them under Content → Categories." : undefined}
             />
           </FormSection>
-          <VisibilitySection form={form} featuredLabel="Featured on the homepage" />
+          <VisibilitySection form={form} featuredLabel="Featured (shown first and larger)" />
         </>
       )}
     </CmsForm>

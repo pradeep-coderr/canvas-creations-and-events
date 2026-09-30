@@ -23,15 +23,18 @@ export function UploadPhoto({
   use,
   onUploaded,
   onCancel,
+  replace,
 }: {
   use: ImageUse;
   onUploaded: (image: MediaImage, message: string) => void;
   onCancel?: () => void;
+  /** Replace this library photo's file instead of adding a new photo. */
+  replace?: { id: string; alt: string };
 }) {
   const id = useId();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [alt, setAlt] = useState("");
+  const [alt, setAlt] = useState(replace?.alt ?? "");
   const [errors, setErrors] = useState<{ file?: string; alt?: string }>({});
   const [status, setStatus] = useState<{ kind: "working" | "error"; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -77,7 +80,7 @@ export function UploadPhoto({
     setStatus({ kind: "working", text: "Processing photo…" });
     let result: Awaited<ReturnType<typeof finalizeImageUpload>>;
     try {
-      result = await finalizeImageUpload({ incomingPath, alt, use, originalFilename: file!.name });
+      result = await finalizeImageUpload({ incomingPath, alt, use, originalFilename: file!.name, replaceId: replace?.id });
     } catch (error) {
       setStatus({ kind: "error", text: describeActionFailure(error).text });
       return;
@@ -159,7 +162,7 @@ export function UploadPhoto({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <Button type="submit" pending={working} pendingLabel={working ? status.text : undefined}>
-          Upload photo
+          {replace ? "Replace photo" : "Upload photo"}
         </Button>
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel}>

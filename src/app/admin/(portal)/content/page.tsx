@@ -3,7 +3,6 @@ import Link from "next/link";
 import { getCollectionCounts, getSingleton } from "@/lib/admin/cms";
 import { requireAdmin } from "@/lib/admin/session";
 import { collectionKeys, collections } from "@/lib/cms/collections";
-import { videoProviderLabels, type VideoProvider } from "@/lib/media/types";
 
 export const metadata: Metadata = { title: "Content" };
 
@@ -34,12 +33,12 @@ export default async function ContentOverviewPage() {
     getSingleton("video_story"),
   ]);
 
-  const provider = (video?.provider ?? null) as VideoProvider | null;
+  const films = counts.films;
   const videoStatus = !video
     ? "Couldn't load. Refresh to try again."
-    : provider === null
-      ? "No video yet. The section shows its text and a TikTok link."
-      : `${videoProviderLabels[provider]} video set. It plays when a visitor presses Play.`;
+    : !films || films.published === 0
+      ? "No published films yet, so the section isn't shown."
+      : `Shown with ${films.published} published ${films.published === 1 ? "film" : "films"}.`;
 
   return (
     <>
@@ -78,8 +77,8 @@ export default async function ContentOverviewPage() {
                 : "Founder details not added yet."}
           </span>
         </Card>
-        <Card href="/admin/content/video" title="Video">
-          <span className="text-sm text-muted-foreground">The video section.</span>
+        <Card href="/admin/content/video" title="Films section">
+          <span className="text-sm text-muted-foreground">The Films section&apos;s heading. The videos are under Films below.</span>
           <span className="text-sm font-medium">{videoStatus}</span>
         </Card>
       </ul>

@@ -38,12 +38,14 @@ export async function signImagePaths(client: Client, paths: (string | null | und
  * The database's foreign keys stay the authority; this is for explaining.
  */
 export async function getMediaUsage(client: Client): Promise<Map<string, string[]>> {
-  const [services, gallery, home, about, video] = await Promise.all([
+  const [services, gallery, home, about, video, films, posters] = await Promise.all([
     client.from("services").select("title, image_id, is_published").not("image_id", "is", null),
     client.from("gallery_items").select("title, media_id, is_published"),
     client.from("home_content").select("hero_image_id").eq("id", true).maybeSingle(),
     client.from("about_content").select("image_id").eq("id", true).maybeSingle(),
     client.from("video_story").select("video_media_id, poster_id").eq("id", true).maybeSingle(),
+    client.from("films").select("title, video_media_id, is_published"),
+    client.from("media_assets").select("title, poster_media_id").eq("kind", "video").not("poster_media_id", "is", null),
   ]);
   const usage = new Map<string, string[]>();
   const add = (id: unknown, label: string) => {
@@ -57,6 +59,8 @@ export async function getMediaUsage(client: Client): Promise<Map<string, string[
   add(about.data?.image_id, "About (founder photo)");
   add(video.data?.video_media_id, "Video section");
   add(video.data?.poster_id, "Video poster");
+  for (const f of films.data ?? []) add(f.video_media_id, `Homepage Films: ${f.title}${draft(f.is_published)}`);
+  for (const p of posters.data ?? []) add(p.poster_media_id, `Cover of the video “${p.title}”`);
   return usage;
 }
 
@@ -92,15 +96,38 @@ export async function listImages(client: Client): Promise<MediaImage[]> {
 export async function listVideos(client: Client): Promise<MediaVideo[]> {
   const { data, error } = await client
     .from("media_assets")
-    .select("id, provider, external_id, title, source_url, created_at")
+    .select("id, provider, external_id, title, source_url, created_at, poster_media_id")
     .eq("kind", "video")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .overrideTypes<
+      {
+        id: string;
+        provider: string;
+        external_id: string | null;
+        title: string | null;
+        source_url: string | null;
+        created_at: string;
+        poster_media_id: string | null;
+      }[],
+      { merge: false }
+    >();
   if (error || !data) {
     console.error("[media] video list failed", { code: error?.code });
     return [];
   }
-  const usage = await getMediaUsage(client);
+  // Covers in a second query (PostgREST can't embed media_assets in itself).
+  const posterIds = [...new Set(data.flatMap((m) => (m.poster_media_id ? [m.poster_media_id] : [])))];
+  const posters = posterIds.length
+    ? ((await client.from("media_assets").select("id, storage_path").in("id", posterIds)).data ?? [])
+    : [];
+  const posterPath = new Map(posters.map((p) => [p.id as string, p.storage_path as string]));
+  const [usage, urls] = await Promise.all([
+    getMediaUsage(client),
+    signImagePaths(client, [...posterPath.values()], ADMIN_URL_TTL),
+  ]);
   return data.map((m) => ({
+    posterId: m.poster_media_id,
+    posterUrl: (m.poster_media_id && urls.get(posterPath.get(m.poster_media_id) ?? "")) || null,
     id: m.id,
     provider: m.provider as VideoProvider,
     externalId: m.external_id ?? "",

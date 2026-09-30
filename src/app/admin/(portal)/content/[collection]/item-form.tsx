@@ -1,12 +1,14 @@
 import {
   CategoryForm,
   FaqForm,
+  FilmForm,
   GalleryItemForm,
+  PricingForm,
   ServiceForm,
   StepForm,
   TestimonialForm,
 } from "@/components/admin/collection-forms";
-import { getCategoryOptions, getImageLibrary } from "@/lib/admin/cms";
+import { getCategoryOptions, getImageLibrary, getVideoLibrary } from "@/lib/admin/cms";
 import { collections, type CollectionKey, type CollectionValues } from "@/lib/cms/collections";
 
 /**
@@ -33,6 +35,10 @@ export async function ItemForm({
   switch (collection) {
     case "services":
       return <ServiceForm {...common} defaultValues={values("services")} imageOptions={await getImageLibrary()} />;
+    case "pricing":
+      return <PricingForm {...common} defaultValues={values("pricing")} />;
+    case "films":
+      return <FilmForm {...common} defaultValues={values("films")} videoOptions={await getVideoLibrary()} />;
     case "categories":
       return <CategoryForm {...common} defaultValues={values("categories")} />;
     case "gallery": {

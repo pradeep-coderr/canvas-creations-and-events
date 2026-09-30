@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { parseVideoLink } from "@/lib/media/video-url";
-import { LINE_MAX, line, optionalId, optionalLine, text } from "./fields";
+import { LINE_MAX, line, optionalId, optionalLine, optionalText, text } from "./fields";
 
 /*
  * The one-row content tables: home_content, about_content, video_story.
@@ -32,11 +31,14 @@ const homeColumns = {
   servicesEnquiryText: "services_enquiry_text",
   categoriesEyebrow: "categories_eyebrow",
   categoriesTitle: "categories_title",
+  pricingEyebrow: "pricing_eyebrow",
+  pricingTitle: "pricing_title",
   galleryEyebrow: "gallery_eyebrow",
   galleryTitle: "gallery_title",
   galleryEmptyTitle: "gallery_empty_title",
   galleryEmptyText: "gallery_empty_text",
   galleryInstagramCta: "gallery_instagram_cta",
+  galleryFilterAll: "gallery_filter_all",
   processEyebrow: "process_eyebrow",
   processTitle: "process_title",
   whyEyebrow: "why_eyebrow",
@@ -53,6 +55,13 @@ const homeColumns = {
 } as const;
 
 type HomeField = keyof typeof homeColumns;
+
+// Optional home_content text (empty saves as NULL, and nothing is shown).
+const homeOptionalColumns = {
+  pricingDescription: "pricing_description",
+  galleryIntro: "gallery_intro",
+} as const;
+type HomeOptionalField = keyof typeof homeOptionalColumns;
 
 // Which fields allow line breaks (cms_text); all others are cms_line.
 const homeTextFields = new Set<HomeField>([
@@ -74,6 +83,8 @@ export const homeSchema = z.object({
   ...(Object.fromEntries(
     (Object.keys(homeColumns) as HomeField[]).map((f) => [f, homeTextFields.has(f) ? text() : line()]),
   ) as Record<HomeField, ReturnType<typeof line>>),
+  pricingDescription: optionalText(),
+  galleryIntro: optionalText(),
   heroImageId: optionalId(),
   // Up to three lines (why_title_lines: 1–3, no blanks). Empty lines are dropped.
   whyTitleLines: z
@@ -89,6 +100,7 @@ export type HomeValues = z.input<typeof homeSchema>;
 export function homeToRow(v: z.output<typeof homeSchema>): Row {
   const row: Row = { hero_image_id: v.heroImageId, why_title_lines: v.whyTitleLines };
   for (const [field, column] of Object.entries(homeColumns)) row[column] = v[field as HomeField];
+  for (const [field, column] of Object.entries(homeOptionalColumns)) row[column] = v[field as HomeOptionalField];
   return row;
 }
 
@@ -99,6 +111,7 @@ export function homeToValues(row: Row): HomeValues {
     whyTitleLines: [lines[0] ?? "", lines[1] ?? "", lines[2] ?? ""] as [string, string, string],
   } as HomeValues;
   for (const [field, column] of Object.entries(homeColumns)) values[field as HomeField] = str(row[column]);
+  for (const [field, column] of Object.entries(homeOptionalColumns)) values[field as HomeOptionalField] = str(row[column]);
   return values;
 }
 
@@ -159,85 +172,29 @@ export const aboutToValues = (row: Row): AboutValues => ({
 // Video / story (video_story)
 // ---------------------------------------------------------------------------
 
-/** Where the video comes from ("none" = no video). */
-export const videoSources = ["none", "youtube", "vimeo", "stream"] as const;
-export type VideoSource = (typeof videoSources)[number];
-
-export const videoSourceLabels: Record<VideoSource, string> = {
-  none: "No video",
-  youtube: "YouTube",
-  vimeo: "Vimeo",
-  stream: "Uploaded video",
-};
-
 /*
- * YouTube / Vimeo: the admin pastes a link; the server normalizes it into a
- * media library entry (media_assets, provider + id) and points the section
- * at it. Uploaded video ("stream") picks an existing provider video and is
- * refused by the server while no provider is configured.
+ * The Films section's wording. Since Phase 22 the videos themselves are the
+ * films list (public.films); the old single-video columns stay NULL.
  */
-export const videoSchema = z
-  .object({
-    eyebrow: line(),
-    title: line(),
-    emptyText: text(),
-    tiktokCta: line(),
-    provider: z.enum(videoSources),
-    videoUrl: z.string().trim().max(500, "Keep this to 500 characters or fewer."),
-    videoMediaId: optionalId(),
-    posterId: optionalId(),
-    videoTitle: optionalLine(),
-    caption: optionalLine(),
-  })
-  .superRefine((v, ctx) => {
-    const need = (path: string, message: string) => ctx.addIssue({ code: "custom", path: [path], message });
-    if (v.provider === "none") return;
-    if (!v.videoTitle) need("videoTitle", "Describe the video for screen readers.");
-    if (v.provider === "stream") {
-      if (!v.videoMediaId) need("videoMediaId", "Choose the uploaded video.");
-      return;
-    }
-    const link = parseVideoLink(v.videoUrl, v.provider);
-    if (!link.ok) need("videoUrl", link.error);
-  });
+export const videoSchema = z.object({
+  eyebrow: line(),
+  title: line(),
+  emptyText: text(),
+  tiktokCta: line(),
+});
 
 export type VideoValues = z.input<typeof videoSchema>;
 
-/**
- * Only the fields that belong to the chosen source are kept (the rest are
- * NULL). `videoMediaId` is the library entry the server resolved.
- */
-export function videoToRow(v: z.output<typeof videoSchema>, videoMediaId: string | null): Row {
-  const base = { eyebrow: v.eyebrow, title: v.title, empty_text: v.emptyText, tiktok_cta: v.tiktokCta };
-  const none = { video_media_id: null, poster_id: null, embed_url: null, video_title: null, caption: null };
-  if (v.provider === "none") return { ...base, provider: null, ...none };
-  return {
-    ...base,
-    ...none,
-    provider: v.provider,
-    video_media_id: videoMediaId,
-    poster_id: v.posterId,
-    video_title: v.videoTitle,
-    caption: v.caption,
-  };
+export function videoToRow(v: z.output<typeof videoSchema>): Row {
+  return { eyebrow: v.eyebrow, title: v.title, empty_text: v.emptyText, tiktok_cta: v.tiktokCta };
 }
 
-/** `row.video` is the linked media entry (provider + source link), if any. */
-export const videoToValues = (row: Row): VideoValues => {
-  const video = row.video as { source_url?: string | null } | null | undefined;
-  return {
-    eyebrow: str(row.eyebrow),
-    title: str(row.title),
-    emptyText: str(row.empty_text),
-    tiktokCta: str(row.tiktok_cta),
-    provider: (videoSources as readonly string[]).includes(str(row.provider)) ? (row.provider as VideoSource) : "none",
-    videoUrl: str(video?.source_url),
-    videoMediaId: str(row.video_media_id),
-    posterId: str(row.poster_id),
-    videoTitle: str(row.video_title),
-    caption: str(row.caption),
-  };
-};
+export const videoToValues = (row: Row): VideoValues => ({
+  eyebrow: str(row.eyebrow),
+  title: str(row.title),
+  emptyText: str(row.empty_text),
+  tiktokCta: str(row.tiktok_cta),
+});
 
-/** Select for video_story including its media link (for videoToValues). */
-export const VIDEO_STORY_SELECT = "*, video:media_assets!video_story_video_provider_fkey(source_url)";
+/** Select for video_story (its wording). */
+export const VIDEO_STORY_SELECT = "eyebrow, title, empty_text, tiktok_cta";

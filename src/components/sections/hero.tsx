@@ -92,14 +92,11 @@ export function Hero({
           </p>
         </div>
 
-        {/* Image with an offset gold hairline frame behind it */}
-        <div
-          className="relative pr-3 pb-3 motion-safe:animate-fade sm:pr-5 sm:pb-5 lg:col-span-5"
-          style={{ animationDelay: "150ms" }}
-        >
+        {/* Image with an offset gold hairline frame behind it (signature entrance: globals.css "Hero signature") */}
+        <div className="hero-depth relative pr-3 pb-3 sm:pr-5 sm:pb-5 lg:col-span-5">
           <div
             aria-hidden="true"
-            className="absolute inset-0 top-3 left-3 border border-highlight/60 sm:top-5 sm:left-5"
+            className="hero-frame absolute inset-0 top-3 left-3 border border-highlight/60 sm:top-5 sm:left-5"
           />
           {copy.image ? (
             <ImageFrame
@@ -109,15 +106,15 @@ export function Hero({
               loading="eager"
               fetchPriority="high"
               sizes="(min-width: 1280px) 460px, (min-width: 1024px) 38vw, 100vw"
-              className={frameRatio}
-              imageClassName={copy.image.position}
+              className={`hero-media ${frameRatio}`}
+              imageClassName={`hero-media-settle ${copy.image.position ?? ""}`}
             />
           ) : (
             // Placeholder until client photography exists: the real monogram
             // on ivory — deliberately not a fake photo. `mix-blend-multiply`
             // blends the monogram's white disc into the ivory surface.
             <div
-              className={`relative flex items-center justify-center bg-surface-ivory ${frameRatio}`}
+              className={`hero-media relative flex items-center justify-center bg-surface-ivory ${frameRatio}`}
             >
               <Image
                 src="/images/logo/canvas-creations-monogram.png"

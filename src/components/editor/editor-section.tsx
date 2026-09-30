@@ -7,13 +7,6 @@ import type { HomeSectionKey } from "@/components/home/home-sections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -23,17 +16,15 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { collections } from "@/lib/cms/collections";
-import { videoSourceLabels, videoSources, type VideoSource as VideoSourceKey } from "@/lib/cms/singletons";
 import {
   chromeSection,
   sections,
   validateField,
   type EditableField,
-  type EditorScope,
   type SectionDef,
 } from "@/lib/editor/fields";
 import { useEditor, type StyleRef } from "./editor-context";
-import { SectionStyleControls } from "./style-controls";
+import { SectionStyleControls, TextStyleControls } from "./style-controls";
 import { EditorMediaField } from "./editor-media";
 
 /*
@@ -44,8 +35,6 @@ import { EditorMediaField } from "./editor-media";
  * server action. In preview, the wrapper disappears; sections a visitor
  * wouldn't see (nothing published) are hidden.
  */
-
-const NONE = "__none__";
 
 /** One labelled control bound to an editor draft. */
 function PanelField({ def }: { def: EditableField }) {
@@ -122,128 +111,6 @@ function PanelField({ def }: { def: EditableField }) {
   );
 }
 
-/** A select bound to an editor draft (photos, video type). */
-function PanelSelect({
-  scope,
-  field,
-  label,
-  options,
-  noneLabel,
-  hint,
-  disabled,
-}: {
-  scope: EditorScope;
-  field: string;
-  label: string;
-  options: { value: string; label: string }[];
-  noneLabel?: string;
-  hint?: string;
-  disabled?: boolean;
-}) {
-  const editor = useEditor();
-  const id = useId();
-  const value = String(editor.value(scope, field) ?? "");
-  const error = editor.error(scope, field);
-  return (
-    <div className="grid gap-2">
-      <label htmlFor={id} className="text-sm font-semibold">
-        {label}
-      </label>
-      <Select
-        value={value || (noneLabel ? NONE : "")}
-        onValueChange={(v) => editor.setDraft(scope, field, v === NONE ? "" : v)}
-        disabled={disabled}
-      >
-        <SelectTrigger
-          id={id}
-          className="w-full"
-          aria-invalid={error ? true : undefined}
-          aria-describedby={[hint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(" ") || undefined}
-        >
-          <SelectValue placeholder="Choose…" />
-        </SelectTrigger>
-        <SelectContent>
-          {noneLabel && <SelectItem value={NONE}>{noneLabel}</SelectItem>}
-          {options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {hint && (
-        <p id={`${id}-hint`} className="text-sm text-muted-foreground">
-          {hint}
-        </p>
-      )}
-      {error && (
-        <p id={`${id}-error`} role="alert" className="text-sm font-medium text-destructive">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** Where the video comes from: same choices and rules as /admin/content/video. */
-function VideoSource() {
-  const editor = useEditor();
-  const { videoOptions, uploadedVideoConfigured } = editor.data;
-  const provider = String(editor.value("video", "provider")) as VideoSourceKey;
-  const streamVideos = videoOptions.filter((v) => v.provider === "stream");
-  const text = (field: string, label: string, hint?: string, optional?: boolean) => (
-    <PanelField def={{ scope: "video", field, label, kind: "line", hint, optional }} />
-  );
-  return (
-    <fieldset className="grid gap-4 border-t border-border pt-5">
-      <legend className="sr-only">Video</legend>
-      <PanelSelect
-        scope="video"
-        field="provider"
-        label="Video"
-        options={videoSources
-          .filter((p) => p !== "stream" || uploadedVideoConfigured || provider === "stream")
-          .map((p) => ({ value: p, label: videoSourceLabels[p] }))}
-        hint={
-          uploadedVideoConfigured
-            ? undefined
-            : "Uploaded video is not configured yet. Add a YouTube or Vimeo link instead."
-        }
-      />
-      {(provider === "youtube" || provider === "vimeo") &&
-        text(
-          "videoUrl",
-          provider === "youtube" ? "YouTube link" : "Vimeo link",
-          "Copy it from the video's Share button.",
-        )}
-      {provider === "stream" && (
-        <PanelSelect
-          scope="video"
-          field="videoMediaId"
-          label="Uploaded video"
-          options={streamVideos.map((v) => ({ value: v.id, label: v.title }))}
-          disabled={streamVideos.length === 0}
-          hint={streamVideos.length === 0 ? "No uploaded videos yet." : undefined}
-        />
-      )}
-      {provider !== "none" && (
-        <>
-          {text("videoTitle", "What the video shows", "Read out by screen readers and shown on the play button.")}
-          {text("caption", "Caption", undefined, true)}
-          <EditorMediaField
-            scope="video"
-            field="posterId"
-            label="Cover photo"
-            use="posters"
-            hint="Shown before the video plays. The player only loads when a visitor presses Play."
-            emptyText="No cover photo: a Canvas Creations cover is shown."
-          />
-        </>
-      )}
-    </fieldset>
-  );
-}
-
 function SectionPanel({
   section,
   def,
@@ -264,17 +131,17 @@ function SectionPanel({
   const editor = useEditor();
   const scopes = [...new Set(def.fields.map((f) => f.scope))];
   const photoField = section === "hero" ? "heroImageId" : section === "about" ? "imageId" : null;
-  const extraFields =
-    section === "video" ? ["provider", "videoUrl", "videoMediaId", "posterId", "videoTitle", "caption"] : photoField ? [photoField] : [];
-  // The scope the photo/video fields belong to (the section's own record).
-  const ownScope = section === "about" ? "about" : section === "video" ? "video" : "home";
-  // This section's style presets: its own, and those of its texts.
+  const extraFields = photoField ? [photoField] : [];
+  // The scope the photo fields belong to (the section's own record).
+  const ownScope = section === "about" ? "about" : "home";
+  // This section's style presets: its own, its texts', and its list's parts.
   const styleRefs: StyleRef[] = [
     ...(section ? [{ kind: "section", key: section } as const] : []),
     ...def.fields
       .map((f) => `${f.scope}.${f.field}`)
       .filter(isStyleKey)
       .map((key) => ({ kind: "text", key }) as const),
+    ...(def.styleKeys ?? []).map((s) => ({ kind: "text", key: s.key }) as const),
   ];
   const unsaved =
     new Set(
@@ -327,7 +194,20 @@ function SectionPanel({
               }
             />
           )}
-          {section === "video" && <VideoSource />}
+          {def.styleKeys && def.styleKeys.length > 0 && (
+            <fieldset className="grid gap-4 border-t border-border pt-5">
+              <legend className="text-sm font-semibold">
+                {def.collection ? `${collections[def.collection].title}: text styles` : "Text styles"}
+              </legend>
+              <p className="-mt-2 text-sm text-muted-foreground">One look for every item in the list.</p>
+              {def.styleKeys.map((s) => (
+                <div key={s.key} className="grid gap-1">
+                  <p className="text-sm font-medium">{s.label}</p>
+                  <TextStyleControls styleKey={s.key} label={s.label} />
+                </div>
+              ))}
+            </fieldset>
+          )}
           {section && <SectionStyleControls section={section} spacing={section !== "hero"} />}
           {def.collection && (
             <p className="border-l-2 border-highlight pl-3 text-sm text-muted-foreground">

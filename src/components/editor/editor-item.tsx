@@ -5,7 +5,9 @@ import { ArrowDown, ArrowUp, Eye, EyeOff, MoreHorizontal, Pencil, Plus, Trash2 }
 import {
   CategoryForm,
   FaqForm,
+  FilmForm,
   GalleryItemForm,
+  PricingForm,
   ServiceForm,
   StepForm,
   TestimonialForm,
@@ -49,6 +51,10 @@ function ItemForm({
   switch (collection) {
     case "services":
       return <ServiceForm {...common} defaultValues={v<"services">()} imageOptions={data.imageOptions} />;
+    case "pricing":
+      return <PricingForm {...common} defaultValues={v<"pricing">()} />;
+    case "films":
+      return <FilmForm {...common} defaultValues={v<"films">()} videoOptions={data.videoOptions} />;
     case "categories":
       return <CategoryForm {...common} defaultValues={v<"categories">()} />;
     case "gallery":
@@ -222,12 +228,13 @@ export function AddItem({ collection }: { collection: CollectionKey }) {
   const { singular } = collections[collection];
   const items = editor.data.items[collection];
   const nextOrder = items.reduce((max, i) => Math.max(max, Number(i.values.sortOrder) || 0), 0) + 1;
-  // Same defaults as the table: a draft at the end; services and
-  // testimonials are featured by default, gallery photos aren't.
+  // A draft at the end. Services and testimonials are featured by default;
+  // in the other lists "featured" means shown first, so it's opt-in.
   const defaults = collections[collection].toValues({
     is_published: false,
-    is_featured: collection !== "gallery",
+    is_featured: collection === "services" || collection === "testimonials",
     sort_order: nextOrder,
+    price_type: "fixed",
   }) as Record<string, unknown>;
 
   return (

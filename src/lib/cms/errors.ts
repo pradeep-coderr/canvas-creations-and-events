@@ -13,6 +13,7 @@ export function describeDbError(
   if (code === "23505") {
     if (/slug/.test(where)) return "That web address name (slug) is already used. Choose a different one.";
     if (/storage_path/.test(where)) return "That file is already in the media list.";
+    if (/films_video_key/.test(where)) return "That video is already in the films list. Each video can be listed once.";
     return `Couldn't ${action}: it duplicates an existing item.`;
   }
   if (code === "23503") {
@@ -20,6 +21,14 @@ export function describeDbError(
       return /still referenced/.test(where)
         ? "This photo is still used in the gallery. Remove it from the gallery first."
         : "The selected photo no longer exists. Choose another one.";
+    if (/films_video_fkey/.test(where))
+      return /still referenced/.test(where)
+        ? "This video is still used in the films list. Remove it from there first."
+        : "The selected video no longer exists, or isn't a YouTube or Vimeo video. Choose another one.";
+    if (/media_assets_poster_fkey/.test(where))
+      return /still referenced/.test(where)
+        ? "This photo is a video's cover. Choose another cover for that video first."
+        : "The selected cover photo no longer exists. Choose another one.";
     if (/video_story_(video|poster)_fkey/.test(where))
       return "The selected video or poster no longer exists, or is still used by the video section.";
     if (/category/.test(where)) return "The selected category no longer exists. Choose another one.";
@@ -27,6 +36,9 @@ export function describeDbError(
   }
   if (code === "23514" || code === "23502") {
     if (/faqs_action_check/.test(where)) return "A link needs both its text and its address.";
+    if (/pricing_packages_quote_price_check/.test(where))
+      return "A fixed or “from” price needs an amount; a custom quote has none.";
+    if (/films_video_provider_check/.test(where)) return "Films can use YouTube or Vimeo videos only.";
     if (/video_story_video_check/.test(where))
       return "The video settings are incomplete for the chosen video type.";
     return `Couldn't ${action}: some content doesn't meet the website's rules. Check the fields and try again.`;

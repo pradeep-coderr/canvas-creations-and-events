@@ -65,6 +65,8 @@ const finalizeSchema = z.object({
     .string()
     .transform((v) => v.replace(/[\u0000-\u001f\u007f]/g, "").split(/[\\/]/).pop()!.trim().slice(0, 200))
     .transform((v) => v || null),
+  /** Replace this library photo's file (it keeps its id, so every use shows the new file). */
+  replaceId: z.uuid().optional(),
 });
 
 export async function finalizeImageUpload(input: unknown): Promise<MediaResult<MediaImage>> {
@@ -94,6 +96,58 @@ export async function finalizeImageUpload(input: unknown): Promise<MediaResult<M
     if (stored.error) {
       console.error("[media] final upload failed", { message: stored.error.message });
       return { ok: false, error: "This image could not be uploaded. Please try again." };
+    }
+
+    if (parsed.data.replaceId) {
+      // Same record, new file: everything using the photo shows the new one.
+      const before = await supabase
+        .from("media_assets")
+        .select("storage_path")
+        .eq("id", parsed.data.replaceId)
+        .eq("kind", "image")
+        .maybeSingle();
+      const { data: replaced, error: replaceError } = await supabase
+        .from("media_assets")
+        .update({
+          storage_path: storagePath,
+          alt: parsed.data.alt,
+          width: processed.width,
+          height: processed.height,
+          original_filename: originalFilename,
+          mime_type: processed.mime,
+          file_size: processed.size,
+        })
+        .eq("id", parsed.data.replaceId)
+        .eq("kind", "image")
+        .select("id, created_at, storage_path")
+        .maybeSingle();
+      if (replaceError || !replaced || !before.data) {
+        console.error("[media] replace failed", { code: replaceError?.code });
+        await bucket.remove([storagePath]);
+        return { ok: false, error: "The photo couldn't be replaced. Nothing was changed. Please try again." };
+      }
+      if (before.data.storage_path) {
+        const removed = await bucket.remove([before.data.storage_path]);
+        if (removed.error) console.error("[media] old file removal failed after replace", { message: removed.error.message });
+      }
+      mediaChanged(true);
+      const { data: signedNew } = await bucket.createSignedUrl(storagePath, 60 * 60);
+      return {
+        ok: true,
+        message: "Photo replaced. Everywhere it's used now shows the new photo.",
+        item: {
+          id: replaced.id,
+          url: signedNew?.signedUrl ?? "",
+          alt: parsed.data.alt,
+          width: processed.width,
+          height: processed.height,
+          originalFilename,
+          fileSize: processed.size,
+          mimeType: processed.mime,
+          createdAt: replaced.created_at,
+          usage: [],
+        },
+      };
     }
 
     const { data: row, error } = await supabase
@@ -214,6 +268,53 @@ export async function addVideoLink(input: unknown): Promise<MediaResult<{ id: st
   if ("error" in result) return { ok: false, error: result.error };
   mediaChanged(false);
   return { ok: true, message: "Video added to the library.", item: { id: result.id } };
+}
+
+const videoTitle = z.string().trim().min(1, "Give the video a short title.").max(TITLE_MAX).regex(/^[^\r\n]*$/, "Keep this on one line.");
+
+/** A library video's title (shown in the admin; films have their own titles). */
+export async function updateVideoTitle(id: string, value: string): Promise<MediaResult> {
+  await requireAdmin();
+  const parsedId = z.uuid().safeParse(id);
+  const parsedTitle = videoTitle.safeParse(value);
+  if (!parsedId.success) return { ok: false, error: "That video couldn't be found." };
+  if (!parsedTitle.success) return { ok: false, error: parsedTitle.error.issues[0].message, fieldErrors: { title: parsedTitle.error.issues[0].message } };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("media_assets")
+    .update({ title: parsedTitle.data })
+    .eq("id", parsedId.data)
+    .eq("kind", "video")
+    .select("id")
+    .maybeSingle();
+  if (error || !data) {
+    console.error("[media] video title update failed", { code: error?.code });
+    return { ok: false, error: "The title couldn't be saved. Please try again." };
+  }
+  mediaChanged(false);
+  return { ok: true, message: "Video title saved." };
+}
+
+/** A video's cover photo (poster), from the library; null removes it. */
+export async function setVideoPoster(videoId: string, posterId: string | null): Promise<MediaResult> {
+  await requireAdmin();
+  if (!z.uuid().safeParse(videoId).success || (posterId !== null && !z.uuid().safeParse(posterId).success)) {
+    return { ok: false, error: "That video or photo couldn't be found." };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("media_assets")
+    .update({ poster_media_id: posterId })
+    .eq("id", videoId)
+    .eq("kind", "video")
+    .select("poster_media_id")
+    .maybeSingle();
+  if (error || !data || data.poster_media_id !== posterId) {
+    console.error("[media] poster update failed", { code: error?.code });
+    return { ok: false, error: "The cover photo couldn't be saved. Please try again." };
+  }
+  mediaChanged(true);
+  return { ok: true, message: posterId ? "Cover photo saved." : "Cover photo removed." };
 }
 
 /** For pickers opened from forms and the visual editor. */

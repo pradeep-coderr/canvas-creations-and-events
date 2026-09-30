@@ -70,4 +70,8 @@ export interface MediaVideo {
   sourceUrl: string | null;
   createdAt: string;
   usage: string[];
+  /** The video's cover photo (library image), if chosen. */
+  posterId: string | null;
+  /** Signed URL of the cover (admin views only). */
+  posterUrl: string | null;
 }

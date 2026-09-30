@@ -62,6 +62,20 @@ export const gallerySection = {
   emptyText:
     "We are curating a selection of our celebrations for this page. In the meantime, follow along on social media.",
   instagramCta: "See more on Instagram",
+  /** Optional line under the heading. */
+  intro: null as string | null,
+  /** The first filter button (shown only when there are enough categories). */
+  filterAll: "All",
+};
+
+/*
+ * Pricing section wording. The section appears only once a real package is
+ * published in the CMS; no packages or prices are built in.
+ */
+export const pricingSection = {
+  eyebrow: "Pricing",
+  title: "Packages",
+  description: null as string | null,
 };
 
 /*
@@ -239,6 +253,7 @@ export type IntroCopy = Renderable<typeof intro>;
 export type ServicesCopy = Renderable<typeof servicesSection>;
 export type CategoriesCopy = Renderable<typeof categoriesSection>;
 export type GalleryCopy = Renderable<typeof gallerySection>;
+export type PricingCopy = Renderable<typeof pricingSection>;
 export type AboutCopy = Renderable<typeof about>;
 export type ProcessCopy = Renderable<Pick<typeof processSection, "eyebrow" | "title">>;
 export type WhyCanvasCopy = Renderable<Pick<typeof whyCanvas, "eyebrow" | "titleLines">>;

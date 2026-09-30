@@ -17,12 +17,13 @@ export default async function NewItemPage({ params }: PageProps<"/admin/content/
   if (!isCollectionKey(collection)) notFound();
   const def = collections[collection];
 
-  // Same defaults as the table: a draft, at the end of the list; services and
-  // testimonials are featured by default, gallery photos aren't.
+  // A draft at the end of the list. Services and testimonials are featured by
+  // default; in the other lists "featured" means shown first, so it's opt-in.
   const defaults = {
     is_published: false,
-    is_featured: collection !== "gallery",
+    is_featured: collection === "services" || collection === "testimonials",
     sort_order: await nextSortOrder(collection),
+    price_type: "fixed",
   };
 
   return (

@@ -5,7 +5,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowUpRight, Plus } from "lucide-react";
-import { addVideoLink, deleteMedia, updateImageAlt } from "@/app/admin/(portal)/content/media/actions";
+import {
+  addVideoLink,
+  deleteMedia,
+  getLibraryImages,
+  setVideoPoster,
+  updateImageAlt,
+  updateVideoTitle,
+} from "@/app/admin/(portal)/content/media/actions";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { describeActionFailure } from "@/lib/admin/action-error";
@@ -20,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ALT_MAX, TITLE_MAX, videoProviderLabels, type MediaImage, type MediaVideo } from "@/lib/media/types";
 import { cn } from "@/lib/utils";
+import { MediaPicker } from "./media-picker";
 import { UploadPhoto } from "./upload-photo";
 
 /*
@@ -39,7 +47,7 @@ function Usage({ usage }: { usage: string[] }) {
   }
   return (
     <div className="text-xs">
-      <span className="font-semibold">Used in:</span>
+      <span className="font-semibold">Used by:</span>
       <ul className="mt-1 list-disc pl-4 text-muted-foreground">
         {usage.map((u) => (
           <li key={u}>{u}</li>
@@ -66,6 +74,7 @@ export function MediaLibrary({
   const [query, setQuery] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [editing, setEditing] = useState<MediaImage | null>(null);
+  const [replacing, setReplacing] = useState<MediaImage | null>(null);
   const [deleting, setDeleting] = useState<{ id: string; name: string; kind: "photo" | "video" } | null>(null);
   const uploadButton = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -181,6 +190,15 @@ export function MediaLibrary({
                         Edit description<span className="sr-only">: {image.alt}</span>
                       </Button>
                       <Button
+                        variant="outline"
+                        onClick={(e) => {
+                          returnFocus.current = e.currentTarget;
+                          setReplacing(image);
+                        }}
+                      >
+                        Replace<span className="sr-only"> photo: {image.alt}</span>
+                      </Button>
+                      <Button
                         variant="destructive"
                         disabled={image.usage.length > 0}
                         aria-describedby={image.usage.length > 0 ? `used-${image.id}` : undefined}
@@ -205,6 +223,7 @@ export function MediaLibrary({
         </>
       ) : (
         <VideosTab
+          images={images}
           videos={videos}
           uploadedVideoConfigured={uploadedVideoConfigured}
           onResult={(r) => {
@@ -239,6 +258,35 @@ export function MediaLibrary({
               router.refresh();
             }}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Replace a photo's file (same library entry, so every use updates) */}
+      <Dialog open={!!replacing} onOpenChange={(open) => !open && setReplacing(null)}>
+        <DialogContent
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            returnFocus.current?.focus();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Replace this photo</DialogTitle>
+            <DialogDescription>
+              Upload the new version. Everywhere this photo is used ({replacing?.usage.length ? replacing.usage.join(", ") : "nowhere yet"}) will show it.
+            </DialogDescription>
+          </DialogHeader>
+          {replacing && (
+            <UploadPhoto
+              use="library"
+              replace={{ id: replacing.id, alt: replacing.alt }}
+              onCancel={() => setReplacing(null)}
+              onUploaded={(_image, message) => {
+                setReplacing(null);
+                setStatus({ kind: "success", text: message });
+                router.refresh();
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
@@ -382,12 +430,170 @@ function EditDescription({
   );
 }
 
+/** A video's cover photo and title (the cover is shown wherever the video appears). */
+function VideoDetails({
+  video,
+  images,
+  onResult,
+}: {
+  video: MediaVideo;
+  images: MediaImage[];
+  onResult: (r: { ok: boolean; message?: string; error?: string }) => void;
+}) {
+  const id = useId();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [library, setLibrary] = useState(images);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState<null | "poster" | "remove" | "title">(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [title, setTitle] = useState(video.title);
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const coverButton = useRef<HTMLButtonElement>(null);
+
+  const run = async (kind: "poster" | "remove" | "title", work: () => Promise<{ ok: boolean; message?: string; error?: string }>) => {
+    setBusy(kind);
+    try {
+      const result = await work();
+      onResult(result);
+      return result;
+    } catch (error) {
+      const result = { ok: false, error: describeActionFailure(error).text };
+      onResult(result);
+      return result;
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-[12rem_1fr] sm:gap-5">
+      <div className="relative aspect-video overflow-hidden bg-muted">
+        {video.posterUrl ? (
+          <Image src={video.posterUrl} alt="" fill sizes="192px" className="object-cover" />
+        ) : (
+          <span className="absolute inset-0 flex items-center justify-center p-3 text-center text-xs text-muted-foreground">
+            No cover photo (the Canvas cover is shown)
+          </span>
+        )}
+      </div>
+      <div className="grid content-start gap-2">
+        {editingTitle ? (
+          <form
+            noValidate
+            className="grid gap-2"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (busy) return;
+              const result = await run("title", () => updateVideoTitle(video.id, title));
+              if (result.ok) setEditingTitle(false);
+              else setTitleError(result.error ?? null);
+            }}
+          >
+            <label htmlFor={`${id}-title`} className="text-sm font-semibold">
+              Title
+            </label>
+            <Input
+              id={`${id}-title`}
+              maxLength={TITLE_MAX}
+              value={title}
+              autoFocus
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setTitleError(null);
+              }}
+              aria-invalid={titleError ? true : undefined}
+              aria-describedby={titleError ? `${id}-title-error` : undefined}
+            />
+            {titleError && (
+              <p id={`${id}-title-error`} role="alert" className="text-sm font-medium text-destructive">
+                {titleError}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" pending={busy === "title"} pendingLabel="Saving…" aria-disabled={title.trim() === video.title || undefined}>
+                Save title
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setTitle(video.title);
+                  setTitleError(null);
+                  setEditingTitle(false);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <p className="font-semibold break-words">{video.title}</p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {!editingTitle && (
+            <Button type="button" variant="outline" onClick={() => setEditingTitle(true)}>
+              Edit title<span className="sr-only">: {video.title}</span>
+            </Button>
+          )}
+          <Button
+            ref={coverButton}
+            type="button"
+            variant="outline"
+            pending={busy === "poster"}
+            pendingLabel="Saving cover…"
+            onClick={async () => {
+              setPickerOpen(true);
+              setLoading(true);
+              try {
+                setLibrary(await getLibraryImages());
+              } catch {
+                // Keep the list we have.
+              } finally {
+                setLoading(false);
+              }
+            }}
+          >
+            {video.posterId ? "Change cover photo" : "Choose cover photo"}
+            <span className="sr-only">: {video.title}</span>
+          </Button>
+          {video.posterId && (
+            <Button
+              type="button"
+              variant="ghost"
+              pending={busy === "remove"}
+              pendingLabel="Removing…"
+              onClick={() => void run("remove", () => setVideoPoster(video.id, null))}
+            >
+              Remove cover<span className="sr-only">: {video.title}</span>
+            </Button>
+          )}
+        </div>
+      </div>
+      <MediaPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        images={library}
+        loading={loading}
+        selectedId={video.posterId ?? ""}
+        use="posters"
+        title={`Cover photo: ${video.title}`}
+        onUploaded={(image) => setLibrary((l) => [image, ...l.filter((i) => i.id !== image.id)])}
+        onSelect={(image) => void run("poster", () => setVideoPoster(video.id, image.id))}
+        onDeleted={(deletedId) => setLibrary((l) => l.filter((i) => i.id !== deletedId))}
+        returnFocus={coverButton}
+      />
+    </div>
+  );
+}
+
 function VideosTab({
+  images,
   videos,
   uploadedVideoConfigured,
   onResult,
   onDelete,
 }: {
+  images: MediaImage[];
   videos: MediaVideo[];
   uploadedVideoConfigured: boolean;
   onResult: (r: { ok: boolean; message?: string; error?: string }) => void;
@@ -493,8 +699,8 @@ function VideosTab({
           {videos.map((video) => (
             <li key={video.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:gap-6">
               <div className="min-w-0 flex-1">
-                <p className="font-semibold break-words">{video.title}</p>
-                <p className="text-sm text-muted-foreground">{videoProviderLabels[video.provider]}</p>
+                <VideoDetails video={video} images={images} onResult={onResult} />
+                <p className="mt-3 text-sm text-muted-foreground">{videoProviderLabels[video.provider]}</p>
                 {video.sourceUrl && (
                   <a
                     href={video.sourceUrl}

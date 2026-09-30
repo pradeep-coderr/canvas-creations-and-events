@@ -3,8 +3,8 @@ import { SiteFrame } from "@/components/layout/site-frame";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 import { SiteThemeStyle } from "@/components/theme/site-theme-style";
 import { site } from "@/data/site";
-import { headlineText } from "@/lib/cms/site-settings";
-import { getPageStyles, getSiteSettings } from "@/lib/content/public";
+import { headlineText, withSectionLinks } from "@/lib/cms/site-settings";
+import { getPageStyles, getSectionAvailability, getSiteSettings } from "@/lib/content/public";
 import { textStylesCss } from "@/lib/styles/schema";
 
 // The real client logo (square) — no promotional image is fabricated.
@@ -45,7 +45,9 @@ export async function generateMetadata(): Promise<Metadata> {
  * The global site theme (admin → Design) is applied here for every visitor.
  */
 export default async function SiteLayout({ children }: LayoutProps<"/">) {
-  const [settings, styles] = await Promise.all([getSiteSettings(), getPageStyles()]);
+  const [saved, styles, available] = await Promise.all([getSiteSettings(), getPageStyles(), getSectionAvailability()]);
+  // Pricing and Films appear in the menu only while they have published content.
+  const settings = withSectionLinks(saved, available);
   const textCss = textStylesCss(styles.text);
   return (
     <>

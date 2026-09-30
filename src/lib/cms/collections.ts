@@ -1,9 +1,13 @@
 import { z } from "zod";
 import {
   line,
+  lineList,
   optionalHref,
   optionalId,
   optionalLine,
+  optionalPrice,
+  optionalShort,
+  optionalText,
   requiredId,
   slug,
   sortOrder,
@@ -19,8 +23,10 @@ import {
 
 export const collectionKeys = [
   "services",
+  "pricing",
   "categories",
   "gallery",
+  "films",
   "testimonials",
   "faqs",
   "process",
@@ -96,6 +102,45 @@ export const faqSchema = z
       ctx.addIssue({ code: "custom", path: ["actionLabel"], message: "Add the link text, or clear the link." });
   });
 
+/** How a package's price is shown: "$1,500", "From $1,500" or "Custom quote". */
+export const priceTypes = ["fixed", "starting_from", "custom_quote"] as const;
+export type PriceType = (typeof priceTypes)[number];
+export const priceTypeLabels: Record<PriceType, string> = {
+  fixed: "Fixed price",
+  starting_from: "Starting from",
+  custom_quote: "Custom quote (no price shown)",
+};
+
+// Prices are typed as text in the form (so "1,500" works) and stored as numbers.
+export const pricingSchema = z
+  .object({
+    title: line(),
+    slug: slug(),
+    description: optionalText(),
+    priceType: z.enum(priceTypes),
+    price: optionalPrice(),
+    pricePrefix: optionalShort(40),
+    priceSuffix: optionalShort(60),
+    features: lineList(),
+    ctaLabel: optionalLine(),
+    isFeatured: z.boolean(),
+    ...visibility,
+  })
+  // Same rule as pricing_packages_quote_price_check (a quote's amount is
+  // ignored: the form hides it, and it's saved as no price).
+  .superRefine((v, ctx) => {
+    if (v.priceType !== "custom_quote" && v.price === null)
+      ctx.addIssue({ code: "custom", path: ["price"], message: "Enter the price in Australian dollars." });
+  });
+
+export const filmSchema = z.object({
+  videoMediaId: requiredId("Choose a video."),
+  title: line(),
+  caption: optionalText(),
+  isFeatured: z.boolean(),
+  ...visibility,
+});
+
 /** Process steps and principles share one shape. */
 export const stepSchema = z.object({
   title: line(),
@@ -163,6 +208,47 @@ export const collections = {
     label: (row) => str(row.title),
     detail: (row) => excerpt(row.summary),
   }),
+  pricing: define({
+    table: "pricing_packages",
+    title: "Pricing",
+    singular: "package",
+    plural: "packages",
+    description: "Your packages and prices. The pricing section appears on the homepage once a package is published.",
+    featured: true,
+    listSelect: "id, title, price_type, price, is_published, is_featured, sort_order, created_at",
+    schema: pricingSchema,
+    toRow: (v) => ({
+      title: v.title,
+      slug: v.slug,
+      description: v.description,
+      price_type: v.priceType,
+      price: v.priceType === "custom_quote" ? null : v.price,
+      price_prefix: v.pricePrefix,
+      price_suffix: v.priceSuffix,
+      features: v.features,
+      cta_label: v.ctaLabel,
+      is_featured: v.isFeatured,
+      ...visibilityRow(v),
+    }),
+    toValues: (row) => ({
+      title: str(row.title),
+      slug: str(row.slug),
+      description: str(row.description),
+      priceType: (priceTypes as readonly string[]).includes(str(row.price_type)) ? (row.price_type as PriceType) : "fixed",
+      price: row.price === null || row.price === undefined ? "" : String(Number(row.price)),
+      pricePrefix: str(row.price_prefix),
+      priceSuffix: str(row.price_suffix),
+      features: Array.isArray(row.features) ? (row.features as string[]).join("\n") : "",
+      ctaLabel: str(row.cta_label),
+      isFeatured: row.is_featured === true,
+      ...visibilityValues(row),
+    }),
+    label: (row) => str(row.title),
+    detail: (row) => formatPackagePrice({
+      priceType: str(row.price_type) as PriceType,
+      price: row.price === null || row.price === undefined ? null : Number(row.price),
+    }),
+  }),
   categories: define({
     table: "categories",
     title: "Categories",
@@ -181,7 +267,7 @@ export const collections = {
     title: "Gallery",
     singular: "gallery item",
     plural: "gallery items",
-    description: "Photos of your work. Up to five featured photos appear on the homepage.",
+    description: "Photos of your work, shown in the portfolio on the homepage. Featured photos are shown first and largest.",
     featured: true,
     listSelect:
       "id, title, is_published, is_featured, sort_order, created_at, media:media_assets!gallery_items_media_fkey(alt, storage_path), category:categories(label)",
@@ -207,6 +293,36 @@ export const collections = {
     detail: (row) => {
       const category = row.category as { label?: string } | null | undefined;
       return category?.label ? `Category: ${category.label}` : null;
+    },
+  }),
+  films: define({
+    table: "films",
+    title: "Films",
+    singular: "film",
+    plural: "films",
+    description: "YouTube or Vimeo videos from the media library, shown in the Films section. The featured film is shown largest.",
+    featured: true,
+    listSelect:
+      "id, title, is_published, is_featured, sort_order, created_at, video:media_assets!films_video_fkey(title, provider)",
+    schema: filmSchema,
+    toRow: (v) => ({
+      video_media_id: v.videoMediaId,
+      title: v.title,
+      caption: v.caption,
+      is_featured: v.isFeatured,
+      ...visibilityRow(v),
+    }),
+    toValues: (row) => ({
+      videoMediaId: str(row.video_media_id),
+      title: str(row.title),
+      caption: str(row.caption),
+      isFeatured: row.is_featured === true,
+      ...visibilityValues(row),
+    }),
+    label: (row) => str(row.title),
+    detail: (row) => {
+      const video = row.video as { provider?: string } | null | undefined;
+      return video?.provider === "vimeo" ? "Vimeo" : video?.provider === "youtube" ? "YouTube" : null;
     },
   }),
   testimonials: define({
@@ -310,4 +426,30 @@ export interface CategoryOption {
   id: string;
   label: string;
   isPublished: boolean;
+}
+
+/** "$1,500" (whole dollars) or "$1,500.50", Australian dollars. */
+export function formatAud(amount: number) {
+  return new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: "AUD",
+    currencyDisplay: "narrowSymbol",
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+/**
+ * A package's price line: "$1,500", "From $1,500" or "Custom quote", with
+ * the optional words before/after. Never "$0": no amount, no price.
+ */
+export function formatPackagePrice(p: {
+  priceType: PriceType;
+  price: number | null;
+  prefix?: string | null;
+  suffix?: string | null;
+}): string {
+  if (p.priceType === "custom_quote" || p.price === null || !(p.price > 0)) return "Custom quote";
+  const lead = p.prefix || (p.priceType === "starting_from" ? "From" : "");
+  return [lead, formatAud(p.price), p.suffix].filter(Boolean).join(" ");
 }

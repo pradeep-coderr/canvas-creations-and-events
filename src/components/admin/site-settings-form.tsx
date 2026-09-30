@@ -38,7 +38,9 @@ export function SiteSettingsForm({ defaultValues }: { defaultValues: SiteValues 
           <FormSection title="Menu and buttons" description="Only the wording changes; where each link goes stays the same.">
             <TextField form={form} name="navHome" label="Menu: Home" />
             <TextField form={form} name="navServices" label="Menu: Services" />
+            <TextField form={form} name="navPricing" label="Menu: Pricing" hint="Shown only while a package is published." />
             <TextField form={form} name="navGallery" label="Menu: Gallery" />
+            <TextField form={form} name="navFilms" label="Menu: Films" hint="Shown only while a film is published." />
             <TextField form={form} name="navAbout" label="Menu: About" />
             <TextField form={form} name="navFaq" label="Menu: FAQ" />
             <TextField form={form} name="navContact" label="Menu: Contact" />

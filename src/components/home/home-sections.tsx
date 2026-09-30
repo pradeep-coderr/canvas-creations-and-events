@@ -7,6 +7,7 @@ import { Faq } from "@/components/sections/faq";
 import { GalleryPreview } from "@/components/sections/gallery-preview";
 import { Hero } from "@/components/sections/hero";
 import { Intro } from "@/components/sections/intro";
+import { Pricing } from "@/components/sections/pricing";
 import type { ItemSlots } from "@/components/sections/item-slots";
 import { Process } from "@/components/sections/process";
 import { Services } from "@/components/sections/services";
@@ -14,8 +15,10 @@ import { VideoStory } from "@/components/sections/video-story";
 import { WhyCanvas } from "@/components/sections/why-canvas";
 import type { Category } from "@/data/categories";
 import type { FaqItem } from "@/data/faq";
+import type { Film } from "@/data/films";
 import type { GalleryItem } from "@/data/gallery";
-import type { AboutCopy, Principle, ProcessStep, VideoContent, VideoStoryCopy } from "@/data/home";
+import type { AboutCopy, Principle, ProcessStep, VideoStoryCopy } from "@/data/home";
+import type { PricingPackage } from "@/data/pricing";
 import type { Service } from "@/data/services";
 import type { Testimonial } from "@/data/testimonials";
 import type { SiteCopy } from "@/lib/cms/site-settings";
@@ -30,10 +33,15 @@ export interface HomeContent {
   /** Section style presets (background, spacing) from the visual editor. */
   sectionStyles?: PageStyles["sections"];
   about: AboutCopy;
-  video: { copy: VideoStoryCopy; video: VideoContent | null };
+  /** The Films section's wording. */
+  video: { copy: VideoStoryCopy };
   services: Service[];
+  pricing: PricingPackage[];
   categories: Category[];
   gallery: GalleryItem[];
+  /** Categories that have photos in the portfolio (for its filter). */
+  galleryCategories: { id: string; label: string }[];
+  films: Film[];
   testimonials: Testimonial[];
   faqs: FaqItem[];
   processSteps: ProcessStep[];
@@ -44,6 +52,7 @@ export type HomeSectionKey =
   | "hero"
   | "intro"
   | "services"
+  | "pricing"
   | "categories"
   | "gallery"
   | "about"
@@ -62,8 +71,10 @@ export interface HomeEditorSlots {
   heroImage?: ReactNode;
   aboutImage?: ReactNode;
   services?: ItemSlots<Service>;
+  pricing?: ItemSlots<PricingPackage>;
   categories?: ItemSlots<Category>;
   gallery?: ItemSlots<GalleryItem>;
+  films?: ItemSlots<Film>;
   testimonials?: ItemSlots<Testimonial>;
   faqs?: ItemSlots<FaqItem>;
   process?: ItemSlots<ProcessStep>;
@@ -112,11 +123,23 @@ export function HomeSections({ content, slots }: { content: HomeContent; slots?:
       <S section="services" styles={ss}>
         <Services services={content.services} copy={copy.services} itemSlots={slots?.services} />
       </S>
+      {/* Only once a package is published (the editor always shows it). */}
+      {(content.pricing.length > 0 || slots?.pricing) && (
+        <S section="pricing" styles={ss}>
+          <Pricing packages={content.pricing} copy={copy.pricing} itemSlots={slots?.pricing} />
+        </S>
+      )}
       <S section="categories" styles={ss}>
         <CategoryStrip categories={content.categories} copy={copy.categories} itemSlots={slots?.categories} />
       </S>
       <S section="gallery" styles={ss}>
-        <GalleryPreview items={content.gallery} copy={copy.gallery} itemSlots={slots?.gallery} socials={settings.socials} />
+        <GalleryPreview
+          items={content.gallery}
+          categories={content.galleryCategories}
+          copy={copy.gallery}
+          itemSlots={slots?.gallery}
+          socials={settings.socials}
+        />
       </S>
       <S section="about" styles={ss}>
         <AboutFounder copy={content.about} imageAction={slots?.aboutImage} />
@@ -128,9 +151,12 @@ export function HomeSections({ content, slots }: { content: HomeContent; slots?:
       <S section="whyCanvas" styles={ss}>
         <WhyCanvas principles={content.principles} copy={copy.whyCanvas} itemSlots={slots?.principles} />
       </S>
-      <S section="video" styles={ss}>
-        <VideoStory video={content.video.video} copy={content.video.copy} socials={settings.socials} />
-      </S>
+      {/* Films: only once a film is published (the editor always shows it). */}
+      {(content.films.length > 0 || slots?.films) && (
+        <S section="video" styles={ss}>
+          <VideoStory films={content.films} copy={content.video.copy} socials={settings.socials} itemSlots={slots?.films} />
+        </S>
+      )}
       <S section="faq" styles={ss}>
         <Faq faqs={content.faqs} copy={copy.faq} itemSlots={slots?.faqs} />
       </S>

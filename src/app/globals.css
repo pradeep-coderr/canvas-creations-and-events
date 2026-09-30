@@ -192,6 +192,89 @@
   }
 }
 
+/*
+ * Hero signature (Phase 22), pure CSS so the hero is complete in the server
+ * HTML and never waits for JavaScript. With motion allowed:
+ *   - the photo is revealed through a soft upward wipe while it settles from
+ *     1.03 to 1 (transform/opacity/clip-path only, nothing re-laid out);
+ *   - the gold hairline frame behind it draws in from its corner;
+ *   - on large screens only, the photo drifts up a little as the page
+ *     scrolls (scroll-driven, no scroll listeners; not on phones/tablets).
+ * With reduced motion none of this runs: everything is simply there.
+ */
+@keyframes cc-hero-reveal {
+  from {
+    opacity: 0;
+    clip-path: inset(14% 0 0 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes cc-hero-settle {
+  from {
+    transform: scale(1.03);
+  }
+}
+@keyframes cc-hero-frame {
+  from {
+    clip-path: inset(0 100% 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes cc-hero-depth {
+  to {
+    transform: translateY(-2rem);
+  }
+}
+@utility hero-media {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: cc-hero-reveal 1.3s var(--ease-elegant) 0.15s both;
+  }
+}
+@utility hero-media-settle {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: cc-hero-settle 2.4s var(--ease-elegant) 0.15s both;
+  }
+}
+@utility hero-frame {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: cc-hero-frame 1.6s var(--ease-elegant) 0.55s both;
+  }
+}
+@utility hero-depth {
+  @media (prefers-reduced-motion: no-preference) and (min-width: 64rem) {
+    @supports (animation-timeline: scroll()) {
+      animation: cc-hero-depth linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 70vh;
+    }
+  }
+}
+
+/*
+ * Portfolio filter (Phase 22): while a category is chosen, the editorial
+ * layout gives way to an even grid of the photos that match, so no gaps are
+ * left where hidden photos were.
+ */
+[data-portfolio-filter]:not([data-portfolio-filter="all"]) .cc-portfolio > li {
+  grid-column: span 1;
+  grid-row: auto;
+}
+@media (min-width: 64rem) {
+  [data-portfolio-filter]:not([data-portfolio-filter="all"]) .cc-portfolio > li {
+    grid-column: span 4;
+  }
+}
+[data-portfolio-filter]:not([data-portfolio-filter="all"]) .cc-portfolio-frame {
+  aspect-ratio: 1 / 1;
+  height: auto;
+  min-height: 0;
+}
+
 /* Desktop header is taller (lg breakpoint) */
 @media (min-width: 64rem) {
   :root {
