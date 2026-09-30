@@ -3336,9 +3336,18 @@ Final gate: `bun install --frozen-lockfile`, typecheck, lint, build, `git diff -
 
 Final gate (hosted env): `bun install --frozen-lockfile`, typecheck, lint, build, `git diff --check`, `supabase db lint`: all clean.
 
+### Production: migration pushed
+
+The owner approved it. After a dry run (listing only this migration), it was pushed with `supabase db push`, and `migration list` shows local and remote in sync. Checked on the hosted database:
+- RLS is on for `pricing_packages` and `films`, with the five policies each (public reads published; admins add/read all/edit/delete).
+- Both tables are empty: no content invented.
+- New wording: Pricing / Packages / All; menu labels Pricing / Films; `media_assets.poster_media_id` exists.
+- Anonymous REST reads of both tables return `[]`. Anonymous inserts into both are refused (`42501`).
+- The live site (old code, additive migration) still returns 200 with the Adelaide address.
+
 ### Production: not done yet (not claimed)
 
-1. **Push the migration first**, then deploy the code. The new code reads the new columns (`nav_pricing`, `pricing_*`, `films`). Deployed without the migration, the site would fall back to its built-in wording.
+1. Deploy the code (`git push`). The migration it needs is now live.
 2. After deploy, check the live homepage, menu and editor. Pricing and Films stay hidden and the portfolio shows its empty state until the owner publishes real content.
 3. With real content, verify on a phone: gallery layout, lightbox (swipe), filter (once there are three or more categories), video playback, pricing layout, and the editor's Save behaviour.
 
