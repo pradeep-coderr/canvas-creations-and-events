@@ -3374,3 +3374,21 @@ The owner approved it. After a dry run (listing only this migration), it was pus
 - keyboard Enter on the logo.
 
 Typecheck, lint and build are clean. Not yet checked on the live site; it needs the next deploy.
+
+### Follow-up: hero monogram without its panel (owner's request)
+
+**Request:** the hero placeholder shown while no hero photo is set (ivory panel, gold frame, small CC monogram): remove the background and show only the CC logo, larger.
+
+**Change:**
+- **No panel or frame:** the placeholder is now just the monogram on the page background. The gold hairline frame renders only when a real hero photo is set.
+- **Larger:** about 433px wide at 1440, 345 at 1024, 424 at 768 and 277 at 390, up from about 185px at 1440. Its reveal animation is unchanged.
+- **Truly transparent image:** the original `canvas-creations-monogram.png` has an opaque near-white background (78% of its pixels are opaque), which is the light box the ivory panel used to hide.
+  - The new asset, `public/images/logo/canvas-creations-cc-mark.png` (775×533), was made from it by converting white to transparency, which keeps the gold and pink edges smooth on the white hero background.
+  - It was then trimmed to the artwork, and 192 near-invisible specks of noise were removed, including one visible above the top-right leaf.
+  - The original file is untouched and still used elsewhere (About placeholder, film cover fallback).
+- **Limitation:** this artwork is made for a light background. If the hero section's style were set to the dark tone in the editor, the colour-to-alpha conversion would make the pink look deeper.
+
+**Tested locally:**
+- Screenshots at 1440/1024/768/390: no box, no frame, no overflow.
+- `e2e22.mjs` still passes 74/74 (hero check updated: the frame is absent when there's no photo).
+- Typecheck and lint are clean.

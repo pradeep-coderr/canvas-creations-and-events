@@ -94,10 +94,13 @@ export function Hero({
 
         {/* Image with an offset gold hairline frame behind it (signature entrance: globals.css "Hero signature") */}
         <div className="hero-depth relative pr-3 pb-3 sm:pr-5 sm:pb-5 lg:col-span-5">
-          <div
-            aria-hidden="true"
-            className="hero-frame absolute inset-0 top-3 left-3 border border-highlight/60 sm:top-5 sm:left-5"
-          />
+          {/* The gold frame belongs to a photo; the monogram stands on its own. */}
+          {copy.image && (
+            <div
+              aria-hidden="true"
+              className="hero-frame absolute inset-0 top-3 left-3 border border-highlight/60 sm:top-5 sm:left-5"
+            />
+          )}
           {copy.image ? (
             <ImageFrame
               src={copy.image.src}
@@ -110,20 +113,20 @@ export function Hero({
               imageClassName={`hero-media-settle ${copy.image.position ?? ""}`}
             />
           ) : (
-            // Placeholder until client photography exists: the real monogram
-            // on ivory — deliberately not a fake photo. `mix-blend-multiply`
-            // blends the monogram's white disc into the ivory surface.
-            <div
-              className={`hero-media relative flex items-center justify-center bg-surface-ivory ${frameRatio}`}
-            >
+            // Until a hero photo is chosen: the real CC monogram on its own,
+            // large, on the page background (no panel, no frame) — never a
+            // fake photo. This copy has a transparent background (the white
+            // was converted to transparency) and is trimmed to the artwork.
+            <div className="hero-media mx-auto w-[82%] max-w-[30rem] sm:w-[62%] lg:w-full">
               <Image
-                src="/images/logo/canvas-creations-monogram.png"
+                src="/images/logo/canvas-creations-cc-mark.png"
                 alt=""
-                width={804}
-                height={804}
+                width={775}
+                height={533}
                 loading="eager"
-                sizes="(min-width: 1024px) 240px, 45vw"
-                className="w-[45%] max-w-60 mix-blend-multiply"
+                fetchPriority="high"
+                sizes="(min-width: 1024px) 480px, (min-width: 640px) 62vw, 82vw"
+                className="h-auto w-full"
               />
             </div>
           )}
