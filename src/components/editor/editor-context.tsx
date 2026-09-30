@@ -54,6 +54,8 @@ export interface EditorItemMeta {
   label: string;
   published: boolean;
   featured: boolean;
+  /** Temporary sample content (is_demo). */
+  demo?: boolean;
   /** Would a visitor see it on the homepage right now? */
   visibleOnSite: boolean;
   /** Why a published item isn't on the homepage (not featured, over the limit). */

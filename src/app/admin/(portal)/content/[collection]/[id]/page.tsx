@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { BackLink } from "@/components/admin/back-link";
-import { FeaturedBadge, VisibilityBadge } from "@/components/admin/content-badges";
+import { FeaturedBadge, SampleContentBadge, VisibilityBadge } from "@/components/admin/content-badges";
 import { getCollectionItem } from "@/lib/admin/cms";
 import { requireAdmin } from "@/lib/admin/session";
 import { collections, isCollectionKey, singularTitle } from "@/lib/cms/collections";
@@ -30,6 +30,7 @@ export default async function EditItemPage({ params, searchParams }: PageProps<"
         </h1>
         <VisibilityBadge published={row.is_published === true} />
         {def.featured && row.is_featured === true && <FeaturedBadge />}
+        {row.is_demo === true && <SampleContentBadge />}
       </div>
       <div className="mt-8">
         <ItemForm

@@ -32,6 +32,7 @@ const homeGroups = [
   ["home-pricing", "Pricing"],
   ["home-categories", "Categories"],
   ["home-gallery", "Gallery"],
+  ["home-stories", "Event stories"],
   ["home-process", "Process"],
   ["home-why", "Why Canvas"],
   ["home-testimonials", "Testimonials"],
@@ -144,6 +145,21 @@ export function HomeForm({ defaultValues, imageOptions }: { defaultValues: HomeV
               label="Heading while there are no photos"
             />
             <TextAreaField form={form} name="galleryEmptyText" label="Text while there are no photos" rows={3} />
+          </FormSection>
+
+          <FormSection
+            id="home-stories"
+            title="Event stories section"
+            description="Only shown when at least one story is published. The stories themselves are edited under Content → Event stories."
+          >
+            <Heading form={form} prefix="stories" />
+            <TextAreaField
+              form={form}
+              name="sampleNotice"
+              label="Note while sample content is shown"
+              rows={2}
+              hint="Shown under the portfolio and stories headings while any item there is marked as sample content."
+            />
           </FormSection>
 
           <FormSection id="home-process" title="Process section" description="The steps themselves are edited under Content → Process.">

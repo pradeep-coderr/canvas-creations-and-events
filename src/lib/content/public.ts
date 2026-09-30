@@ -5,6 +5,7 @@ import { sortedFaqs, type FaqItem } from "@/data/faq";
 import { films as localFilms, type Film } from "@/data/films";
 import { galleryPreview, type GalleryItem } from "@/data/gallery";
 import { pricingPackages, type PricingPackage } from "@/data/pricing";
+import { eventStories, type EventStory, type StoryImage } from "@/data/stories";
 import {
   about,
   categoriesSection,
@@ -16,6 +17,7 @@ import {
   intro,
   pricingSection,
   processSection,
+  storiesSection,
   servicesSection,
   testimonialsSection,
   videoStory,
@@ -30,6 +32,7 @@ import {
   type IntroCopy,
   type PricingCopy,
   type Principle,
+  type StoriesCopy,
   type ProcessCopy,
   type ProcessStep,
   type ServicesCopy,
@@ -76,6 +79,8 @@ interface MediaRow {
   height: number | null;
   storage_path: string;
   alt: string | null;
+  credit?: string | null;
+  credit_url?: string | null;
 }
 
 async function fromCms<T>(label: string, query: (db: Db) => Promise<T>, fallback: T): Promise<T> {
@@ -93,7 +98,7 @@ async function fromCms<T>(label: string, query: (db: Db) => Promise<T>, fallback
   }
 }
 
-const MEDIA = "storage_path, alt, width, height";
+const MEDIA = "storage_path, alt, width, height, credit, credit_url";
 
 /** Signed URLs for these media rows (public pages: long-lived, see PUBLIC_URL_TTL). */
 async function signed(db: Db, media: (MediaRow | null | undefined)[]) {
@@ -105,6 +110,13 @@ function toImage(media: MediaRow | null | undefined, urls: Map<string, string>) 
   const src = media && urls.get(media.storage_path);
   if (!media || !src) return null;
   return { src, alt: media.alt ?? "", width: media.width ?? undefined, height: media.height ?? undefined };
+}
+
+/** A photo with its credit (stories and the portfolio show where sample photos came from). */
+function toCreditedImage(media: MediaRow | null | undefined, urls: Map<string, string>): StoryImage | null {
+  const image = toImage(media, urls);
+  if (!image || !media) return null;
+  return media.credit ? { ...image, credit: { text: media.credit, href: media.credit_url ?? undefined } } : image;
 }
 
 // Every public query filters on is_published explicitly as well as through
@@ -184,7 +196,7 @@ export function getPortfolio(): Promise<Portfolio> {
       const { data, error } = await db
         .from("gallery_items")
         .select(
-          `id, title, sort_order, is_featured, media:media_assets!gallery_items_media_fkey(${MEDIA}), category:categories(slug, label, sort_order)`,
+          `id, title, sort_order, is_featured, is_demo, media:media_assets!gallery_items_media_fkey(${MEDIA}), category:categories(slug, label, sort_order)`,
         )
         .eq("is_published", true)
         .order("is_featured", { ascending: false })
@@ -197,6 +209,7 @@ export function getPortfolio(): Promise<Portfolio> {
             title: string | null;
             sort_order: number;
             is_featured: boolean;
+            is_demo: boolean;
             media: MediaRow | null;
             // null when the category is unpublished (RLS) or unset.
             category: { slug: string; label: string; sort_order: number } | null;
@@ -207,7 +220,7 @@ export function getPortfolio(): Promise<Portfolio> {
       const urls = await signed(db, data.map((row) => row.media));
       // An item whose photo can't be shown is left out rather than rendered broken.
       const shown = data.flatMap((row) => {
-        const image = toImage(row.media, urls);
+        const image = toCreditedImage(row.media, urls);
         return image ? [{ row, image }] : [];
       });
       const categories = new Map<string, { label: string; order: number }>();
@@ -222,6 +235,7 @@ export function getPortfolio(): Promise<Portfolio> {
           categoryId: row.category?.slug,
           featured: row.is_featured,
           order: row.sort_order,
+          isDemo: row.is_demo,
         })),
         categories: [...categories.entries()]
           .sort((a, b) => a[1].order - b[1].order)
@@ -229,6 +243,74 @@ export function getPortfolio(): Promise<Portfolio> {
       };
     },
     { items: galleryPreview, categories: [] },
+  );
+}
+
+/** Published event stories: featured first, then by the chosen order. */
+export function getEventStories(): Promise<EventStory[]> {
+  return fromCms(
+    "event stories",
+    async (db) => {
+      const { data, error } = await db
+        .from("event_stories")
+        .select(
+          `id, title, description, location, styling, is_demo, is_featured, sort_order, category:categories(label), image:media_assets!event_stories_image_fkey(${MEDIA}), images:event_story_images(sort_order, media:media_assets!event_story_images_media_fkey(${MEDIA})), testimonial:testimonials(quote, author_name, event_type)`,
+        )
+        .eq("is_published", true)
+        .order("is_featured", { ascending: false })
+        .order("sort_order")
+        .order("created_at")
+        .overrideTypes<
+          {
+            id: string;
+            title: string;
+            description: string;
+            location: string | null;
+            styling: string[] | null;
+            is_demo: boolean;
+            is_featured: boolean;
+            sort_order: number;
+            // null when the category is unpublished (RLS) or unset.
+            category: { label: string } | null;
+            image: MediaRow | null;
+            images: { sort_order: number; media: MediaRow | null }[];
+            // null unless a PUBLISHED testimonial is attached (RLS).
+            testimonial: { quote: string; author_name: string; event_type: string | null } | null;
+          }[],
+          { merge: false }
+        >();
+      if (error) throw error;
+      const urls = await signed(db, data.flatMap((row) => [row.image, ...row.images.map((i) => i.media)]));
+      return data.flatMap((row) => {
+        const image = toCreditedImage(row.image, urls);
+        // A story without its main photo isn't shown rather than rendered broken.
+        if (!image) return [];
+        return [
+          {
+            id: row.id,
+            title: row.title,
+            description: row.description,
+            category: row.category?.label,
+            image,
+            gallery: row.images
+              .toSorted((a, b) => a.sort_order - b.sort_order)
+              .flatMap((i) => {
+                const img = toCreditedImage(i.media, urls);
+                return img ? [img] : [];
+              }),
+            location: row.location ?? undefined,
+            styling: row.styling ?? [],
+            testimonial: row.testimonial
+              ? { quote: row.testimonial.quote, name: row.testimonial.author_name, eventType: row.testimonial.event_type ?? undefined }
+              : undefined,
+            isDemo: row.is_demo,
+            featured: row.is_featured,
+            order: row.sort_order,
+          },
+        ];
+      });
+    },
+    eventStories,
   );
 }
 
@@ -446,6 +528,7 @@ export interface HomeCopy {
   services: ServicesCopy;
   categories: CategoriesCopy;
   pricing: PricingCopy;
+  stories: StoriesCopy;
   gallery: GalleryCopy;
   process: ProcessCopy;
   whyCanvas: WhyCanvasCopy;
@@ -461,6 +544,7 @@ const localHomeCopy: HomeCopy = {
   services: servicesSection,
   categories: categoriesSection,
   pricing: pricingSection,
+  stories: storiesSection,
   gallery: gallerySection,
   process: processSection,
   whyCanvas,
@@ -495,6 +579,9 @@ interface HomeRow {
   pricing_eyebrow: string;
   pricing_title: string;
   pricing_description: string | null;
+  stories_eyebrow: string;
+  stories_title: string;
+  sample_notice: string;
   process_eyebrow: string;
   process_title: string;
   why_eyebrow: string;
@@ -540,6 +627,7 @@ export function getHomeCopy(): Promise<HomeCopy> {
         },
         categories: { eyebrow: r.categories_eyebrow, title: r.categories_title },
         pricing: { eyebrow: r.pricing_eyebrow, title: r.pricing_title, description: r.pricing_description },
+        stories: { eyebrow: r.stories_eyebrow, title: r.stories_title, sampleNotice: r.sample_notice },
         gallery: {
           eyebrow: r.gallery_eyebrow,
           title: r.gallery_title,
@@ -616,11 +704,12 @@ export function getVideoCopy(): Promise<VideoStoryCopy> {
 
 /** Everything the homepage shows from the CMS, fetched in parallel. */
 export const getHomepageContent = cache(async () => {
-  const [services, categories, portfolio, pricing, films, testimonials, faqs, processSteps, principles, copy, aboutCopy, videoCopy, settings, styles] =
+  const [services, categories, portfolio, stories, pricing, films, testimonials, faqs, processSteps, principles, copy, aboutCopy, videoCopy, settings, styles] =
     await Promise.all([
       getFeaturedServices(),
       getCategories(),
       getPortfolio(),
+      getEventStories(),
       getPricingPackages(),
       getFilms(),
       getFeaturedTestimonials(),
@@ -638,6 +727,7 @@ export const getHomepageContent = cache(async () => {
     categories,
     gallery: portfolio.items,
     galleryCategories: portfolio.categories,
+    stories,
     pricing,
     films,
     testimonials,

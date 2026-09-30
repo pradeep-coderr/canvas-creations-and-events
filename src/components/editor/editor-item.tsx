@@ -8,6 +8,7 @@ import {
   FilmForm,
   GalleryItemForm,
   PricingForm,
+  StoryForm,
   ServiceForm,
   StepForm,
   TestimonialForm,
@@ -53,6 +54,16 @@ function ItemForm({
       return <ServiceForm {...common} defaultValues={v<"services">()} imageOptions={data.imageOptions} />;
     case "pricing":
       return <PricingForm {...common} defaultValues={v<"pricing">()} />;
+    case "stories":
+      return (
+        <StoryForm
+          {...common}
+          defaultValues={v<"stories">()}
+          imageOptions={data.imageOptions}
+          categoryOptions={data.categoryOptions}
+          testimonialOptions={data.items.testimonials.map((t) => ({ id: t.id, label: t.label, isPublished: t.published }))}
+        />
+      );
     case "films":
       return <FilmForm {...common} defaultValues={v<"films">()} videoOptions={data.videoOptions} />;
     case "categories":
@@ -151,6 +162,7 @@ export function EditorItem({
   return (
     <div className="cc-item" data-hidden-on-site={!meta.visibleOnSite || undefined}>
       <div className="cc-item-bar" data-editor-control="">
+        {meta.demo && <span className="cc-item-note cc-item-sample">SAMPLE / DEMO CONTENT</span>}
         {visibility && <span className="cc-item-note">{visibility}</span>}
         <Button
           ref={editButton}

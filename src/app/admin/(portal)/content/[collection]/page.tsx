@@ -25,6 +25,7 @@ export default async function CollectionPage({ params }: PageProps<"/admin/conte
     detail: def.detail?.(row) ?? null,
     published: row.is_published === true,
     featured: def.featured && row.is_featured === true,
+    demo: row.is_demo === true,
   }));
 
   return (

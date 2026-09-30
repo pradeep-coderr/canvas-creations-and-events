@@ -25,7 +25,10 @@ export function Intro({ copy = intro }: { copy?: IntroCopy }) {
             className="max-w-3xl [&_p:last-child]:max-w-2xl"
           />
         </Reveal>
-        <DecorativeDivider className="mt-14 sm:mt-16" />
+        {/* The divider draws out from its centre as it scrolls into view. */}
+        <div className="reveal-line [transform-origin:center]">
+          <DecorativeDivider className="mt-14 sm:mt-16" />
+        </div>
       </Container>
     </Section>
   );

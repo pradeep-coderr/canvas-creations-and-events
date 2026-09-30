@@ -59,6 +59,8 @@ export interface MediaImage {
   createdAt: string;
   /** Where it is used (drafts included), in client-friendly words. */
   usage: string[];
+  /** Where the photo came from (e.g. a stock-photo page), if recorded. */
+  credit?: { text: string; href?: string };
 }
 
 /** A video in the library (links and uploaded-provider videos). */

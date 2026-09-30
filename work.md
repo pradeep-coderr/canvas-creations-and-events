@@ -3392,3 +3392,137 @@ Typecheck, lint and build are clean. Not yet checked on the live site; it needs 
 - Screenshots at 1440/1024/768/390: no box, no frame, no overflow.
 - `e2e22.mjs` still passes 74/74 (hero check updated: the frame is absent when there's no photo).
 - Typecheck and lint are clean.
+
+## Phase 23 — Realistic Sample Content, Editorial Event Showcase & Bi-Directional Scroll Motion
+
+**Date:** 1 October 2026 (Adelaide).
+**Migrations (both pushed to the hosted database; local and remote in sync):**
+- `20260930175156_event_stories_sample_content.sql`
+- `20260930182828_set_story_images.sql` (code-review fix)
+
+**Code:** committed and pushed to GitHub with this entry, so Vercel deploys it together with Phases 21–22 and the follow-ups (they were unpushed until now).
+
+### Why the owner saw "nothing" before this push
+
+- GitHub/Vercel were still on `298d1e2` (Phase 20); seven local commits hadn't been pushed.
+- The live database had no pricing, photos or films, and Pricing, Films and Stories only appear with published content.
+- The local dev server (port 3000) uses `.env.local`, which points at the **live** database, so it was empty too.
+
+### Database
+
+- **Sample flag (`is_demo`)** on `gallery_items`, `categories`, `films` and the new `event_stories`:
+  - the admin shows **SAMPLE / DEMO CONTENT**;
+  - the site shows a small **"Sample"** label, which screen readers hear as "Sample image, not a Canvas Creations event";
+  - a note under the portfolio and stories headings reads "Sample imagery is shown while our portfolio is being prepared." (editable).
+- **`media_assets.credit` / `credit_url`:** where a library photo came from. Shown in the media library ("Source: Pexels") and the lightbox caption.
+- **`event_stories`:**
+  - title, unique slug, description, category, main photo (FK, `on delete restrict`), optional location, styling notes (0–12 lines), optional testimonial (FK to `testimonials`), `is_demo`, featured, order, published;
+  - **`event_story_images`:** ordered extra photos, FK `on delete restrict`;
+  - RLS: public reads published stories and their photos; admins manage them; no public writes;
+  - public media access includes photos of published stories.
+- **Wording:** `home_content.stories_eyebrow` ("Event stories"), `stories_title` ("A celebration, up close") and `sample_notice`.
+- **Review fix:** `public.set_story_images(story, media[])` (`SECURITY INVOKER`, so admin RLS applies) replaces a story's photos in one transaction. Previously a failed save could lose them.
+
+### Sample content (live and local): licensed stock, clearly marked
+
+- **Source:** 18 photos from **Pexels** (free to use; each photo's Pexels page is stored as its credit). All are decor only: no identifiable people, no one else's names or monograms, no religious figures. Picked for one coherent blush, gold and ivory look: birthdays, weddings, mandaps, an engagement neon sign and a rose wall, baby shower balloons, dessert tables. One photo was cropped to remove a blurred arm at the edge.
+- **Processing:** like the app's own uploads (≤ 2400 px, metadata stripped, JPEG q82), with factual alt text.
+- **Content, all `is_demo`:**
+  - 5 categories: Birthdays, Weddings, Cultural celebrations, Engagements, Baby showers;
+  - 16 portfolio photos;
+  - 3 event stories: "Blush and gold birthday", "Garden-inspired wedding reception", "Floral mandap ceremony". Each has a factual description of what the photos show and styling notes, and **no testimonial, client, date, place or claim**.
+- **No sample films:** there's no licensed sample video in the supported YouTube/Vimeo form, and using someone else's channel would misrepresent it. The Films section stays hidden until real films are added.
+- **No sample pricing:** no invented prices. The section appears when real packages are published.
+- **How it got to live:**
+  - photos uploaded with `supabase storage cp --linked` (the CLI's own access; no key in any file);
+  - rows inserted in one transaction with `supabase db query --linked`.
+  - Checked on the live database: 18 photos (credit Pexels), 16 portfolio items, 3 stories with 8 extra photos, 5 categories.
+- **To remove all sample content later:** unpublish or delete it in the admin, or run the prepared clean-up SQL (`prodsample.mjs cleansql`: sample stories, gallery items, categories and Pexels photos).
+- **Replacing it with the real thing:** edit the item, swap the photo, title and description, attach a real testimonial, and untick "Sample / demo content". Tested (see below).
+
+### Event stories (`sections/event-stories.tsx`)
+
+- **Magazine-style layout:**
+  - a large main photo opening through a soft mask;
+  - text beside it (category, title, description, "Styling" notes, optional location);
+  - photo and text swap sides on alternate stories (desktop);
+  - supporting photos below, drifting at two rates on desktop;
+  - an editorial hairline drawn between stories.
+- **Testimonial:** "What they said" appears **only when a published testimonial is attached**. This reuses the existing testimonials list, not a second system; the old standalone "Kind words" section stays removed.
+- **Lightbox:** each story's photos open in the existing lightbox, with "Sample image · Pexels" in the caption.
+- **Admin:** Content → Event stories (list, create, edit, reorder, publish, delete, sample badge). The form has a main photo, **"More photos"** (an ordered list with add, move and remove, via the existing picker including upload), a styling list, and a testimonial select (drafts marked "not shown").
+- **Editor:** in-place editing with the section's wording and list-wide text styles (category, title, text, quote), all drafts until Save.
+
+### Homepage order (Discover → Explore → Trust → Enquire)
+
+Hero → Intro → Services → Pricing (when published) → Categories → Portfolio → **Event stories** → Films (when published) → Process → Why Canvas → **About** (moved after Why Canvas) → FAQ → Enquiry → Contact.
+
+### Scroll motion: linked to scroll position, in both directions (`globals.css` "Scroll motion")
+
+Every effect is a CSS scroll-driven animation (`animation-timeline: view()` / `scroll(root)`). Scroll progress *is* animation progress, so scrolling back up reverses it exactly. There are no scroll listeners, no React scroll state and no new client components.
+
+| Effect | Where |
+| --- | --- |
+| `.reveal`: fade and rise (32 px desktop, 16 px phones; entry → 30 % cover) | all sections (services rows stagger naturally by position) |
+| `.reveal-mask`: clip opens 14 % → 0 while the image settles 1.07 → 1 | portfolio lead photo, story main photos, About photo |
+| `.reveal-line`: hairline draws across | between stories, intro divider (from the centre) |
+| `.drift` / `.drift-slow`: ±24 / ±12 px while crossing the viewport (desktop only) | portfolio and story supporting photos |
+| Hero: text eases up 2.5 rem and softens to 0.55 opacity over the first 85 vh (0.75 rem on phones); photo drifts up 2.5 rem and frame 1 rem the other way (desktop) | hero |
+
+Hero on load (time-based, unchanged): text rises, photo mask and settle, gold frame draws.
+
+**Safety:**
+- Only opacity, transform, translate, scale and clip-path are animated.
+- Everything is inside `@media (prefers-reduced-motion: no-preference)` and `@supports (animation-timeline: …)`. With reduced motion, or in browsers without scroll timelines (e.g. Firefox today), nothing animates and the page is fully visible.
+- Content is complete in the server HTML; it works with JavaScript disabled.
+
+### Code review (medium) and fixes
+
+1. **Story photo save not atomic** (delete, then insert): a failure lost photos, left the page stale, and could duplicate a new story on retry. **Fixed:**
+   - `set_story_images` runs as one transaction;
+   - a new story whose photos fail is removed again;
+   - for an existing story, its details keep and the cache is refreshed.
+2. **Mask animation held `scale`**, blocking the portfolio lead photo's hover zoom. **Fixed:** the settle animates `transform`, which composes with the hover's `scale`.
+
+### Tests actually run (local production build + local Supabase)
+
+| Suite | Result |
+| --- | --- |
+| `e2e23.mjs` (new; run twice, the second time after the review fixes) | **42/42** — breakdown below |
+| `e2e22.mjs` (Phase 22) | 74/74. One failure on the first run found a real compatibility issue: the new sample flag was required, so saves without it were refused. It now defaults to "not sample". |
+| `e2e19` / `disabled19` / smoke / `stale21` | 28/28 · 17/17 · 33/33 · 3/3 |
+| `home22.mjs` (Home link) | 6/6. The mobile-menu case needed a longer wait: the page is now much longer, so the smooth scroll to the top takes longer. |
+
+`e2e23.mjs` covers:
+- **Page and sample content:**
+  - page order;
+  - 16 portfolio photos and all story photos labelled Sample; the notice shown;
+  - 3 stories, featured first; no testimonial and no invented claims; alt text everywhere.
+- **Testimonials and replacing sample content:**
+  - a draft testimonial stays hidden, a published one shows in its story;
+  - replacing sample content (title, description, photo, category, testimonial, sample flag) and reordering or trimming extra photos: saved in order, "Sample" label gone.
+- **Publishing and permissions:**
+  - publish/unpublish (the section disappears and returns);
+  - RLS on draft story photos; anon can't write;
+  - a photo used by a story can't be deleted.
+- **Lightbox:** story lightbox (count, arrows, "Sample image" and Pexels credit link, Escape, focus back).
+- **Admin:** sample badges in lists, story form (sample flag, main/more photos, testimonial), editor, media library source and usage.
+- **Motion:**
+  - the mask progresses with scroll (closed → 7.6 % → open), and scrolling back up returns *identical* values at the same positions;
+  - hero text eases and returns;
+  - fast jumps across the page leave no stuck state;
+  - reveals use view timelines; drift and line run on desktop;
+  - phones: no drift, no hero depth, 16 px rise, 0.75 rem hero movement;
+  - no overflow at 7 widths, also mid-scroll;
+  - reduced motion: nothing animates, all visible;
+  - all scroll-linked CSS sits under `@supports`;
+  - JavaScript disabled: everything renders.
+- **Performance:** public bundle has no admin code; below-the-fold images lazy; no gallery preload. Homepage scripts: 18 files, about 1.3 MB uncompressed (the framework; this phase adds no new client components).
+
+Final gate: `bun install --frozen-lockfile`, typecheck, lint, build, `git diff --check`, `supabase db lint`: all clean.
+
+### Still open
+
+- **Production visual check after deploy:** homepage, stories, sample labels, lightbox, motion on a phone.
+- **Phase 21:** a new `RESEND_API_KEY`, the Resend login email for `ENQUIRY_NOTIFICATION_EMAIL`, and `VAPID_SUBJECT` are still missing in Vercel. Until then, enquiry emails and push notifications stay "not configured"; enquiries are still saved.
+- **Replace sample content with the client's own photos and stories.** Stories stay labelled "Sample" until each is unticked.

@@ -11,6 +11,15 @@ export function VisibilityBadge({ published }: { published: boolean }) {
   );
 }
 
+/** Temporary sample material (is_demo): impossible to miss in the admin. */
+export function SampleContentBadge() {
+  return (
+    <span className={cn(badge, "border-destructive/60 bg-background text-destructive uppercase tracking-wide")}>
+      Sample / demo content
+    </span>
+  );
+}
+
 export function FeaturedBadge() {
   return <span className={cn(badge, "border-highlight-strong bg-surface-ivory text-foreground")}>Featured</span>;
 }

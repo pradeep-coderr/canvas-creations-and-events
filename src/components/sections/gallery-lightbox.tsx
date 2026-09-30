@@ -24,6 +24,10 @@ export interface LightboxPhoto {
   title?: string;
   /** Category id (slug), for the filter. */
   category?: string;
+  /** Temporary sample content (said in the caption). */
+  sample?: boolean;
+  /** Where the photo came from (e.g. a stock-photo page). */
+  credit?: { text: string; href?: string };
 }
 
 export interface FilterCategory {
@@ -133,7 +137,7 @@ export function GalleryLightbox({
           <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[#1c1817] motion-safe:data-open:animate-in motion-safe:data-open:fade-in-0" />
           <DialogPrimitive.Content
             data-tone="dark"
-            aria-describedby={photo?.title ? captionId : undefined}
+            aria-describedby={photo?.title || photo?.sample || photo?.credit ? captionId : undefined}
             onCloseAutoFocus={(event) => {
               event.preventDefault();
               trigger.current?.focus();
@@ -189,9 +193,24 @@ export function GalleryLightbox({
               ) : (
                 <span />
               )}
-              <p id={captionId} className="min-w-0 text-center font-display text-lg italic">
-                {photo?.title}
-              </p>
+              <div id={captionId} className="min-w-0 text-center">
+                {photo?.title && <p className="font-display text-lg italic">{photo.title}</p>}
+                {(photo?.sample || photo?.credit) && (
+                  <p className="text-xs text-muted-foreground">
+                    {photo.sample && "Sample image"}
+                    {photo.sample && photo.credit && " · "}
+                    {photo.credit &&
+                      (photo.credit.href ? (
+                        <a href={photo.credit.href} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                          {photo.credit.text}
+                          <span className="sr-only"> (opens in a new tab)</span>
+                        </a>
+                      ) : (
+                        photo.credit.text
+                      ))}
+                  </p>
+                )}
+              </div>
               {count > 1 ? (
                 <Button variant="secondary" onClick={() => go(1)}>
                   <span className="max-sm:sr-only">Next</span>

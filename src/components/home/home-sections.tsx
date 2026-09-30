@@ -3,6 +3,7 @@ import { AboutFounder } from "@/components/sections/about-founder";
 import { CategoryStrip } from "@/components/sections/category-strip";
 import { Contact } from "@/components/sections/contact";
 import { Enquiry } from "@/components/sections/enquiry";
+import { EventStories } from "@/components/sections/event-stories";
 import { Faq } from "@/components/sections/faq";
 import { GalleryPreview } from "@/components/sections/gallery-preview";
 import { Hero } from "@/components/sections/hero";
@@ -19,6 +20,7 @@ import type { Film } from "@/data/films";
 import type { GalleryItem } from "@/data/gallery";
 import type { AboutCopy, Principle, ProcessStep, VideoStoryCopy } from "@/data/home";
 import type { PricingPackage } from "@/data/pricing";
+import type { EventStory } from "@/data/stories";
 import type { Service } from "@/data/services";
 import type { Testimonial } from "@/data/testimonials";
 import type { SiteCopy } from "@/lib/cms/site-settings";
@@ -42,6 +44,7 @@ export interface HomeContent {
   /** Categories that have photos in the portfolio (for its filter). */
   galleryCategories: { id: string; label: string }[];
   films: Film[];
+  stories: EventStory[];
   testimonials: Testimonial[];
   faqs: FaqItem[];
   processSteps: ProcessStep[];
@@ -55,6 +58,7 @@ export type HomeSectionKey =
   | "pricing"
   | "categories"
   | "gallery"
+  | "stories"
   | "about"
   | "process"
   | "testimonials"
@@ -75,6 +79,7 @@ export interface HomeEditorSlots {
   categories?: ItemSlots<Category>;
   gallery?: ItemSlots<GalleryItem>;
   films?: ItemSlots<Film>;
+  stories?: ItemSlots<EventStory>;
   testimonials?: ItemSlots<Testimonial>;
   faqs?: ItemSlots<FaqItem>;
   process?: ItemSlots<ProcessStep>;
@@ -132,31 +137,40 @@ export function HomeSections({ content, slots }: { content: HomeContent; slots?:
       <S section="categories" styles={ss}>
         <CategoryStrip categories={content.categories} copy={copy.categories} itemSlots={slots?.categories} />
       </S>
+      {/* Explore: the celebrations — portfolio, then stories and films. */}
       <S section="gallery" styles={ss}>
         <GalleryPreview
           items={content.gallery}
           categories={content.galleryCategories}
           copy={copy.gallery}
+          sampleNotice={copy.stories.sampleNotice}
           itemSlots={slots?.gallery}
           socials={settings.socials}
         />
       </S>
-      <S section="about" styles={ss}>
-        <AboutFounder copy={content.about} imageAction={slots?.aboutImage} />
-      </S>
-      <S section="process" styles={ss}>
-        <Process steps={content.processSteps} copy={copy.process} itemSlots={slots?.process} />
-      </S>
-      {/* The testimonials ("Kind words") section is not shown (Phase 20); the CMS list is kept. */}
-      <S section="whyCanvas" styles={ss}>
-        <WhyCanvas principles={content.principles} copy={copy.whyCanvas} itemSlots={slots?.principles} />
-      </S>
+      {/* Only once a story is published (the editor always shows it). */}
+      {(content.stories.length > 0 || slots?.stories) && (
+        <S section="stories" styles={ss}>
+          <EventStories stories={content.stories} copy={copy.stories} itemSlots={slots?.stories} />
+        </S>
+      )}
       {/* Films: only once a film is published (the editor always shows it). */}
       {(content.films.length > 0 || slots?.films) && (
         <S section="video" styles={ss}>
           <VideoStory films={content.films} copy={content.video.copy} socials={settings.socials} itemSlots={slots?.films} />
         </S>
       )}
+      {/* Trust: how it works, why Canvas, who's behind it. */}
+      <S section="process" styles={ss}>
+        <Process steps={content.processSteps} copy={copy.process} itemSlots={slots?.process} />
+      </S>
+      {/* The testimonials ("Kind words") section is not shown (Phase 20): testimonials appear inside event stories. */}
+      <S section="whyCanvas" styles={ss}>
+        <WhyCanvas principles={content.principles} copy={copy.whyCanvas} itemSlots={slots?.principles} />
+      </S>
+      <S section="about" styles={ss}>
+        <AboutFounder copy={content.about} imageAction={slots?.aboutImage} />
+      </S>
       <S section="faq" styles={ss}>
         <Faq faqs={content.faqs} copy={copy.faq} itemSlots={slots?.faqs} />
       </S>

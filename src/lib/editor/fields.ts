@@ -132,6 +132,22 @@ export const sections: Record<HomeSectionKey, SectionDef> = {
       home("galleryInstagramCta", "Instagram link text"),
     ],
   },
+  stories: {
+    title: "Event stories",
+    collection: "stories",
+    fields: [
+      home("storiesEyebrow", "Stories label"),
+      home("storiesTitle", "Stories heading"),
+      home("sampleNotice", "Note while sample content is shown", "text", "Shown under the portfolio and stories headings while any item there is sample content."),
+    ],
+    note: "Visitors see this section only once a story is published. Sample stories are labelled “Sample”.",
+    styleKeys: [
+      { key: "stories.category", label: "Story categories" },
+      { key: "stories.title", label: "Story titles" },
+      { key: "stories.body", label: "Story text and styling" },
+      { key: "stories.quote", label: "Testimonial quotes" },
+    ],
+  },
   about: {
     title: "About",
     fields: [

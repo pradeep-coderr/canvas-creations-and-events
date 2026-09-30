@@ -4,6 +4,7 @@ import { Section } from "@/components/layout/section";
 import { Reveal } from "@/components/motion/reveal";
 import { DecorativeDivider } from "@/components/shared/decorative-divider";
 import { ImageFrame } from "@/components/shared/image-frame";
+import { SampleBadge, SampleNotice } from "@/components/shared/sample-badge";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { Button } from "@/components/ui/button";
 import { galleryPreview, type GalleryItem } from "@/data/gallery";
@@ -80,6 +81,7 @@ export function GalleryPreview({
   items = galleryPreview,
   categories = [],
   copy = gallerySection,
+  sampleNotice,
   itemSlots,
   socials = defaultSiteSettings.socials,
 }: {
@@ -87,6 +89,8 @@ export function GalleryPreview({
   /** Categories that have photos here (the filter shows with three or more). */
   categories?: FilterCategory[];
   copy?: GalleryCopy;
+  /** Shown under the heading while any photo here is sample content. */
+  sampleNotice?: React.ReactNode;
   itemSlots?: ItemSlots<GalleryItem>;
   /** Social links (site details). */
   socials?: SiteCopy["socials"];
@@ -107,6 +111,7 @@ export function GalleryPreview({
               description={copy.intro ?? undefined}
               align="start"
             />
+            {sampleNotice && items.some((i) => i.isDemo) && <SampleNotice className="sm:hidden">{sampleNotice}</SampleNotice>}
             {instagram && (
               <Button asChild variant="link" className="self-start sm:self-auto">
                 <a href={instagram.href} target="_blank" rel="noopener noreferrer">
@@ -117,9 +122,20 @@ export function GalleryPreview({
             )}
           </div>
 
+          {sampleNotice && items.some((i) => i.isDemo) && (
+            <SampleNotice className="mt-4 max-sm:hidden">{sampleNotice}</SampleNotice>
+          )}
+
           {/* The grid is server-rendered; the lightbox adds an open button per photo and the optional filter. */}
           <GalleryLightbox
-            photos={items.map((i) => ({ src: String(i.src), alt: i.alt, title: i.title, category: i.categoryId }))}
+            photos={items.map((i) => ({
+              src: String(i.src),
+              alt: i.alt,
+              title: i.title,
+              category: i.categoryId,
+              sample: i.isDemo,
+              credit: i.credit,
+            }))}
             categories={categories}
             allLabel={copy.filterAll}
           >
@@ -136,16 +152,21 @@ export function GalleryPreview({
                     className={cn("min-w-0", slot.item, fullWidthOnMobile && "col-span-2")}
                   >
                     <SlotItem slots={itemSlots} item={item}>
-                      <Reveal className="h-full">
-                        <figure className="relative h-full">
-                          <ImageFrame
-                            src={item.src}
-                            alt={item.alt}
-                            ratio="square"
-                            zoomOnHover
-                            sizes={slot.sizes}
-                            className={cn("cc-portfolio-frame", slot.frame, fullWidthOnMobile && "aspect-3/2")}
-                          />
+                      {/* The lead photo opens through a mask; the others drift at two rates (desktop). */}
+                      <Reveal variant={i === 0 ? "mask" : "rise"} className="h-full">
+                        <figure className={cn("relative h-full", i > 0 && (i % 2 ? "drift-slow" : "drift"))}>
+                          {/* The label sits on the photo itself (cells can be taller than square photos). */}
+                          <div className={cn("relative", i === 0 && "h-full")}>
+                            <ImageFrame
+                              src={item.src}
+                              alt={item.alt}
+                              ratio="square"
+                              zoomOnHover
+                              sizes={slot.sizes}
+                              className={cn("cc-portfolio-frame", slot.frame, fullWidthOnMobile && "aspect-3/2")}
+                            />
+                            {item.isDemo && <SampleBadge />}
+                          </div>
                           {item.title && <figcaption className="sr-only">{item.title}</figcaption>}
                           <LightboxTrigger index={i} label={item.title ?? item.alt} />
                         </figure>

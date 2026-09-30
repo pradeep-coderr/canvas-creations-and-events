@@ -39,6 +39,9 @@ const homeColumns = {
   galleryEmptyText: "gallery_empty_text",
   galleryInstagramCta: "gallery_instagram_cta",
   galleryFilterAll: "gallery_filter_all",
+  storiesEyebrow: "stories_eyebrow",
+  storiesTitle: "stories_title",
+  sampleNotice: "sample_notice",
   processEyebrow: "process_eyebrow",
   processTitle: "process_title",
   whyEyebrow: "why_eyebrow",
@@ -69,6 +72,7 @@ const homeTextFields = new Set<HomeField>([
   "introBody",
   "servicesDescription",
   "galleryEmptyText",
+  "sampleNotice",
   "enquiryDescription",
   "contactDescription",
 ]);

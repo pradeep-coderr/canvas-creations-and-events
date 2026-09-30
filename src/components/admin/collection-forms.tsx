@@ -9,7 +9,9 @@ import {
   collections,
   priceTypeLabels,
   priceTypes,
+  STORY_PHOTOS_MAX,
   type CategoryOption,
+  type TestimonialOption,
   type CollectionKey,
   type CollectionValues,
 } from "@/lib/cms/collections";
@@ -19,6 +21,7 @@ import {
   CheckboxField,
   FormSection,
   MediaFormField,
+  MediaListField,
   OrderField,
   SelectField,
   TextAreaField,
@@ -61,13 +64,16 @@ function formProps<K extends CollectionKey>(
   };
 }
 
-/** Published / featured / order, with the difference spelled out. */
+/** Published / featured / sample / order, with the difference spelled out. */
 function VisibilitySection<T extends FieldValues>({
   form,
   featuredLabel,
+  demo = false,
 }: {
   form: CmsFormApi<T>;
   featuredLabel?: string;
+  /** Offer the sample / demo content flag. */
+  demo?: boolean;
 }) {
   return (
     <FormSection title="Visibility">
@@ -77,6 +83,14 @@ function VisibilitySection<T extends FieldValues>({
         label="Published on the website"
         hint="Unticked, it's a draft: saved here but hidden from visitors."
       />
+      {demo && (
+        <CheckboxField
+          form={form}
+          name={"isDemo" as Path<T>}
+          label="Sample / demo content"
+          hint="Temporary sample material (e.g. a stock photo), not a real event. The website labels it “Sample”. Untick once it's replaced with the real thing."
+        />
+      )}
       {featuredLabel && (
         <CheckboxField
           form={form}
@@ -236,7 +250,7 @@ export function FilmForm(props: ItemFormProps<"films"> & { videoOptions: MediaVi
             />
             <TextAreaField form={form} name="caption" label="Caption" optional rows={2} />
           </FormSection>
-          <VisibilitySection form={form} featuredLabel="Featured (shown first and largest)" />
+          <VisibilitySection form={form} featuredLabel="Featured (shown first and largest)" demo />
         </>
       )}
     </CmsForm>
@@ -252,7 +266,7 @@ export function CategoryForm(props: ItemFormProps<"categories">) {
             <TextField form={form} name="label" label="Name" hint="For example, the kind of celebration." />
             <SlugField form={form} from="label" />
           </FormSection>
-          <VisibilitySection form={form} />
+          <VisibilitySection form={form} demo />
         </>
       )}
     </CmsForm>
@@ -289,7 +303,81 @@ export function GalleryItemForm(
               hint={props.categoryOptions.length === 0 ? "No categories yet. Add them under Content → Categories." : undefined}
             />
           </FormSection>
-          <VisibilitySection form={form} featuredLabel="Featured (shown first and larger)" />
+          <VisibilitySection form={form} featuredLabel="Featured (shown first and larger)" demo />
+        </>
+      )}
+    </CmsForm>
+  );
+}
+
+export function StoryForm(
+  props: ItemFormProps<"stories"> & {
+    imageOptions: MediaImage[];
+    categoryOptions: CategoryOption[];
+    testimonialOptions: TestimonialOption[];
+  },
+) {
+  return (
+    <CmsForm {...formProps("stories", props)}>
+      {(form) => (
+        <>
+          <FormSection title="Story">
+            <TextField form={form} name="title" label="Title" hint="e.g. Elegant birthday celebration." />
+            <SlugField form={form} from="title" />
+            <TextAreaField form={form} name="description" label="Description" rows={4} hint="Two or three factual sentences about the styling." />
+            <SelectField
+              form={form}
+              name="categoryId"
+              label="Category"
+              optional
+              noneLabel="No category"
+              options={props.categoryOptions.map((c) => ({ value: c.id, label: c.isPublished ? c.label : `${c.label} (draft)` }))}
+            />
+            <TextField form={form} name="location" label="Location" optional hint="Only if it's real and the client is happy to share it." />
+            <TextAreaField
+              form={form}
+              name="styling"
+              label="Styling"
+              optional
+              rows={4}
+              maxLength={12 * 202}
+              hint="One item per line, e.g. Backdrop, Balloons, Cake table."
+            />
+          </FormSection>
+          <FormSection title="Photos">
+            <MediaFormField
+              form={form}
+              name="imageId"
+              label="Main photo"
+              images={props.imageOptions}
+              use="gallery"
+              hint="Shown large. Its description (alt text) is set in the media library."
+            />
+            <MediaListField
+              form={form}
+              name="galleryIds"
+              label="More photos"
+              images={props.imageOptions}
+              use="gallery"
+              max={STORY_PHOTOS_MAX}
+              hint="Shown under the story in this order; all open in the full-screen viewer."
+            />
+          </FormSection>
+          <FormSection
+            title="Testimonial"
+            description="Only a real testimonial the client agreed to publish. It's shown only while it's also published under Content → Testimonials."
+          >
+            <SelectField
+              form={form}
+              name="testimonialId"
+              label="Client testimonial"
+              optional
+              noneLabel="No testimonial"
+              options={props.testimonialOptions.map((t) => ({ value: t.id, label: t.isPublished ? t.label : `${t.label} (draft, not shown)` }))}
+              hint={props.testimonialOptions.length === 0 ? "No testimonials yet. Add real ones under Content → Testimonials." : undefined}
+            />
+          </FormSection>
+          <VisibilitySection form={form} featuredLabel="Featured (shown first)" demo />
         </>
       )}
     </CmsForm>

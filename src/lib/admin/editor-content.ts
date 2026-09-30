@@ -7,6 +7,7 @@ import type { Film } from "@/data/films";
 import type { GalleryItem } from "@/data/gallery";
 import type { EditorialImage, Principle, ProcessStep } from "@/data/home";
 import type { PricingPackage } from "@/data/pricing";
+import type { EventStory, StoryImage } from "@/data/stories";
 import type { Service } from "@/data/services";
 import type { Testimonial } from "@/data/testimonials";
 import { collectionKeys, collections, type CollectionKey, type PriceType } from "@/lib/cms/collections";
@@ -27,15 +28,23 @@ import { getCategoryOptions, getImageLibrary, getVideoLibrary } from "./cms";
  */
 
 type Row = Record<string, unknown>;
-type Media = { storage_path: string; alt: string | null; width: number | null; height: number | null } | null;
+type Media = {
+  storage_path: string;
+  alt: string | null;
+  width: number | null;
+  height: number | null;
+  credit?: string | null;
+  credit_url?: string | null;
+} | null;
 type Urls = Map<string, string>;
-const MEDIA = "storage_path, alt, width, height";
+const MEDIA = "storage_path, alt, width, height, credit, credit_url";
 
 export interface EditorCollections {
   services: Service[];
   pricing: PricingPackage[];
   categories: Category[];
   gallery: GalleryItem[];
+  stories: EventStory[];
   films: Film[];
   testimonials: Testimonial[];
   faqs: FaqItem[];
@@ -56,6 +65,13 @@ export interface EditorPageData {
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
+/** A signed photo with its credit (stories, portfolio). */
+const credited = (m: Media, urls: Map<string, string>): StoryImage | null => {
+  const src = m && urls.get(m.storage_path);
+  if (!m || !src) return null;
+  const img: StoryImage = { src, alt: m.alt ?? "", width: m.width ?? undefined, height: m.height ?? undefined };
+  return m.credit ? { ...img, credit: { text: m.credit, href: m.credit_url ?? undefined } } : img;
+};
 /** A signed image for the editor (drafts included), or null. */
 const image = (m: Media, urls: Urls): EditorialImage | null => {
   const src = m && urls.get(m.storage_path);
@@ -67,6 +83,7 @@ const selects: Record<CollectionKey, string> = {
   pricing: "*",
   categories: "*",
   gallery: `*, media:media_assets!gallery_items_media_fkey(${MEDIA}), category:categories(slug, label, sort_order)`,
+  stories: `*, category:categories(label), image:media_assets!event_stories_image_fkey(${MEDIA}), images:event_story_images(sort_order, media_id, media:media_assets!event_story_images_media_fkey(${MEDIA})), testimonial:testimonials(quote, author_name, event_type, is_published)`,
   films: "*, video:media_assets!films_video_fkey(provider, external_id, poster_media_id)",
   testimonials: "*",
   faqs: "*",
@@ -137,7 +154,7 @@ function toDomain(key: CollectionKey, row: Row, urls: Urls) {
     case "categories":
       return { id, label: str(row.label), order: Number(row.sort_order) } satisfies Category;
     case "gallery": {
-      const img = image(row.media as Media, urls);
+      const img = credited(row.media as Media, urls);
       const category = row.category as { slug: string } | null;
       return {
         id,
@@ -149,7 +166,36 @@ function toDomain(key: CollectionKey, row: Row, urls: Urls) {
         categoryId: category?.slug,
         featured: row.is_featured === true,
         order: Number(row.sort_order),
+        isDemo: row.is_demo === true,
+        credit: img?.credit,
       } satisfies GalleryItem;
+    }
+    case "stories": {
+      const main = credited(row.image as Media, urls);
+      const testimonial = row.testimonial as { quote: string; author_name: string; event_type: string | null; is_published: boolean } | null;
+      return {
+        id,
+        title: str(row.title),
+        description: str(row.description),
+        category: (row.category as { label: string } | null)?.label,
+        image: main ?? { src: "", alt: "" },
+        gallery: ((row.images as { sort_order: number; media: Media }[]) ?? [])
+          .toSorted((a, b) => a.sort_order - b.sort_order)
+          .flatMap((i) => {
+            const img = credited(i.media, urls);
+            return img ? [img] : [];
+          }),
+        location: str(row.location) || undefined,
+        styling: Array.isArray(row.styling) ? (row.styling as string[]) : [],
+        // As visitors would see it: only a published testimonial.
+        testimonial:
+          testimonial?.is_published
+            ? { quote: testimonial.quote, name: testimonial.author_name, eventType: testimonial.event_type ?? undefined }
+            : undefined,
+        isDemo: row.is_demo === true,
+        featured: row.is_featured === true,
+        order: Number(row.sort_order),
+      } satisfies EventStory;
     }
     case "testimonials":
       return {
@@ -228,10 +274,10 @@ export async function loadEditorPage(): Promise<EditorPageData | null> {
       (home.hero_image as Media)?.storage_path,
       (about.image as Media)?.storage_path,
       ...collectionKeys.flatMap((key, i) =>
-        rowsOf(i).map(
-          (row) =>
-            ((row.image ?? row.media ?? (row.video as { poster?: Media } | null)?.poster) as Media)?.storage_path,
-        ),
+        rowsOf(i).flatMap((row) => [
+          ((row.image ?? row.media ?? (row.video as { poster?: Media } | null)?.poster) as Media)?.storage_path,
+          ...((row.images as { media: Media }[] | undefined) ?? []).map((i) => i.media?.storage_path),
+        ]),
       ),
     ],
     ADMIN_URL_TTL,
@@ -243,6 +289,7 @@ export async function loadEditorPage(): Promise<EditorPageData | null> {
   const sectionOf: Partial<Record<CollectionKey, HomeSectionKey>> = {
     pricing: "pricing",
     films: "video",
+    stories: "stories",
     categories: "categories",
     testimonials: "testimonials",
     process: "process",
@@ -258,6 +305,7 @@ export async function loadEditorPage(): Promise<EditorPageData | null> {
       label: collections[key].label(row),
       published: row.is_published === true,
       featured: row.is_featured === true,
+      demo: row.is_demo === true,
       visibleOnSite: vis[j].visible,
       note: vis[j].note,
       values: collections[key].toValues(row) as Record<string, unknown>,
@@ -279,8 +327,10 @@ export async function loadEditorPage(): Promise<EditorPageData | null> {
     [...list].sort((a, b) => Number(b.featured) - Number(a.featured));
   domain.gallery = featuredFirst(domain.gallery as GalleryItem[]);
   domain.films = featuredFirst(domain.films as Film[]);
+  domain.stories = featuredFirst(domain.stories as EventStory[]);
   items.gallery = featuredFirst(items.gallery);
   items.films = featuredFirst(items.films);
+  items.stories = featuredFirst(items.stories);
 
   return {
     data: {

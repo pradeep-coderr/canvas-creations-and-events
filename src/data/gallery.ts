@@ -32,6 +32,10 @@ export interface GalleryItem {
   /** Included in the homepage preview. */
   featured: boolean;
   order: number;
+  /** Temporary sample content (labelled "Sample" on the site). */
+  isDemo?: boolean;
+  /** Where the photo came from (e.g. a stock-photo page), if recorded. */
+  credit?: { text: string; href?: string };
 }
 
 export const galleryItems: GalleryItem[] = [];

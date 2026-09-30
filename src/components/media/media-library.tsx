@@ -173,6 +173,19 @@ export function MediaLibrary({
                   </div>
                   <div className="flex flex-1 flex-col gap-3 p-4">
                     <p className="text-sm font-medium break-words">{image.alt}</p>
+                    {image.credit && (
+                      <p className="text-xs text-muted-foreground">
+                        Source:{" "}
+                        {image.credit.href ? (
+                          <a href={image.credit.href} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                            {image.credit.text}
+                            <span className="sr-only"> (opens in a new tab)</span>
+                          </a>
+                        ) : (
+                          image.credit.text
+                        )}
+                      </p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       {image.width} × {image.height}
                       {formatSize(image.fileSize) && ` · ${formatSize(image.fileSize)}`}

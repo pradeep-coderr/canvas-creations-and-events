@@ -38,13 +38,14 @@ export async function signImagePaths(client: Client, paths: (string | null | und
  * The database's foreign keys stay the authority; this is for explaining.
  */
 export async function getMediaUsage(client: Client): Promise<Map<string, string[]>> {
-  const [services, gallery, home, about, video, films, posters] = await Promise.all([
+  const [services, gallery, home, about, video, films, stories, posters] = await Promise.all([
     client.from("services").select("title, image_id, is_published").not("image_id", "is", null),
     client.from("gallery_items").select("title, media_id, is_published"),
     client.from("home_content").select("hero_image_id").eq("id", true).maybeSingle(),
     client.from("about_content").select("image_id").eq("id", true).maybeSingle(),
     client.from("video_story").select("video_media_id, poster_id").eq("id", true).maybeSingle(),
     client.from("films").select("title, video_media_id, is_published"),
+    client.from("event_stories").select("title, image_id, is_published, images:event_story_images(media_id)"),
     client.from("media_assets").select("title, poster_media_id").eq("kind", "video").not("poster_media_id", "is", null),
   ]);
   const usage = new Map<string, string[]>();
@@ -61,6 +62,10 @@ export async function getMediaUsage(client: Client): Promise<Map<string, string[
   add(video.data?.poster_id, "Video poster");
   for (const f of films.data ?? []) add(f.video_media_id, `Homepage Films: ${f.title}${draft(f.is_published)}`);
   for (const p of posters.data ?? []) add(p.poster_media_id, `Cover of the video “${p.title}”`);
+  for (const st of (stories.data ?? []) as { title: string; image_id: string; is_published: boolean; images: { media_id: string }[] }[]) {
+    add(st.image_id, `Event story: ${st.title}${draft(st.is_published)}`);
+    for (const i of st.images ?? []) add(i.media_id, `Event story (more photos): ${st.title}${draft(st.is_published)}`);
+  }
   return usage;
 }
 
@@ -68,7 +73,7 @@ export async function getMediaUsage(client: Client): Promise<Map<string, string[
 export async function listImages(client: Client): Promise<MediaImage[]> {
   const { data, error } = await client
     .from("media_assets")
-    .select("id, storage_path, alt, width, height, original_filename, file_size, mime_type, created_at")
+    .select("id, storage_path, alt, width, height, original_filename, file_size, mime_type, created_at, credit, credit_url")
     .eq("kind", "image")
     .order("created_at", { ascending: false });
   if (error || !data) {
@@ -90,6 +95,7 @@ export async function listImages(client: Client): Promise<MediaImage[]> {
     mimeType: m.mime_type,
     createdAt: m.created_at,
     usage: usage.get(m.id) ?? [],
+    credit: m.credit ? { text: m.credit, href: m.credit_url ?? undefined } : undefined,
   }));
 }
 

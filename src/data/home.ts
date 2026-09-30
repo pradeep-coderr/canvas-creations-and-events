@@ -68,6 +68,13 @@ export const gallerySection = {
   filterAll: "All",
 };
 
+/** Event stories section wording, and the note shown while sample content is live. */
+export const storiesSection = {
+  eyebrow: "Event stories",
+  title: "A celebration, up close",
+  sampleNotice: "Sample imagery is shown while our portfolio is being prepared.",
+};
+
 /*
  * Pricing section wording. The section appears only once a real package is
  * published in the CMS; no packages or prices are built in.
@@ -254,6 +261,7 @@ export type ServicesCopy = Renderable<typeof servicesSection>;
 export type CategoriesCopy = Renderable<typeof categoriesSection>;
 export type GalleryCopy = Renderable<typeof gallerySection>;
 export type PricingCopy = Renderable<typeof pricingSection>;
+export type StoriesCopy = Renderable<typeof storiesSection>;
 export type AboutCopy = Renderable<typeof about>;
 export type ProcessCopy = Renderable<Pick<typeof processSection, "eyebrow" | "title">>;
 export type WhyCanvasCopy = Renderable<Pick<typeof whyCanvas, "eyebrow" | "titleLines">>;

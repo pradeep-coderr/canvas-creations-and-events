@@ -26,6 +26,7 @@ export const collectionKeys = [
   "pricing",
   "categories",
   "gallery",
+  "stories",
   "films",
   "testimonials",
   "faqs",
@@ -43,6 +44,11 @@ type Row = Record<string, unknown>;
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const num = (v: unknown) => (typeof v === "number" ? v : 0);
+
+/** Temporary sample content (labelled "Sample" on the site). */
+const demo = { isDemo: z.boolean().default(false) };
+const demoRow = (v: { isDemo: boolean }) => ({ is_demo: v.isDemo });
+const demoValues = (row: Row) => ({ isDemo: row.is_demo === true });
 
 // Columns every collection shares.
 const visibility = { isPublished: z.boolean(), sortOrder: sortOrder() };
@@ -67,6 +73,7 @@ export const serviceSchema = z.object({
 export const categorySchema = z.object({
   label: line(),
   slug: slug(),
+  ...demo,
   ...visibility,
 });
 
@@ -75,6 +82,28 @@ export const galleryItemSchema = z.object({
   title: optionalLine(),
   categoryId: optionalId(),
   isFeatured: z.boolean(),
+  ...demo,
+  ...visibility,
+});
+
+export const STORY_PHOTOS_MAX = 8;
+
+export const storySchema = z.object({
+  title: line(),
+  slug: slug(),
+  description: text(),
+  categoryId: optionalId(),
+  imageId: requiredId("Choose the main photo."),
+  /** Extra photos, in order (saved to event_story_images). */
+  galleryIds: z
+    .array(z.uuid())
+    .max(STORY_PHOTOS_MAX, `Use up to ${STORY_PHOTOS_MAX} extra photos.`)
+    .refine((ids) => new Set(ids).size === ids.length, "Each photo can be added once."),
+  location: optionalLine(),
+  styling: lineList(),
+  testimonialId: optionalId(),
+  isFeatured: z.boolean(),
+  ...demo,
   ...visibility,
 });
 
@@ -138,6 +167,7 @@ export const filmSchema = z.object({
   title: line(),
   caption: optionalText(),
   isFeatured: z.boolean(),
+  ...demo,
   ...visibility,
 });
 
@@ -159,6 +189,8 @@ interface CollectionDef<S extends z.ZodType> {
   description: string;
   /** Has a separate "featured on the homepage" flag. */
   featured: boolean;
+  /** Has a sample / demo flag (is_demo). */
+  demo?: boolean;
   /** Columns for the admin list. */
   listSelect: string;
   schema: S;
@@ -256,10 +288,11 @@ export const collections = {
     plural: "categories",
     description: "Kinds of celebrations you style, shown as a list on the homepage and used to group gallery photos.",
     featured: false,
-    listSelect: "id, label, slug, is_published, sort_order, created_at",
+    demo: true,
+    listSelect: "id, label, slug, is_published, is_demo, sort_order, created_at",
     schema: categorySchema,
-    toRow: (v) => ({ label: v.label, slug: v.slug, ...visibilityRow(v) }),
-    toValues: (row) => ({ label: str(row.label), slug: str(row.slug), ...visibilityValues(row) }),
+    toRow: (v) => ({ label: v.label, slug: v.slug, ...demoRow(v), ...visibilityRow(v) }),
+    toValues: (row) => ({ label: str(row.label), slug: str(row.slug), ...demoValues(row), ...visibilityValues(row) }),
     label: (row) => str(row.label),
   }),
   gallery: define({
@@ -269,14 +302,16 @@ export const collections = {
     plural: "gallery items",
     description: "Photos of your work, shown in the portfolio on the homepage. Featured photos are shown first and largest.",
     featured: true,
+    demo: true,
     listSelect:
-      "id, title, is_published, is_featured, sort_order, created_at, media:media_assets!gallery_items_media_fkey(alt, storage_path), category:categories(label)",
+      "id, title, is_published, is_featured, is_demo, sort_order, created_at, media:media_assets!gallery_items_media_fkey(alt, storage_path), category:categories(label)",
     schema: galleryItemSchema,
     toRow: (v) => ({
       media_id: v.mediaId,
       title: v.title,
       category_id: v.categoryId,
       is_featured: v.isFeatured,
+      ...demoRow(v),
       ...visibilityRow(v),
     }),
     toValues: (row) => ({
@@ -284,12 +319,63 @@ export const collections = {
       title: str(row.title),
       categoryId: str(row.category_id),
       isFeatured: row.is_featured === true,
+      ...demoValues(row),
       ...visibilityValues(row),
     }),
     label: (row) => {
       const media = row.media as { alt?: string | null } | null | undefined;
       return str(row.title) || str(media?.alt) || "Untitled photo";
     },
+    detail: (row) => {
+      const category = row.category as { label?: string } | null | undefined;
+      return category?.label ? `Category: ${category.label}` : null;
+    },
+  }),
+  stories: define({
+    table: "event_stories",
+    title: "Event stories",
+    singular: "story",
+    plural: "stories",
+    description:
+      "A celebration told in photos: a main photo, extra photos, styling notes and, only if the client agreed, their testimonial.",
+    featured: true,
+    demo: true,
+    listSelect:
+      "id, title, is_published, is_featured, is_demo, sort_order, created_at, image:media_assets!event_stories_image_fkey(alt, storage_path), category:categories(label)",
+    schema: storySchema,
+    // Extra photos live in event_story_images (saved by the server action).
+    toRow: (v) => ({
+      title: v.title,
+      slug: v.slug,
+      description: v.description,
+      category_id: v.categoryId,
+      image_id: v.imageId,
+      location: v.location,
+      styling: v.styling,
+      testimonial_id: v.testimonialId,
+      is_featured: v.isFeatured,
+      ...demoRow(v),
+      ...visibilityRow(v),
+    }),
+    toValues: (row) => ({
+      title: str(row.title),
+      slug: str(row.slug),
+      description: str(row.description),
+      categoryId: str(row.category_id),
+      imageId: str(row.image_id),
+      galleryIds: Array.isArray(row.images)
+        ? (row.images as { media_id: string; sort_order: number }[])
+            .toSorted((a, b) => a.sort_order - b.sort_order)
+            .map((i) => i.media_id)
+        : [],
+      location: str(row.location),
+      styling: Array.isArray(row.styling) ? (row.styling as string[]).join("\n") : "",
+      testimonialId: str(row.testimonial_id),
+      isFeatured: row.is_featured === true,
+      ...demoValues(row),
+      ...visibilityValues(row),
+    }),
+    label: (row) => str(row.title),
     detail: (row) => {
       const category = row.category as { label?: string } | null | undefined;
       return category?.label ? `Category: ${category.label}` : null;
@@ -302,14 +388,16 @@ export const collections = {
     plural: "films",
     description: "YouTube or Vimeo videos from the media library, shown in the Films section. The featured film is shown largest.",
     featured: true,
+    demo: true,
     listSelect:
-      "id, title, is_published, is_featured, sort_order, created_at, video:media_assets!films_video_fkey(title, provider)",
+      "id, title, is_published, is_featured, is_demo, sort_order, created_at, video:media_assets!films_video_fkey(title, provider)",
     schema: filmSchema,
     toRow: (v) => ({
       video_media_id: v.videoMediaId,
       title: v.title,
       caption: v.caption,
       is_featured: v.isFeatured,
+      ...demoRow(v),
       ...visibilityRow(v),
     }),
     toValues: (row) => ({
@@ -317,6 +405,7 @@ export const collections = {
       title: str(row.title),
       caption: str(row.caption),
       isFeatured: row.is_featured === true,
+      ...demoValues(row),
       ...visibilityValues(row),
     }),
     label: (row) => str(row.title),
@@ -452,4 +541,11 @@ export function formatPackagePrice(p: {
   if (p.priceType === "custom_quote" || p.price === null || !(p.price > 0)) return "Custom quote";
   const lead = p.prefix || (p.priceType === "starting_from" ? "From" : "");
   return [lead, formatAud(p.price), p.suffix].filter(Boolean).join(" ");
+}
+
+/** A testimonial offered in the event story form (real, client-approved only). */
+export interface TestimonialOption {
+  id: string;
+  label: string;
+  isPublished: boolean;
 }

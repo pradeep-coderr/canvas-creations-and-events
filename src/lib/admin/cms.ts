@@ -4,6 +4,7 @@ import {
   collections,
   type CategoryOption,
   type CollectionKey,
+  type TestimonialOption,
 } from "@/lib/cms/collections";
 import { VIDEO_STORY_SELECT } from "@/lib/cms/singletons";
 import { listImages, listVideos } from "@/lib/media/server";
@@ -37,9 +38,18 @@ export async function listCollection(key: CollectionKey): Promise<Row[] | null> 
   return data as unknown as Row[];
 }
 
+/** Extra columns a collection's form needs (a story's extra photos). */
+export const ITEM_SELECT: Partial<Record<CollectionKey, string>> = {
+  stories: "*, images:event_story_images(media_id, sort_order)",
+};
+
 export async function getCollectionItem(key: CollectionKey, id: string): Promise<Row | null> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from(collections[key].table).select("*").eq("id", id).maybeSingle();
+  const { data, error } = await supabase
+    .from(collections[key].table)
+    .select(ITEM_SELECT[key] ?? "*")
+    .eq("id", id)
+    .maybeSingle();
   if (error) console.error("[cms] item read failed", { table: collections[key].table, code: error.code });
   return (data as Row | null) ?? null;
 }
@@ -93,6 +103,25 @@ export async function getImageLibrary(): Promise<MediaImage[]> {
 
 export async function getVideoLibrary(): Promise<MediaVideo[]> {
   return listVideos(await createClient());
+}
+
+/** Testimonials an event story can show (drafts listed but never shown on the site). */
+export async function getTestimonialOptions(): Promise<TestimonialOption[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("testimonials")
+    .select("id, author_name, event_type, is_published")
+    .order("sort_order")
+    .order("created_at");
+  if (error) {
+    console.error("[cms] testimonial read failed", { code: error.code });
+    return [];
+  }
+  return data.map((t) => ({
+    id: t.id,
+    label: t.event_type ? `${t.author_name} (${t.event_type})` : t.author_name,
+    isPublished: t.is_published,
+  }));
 }
 
 export async function getCategoryOptions(): Promise<CategoryOption[]> {

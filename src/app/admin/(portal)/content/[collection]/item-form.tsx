@@ -4,11 +4,12 @@ import {
   FilmForm,
   GalleryItemForm,
   PricingForm,
+  StoryForm,
   ServiceForm,
   StepForm,
   TestimonialForm,
 } from "@/components/admin/collection-forms";
-import { getCategoryOptions, getImageLibrary, getVideoLibrary } from "@/lib/admin/cms";
+import { getCategoryOptions, getImageLibrary, getTestimonialOptions, getVideoLibrary } from "@/lib/admin/cms";
 import { collections, type CollectionKey, type CollectionValues } from "@/lib/cms/collections";
 
 /**
@@ -37,6 +38,22 @@ export async function ItemForm({
       return <ServiceForm {...common} defaultValues={values("services")} imageOptions={await getImageLibrary()} />;
     case "pricing":
       return <PricingForm {...common} defaultValues={values("pricing")} />;
+    case "stories": {
+      const [imageOptions, categoryOptions, testimonialOptions] = await Promise.all([
+        getImageLibrary(),
+        getCategoryOptions(),
+        getTestimonialOptions(),
+      ]);
+      return (
+        <StoryForm
+          {...common}
+          defaultValues={values("stories")}
+          imageOptions={imageOptions}
+          categoryOptions={categoryOptions}
+          testimonialOptions={testimonialOptions}
+        />
+      );
+    }
     case "films":
       return <FilmForm {...common} defaultValues={values("films")} videoOptions={await getVideoLibrary()} />;
     case "categories":

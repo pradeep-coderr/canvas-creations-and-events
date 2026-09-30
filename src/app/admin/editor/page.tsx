@@ -127,6 +127,11 @@ export default async function EditorPage() {
         enquiry: { title: live("home", "servicesEnquiryTitle"), text: live("home", "servicesEnquiryText") },
       },
       categories: { eyebrow: t("home", "categoriesEyebrow"), title: t("home", "categoriesTitle") },
+      stories: {
+        eyebrow: t("home", "storiesEyebrow"),
+        title: t("home", "storiesTitle"),
+        sampleNotice: t("home", "sampleNotice"),
+      },
       pricing: {
         eyebrow: t("home", "pricingEyebrow"),
         title: t("home", "pricingTitle"),
@@ -183,6 +188,7 @@ export default async function EditorPage() {
     categories: page.collections.categories,
     gallery: page.collections.gallery,
     galleryCategories: page.galleryCategories,
+    stories: page.collections.stories,
     films: page.collections.films,
     testimonials: page.collections.testimonials,
     faqs: page.collections.faqs,
@@ -199,6 +205,7 @@ export default async function EditorPage() {
     categories: itemSlots("categories"),
     gallery: itemSlots("gallery"),
     films: itemSlots("films"),
+    stories: itemSlots("stories"),
     testimonials: itemSlots("testimonials"),
     faqs: itemSlots("faqs"),
     process: itemSlots("process"),

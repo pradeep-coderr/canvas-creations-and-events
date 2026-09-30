@@ -54,7 +54,7 @@ export function AboutFounder({
           </Button>
         </Reveal>
 
-        <Reveal className="relative lg:order-first lg:col-span-5">
+        <Reveal variant="mask" className="relative lg:order-first lg:col-span-5">
           {copy.image ? (
             <ImageFrame
               src={copy.image.src}

@@ -21,6 +21,10 @@ export function describeDbError(
       return /still referenced/.test(where)
         ? "This photo is still used in the gallery. Remove it from the gallery first."
         : "The selected photo no longer exists. Choose another one.";
+    if (/event_stor(ies_image|y_images_media)_fkey/.test(where))
+      return /still referenced/.test(where)
+        ? "This photo is used in an event story. Remove it from the story first."
+        : "A selected photo no longer exists. Choose another one.";
     if (/films_video_fkey/.test(where))
       return /still referenced/.test(where)
         ? "This video is still used in the films list. Remove it from there first."

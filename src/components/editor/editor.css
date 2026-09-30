@@ -248,6 +248,12 @@ textarea.cc-edit-input {
   color: var(--muted-foreground);
   margin-right: auto;
 }
+/* Sample / demo content: unmistakable in the editor. */
+.cc-item-sample {
+  color: var(--destructive);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
 
 .cc-item-button {
   height: 2.75rem;

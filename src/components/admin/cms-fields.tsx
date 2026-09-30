@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { MediaList } from "@/components/media/media-list";
 import { MediaSlot } from "@/components/media/media-picker";
 import { LINE_MAX, TEXT_MAX } from "@/lib/cms/fields";
 import type { ImageUse, MediaImage } from "@/lib/media/types";
@@ -262,6 +263,40 @@ export function FormSection({
       {description && <p className="clear-both pt-2 text-sm text-muted-foreground">{description}</p>}
       <div className="clear-both grid gap-6 pt-6">{children}</div>
     </fieldset>
+  );
+}
+
+/** An ordered list of library photos bound to the form (string[] of media ids). */
+export function MediaListField<T extends FieldValues>({
+  form,
+  name,
+  label,
+  hint,
+  images,
+  use,
+  max,
+}: BaseProps<T> & { images: MediaImage[]; use: ImageUse; max: number }) {
+  const error = get(form.formState.errors, name)?.message as string | undefined;
+  return (
+    <Controller
+      control={form.control}
+      name={name}
+      render={({ field }) => (
+        <MediaList
+          label={label}
+          value={Array.isArray(field.value) ? (field.value as string[]) : []}
+          images={images}
+          use={use}
+          max={max}
+          hint={hint}
+          error={error}
+          onChange={(ids) => {
+            field.onChange(ids);
+            field.onBlur();
+          }}
+        />
+      )}
+    />
   );
 }
 

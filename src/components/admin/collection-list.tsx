@@ -6,7 +6,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { CmsResult } from "@/app/admin/(portal)/content/actions";
 import { collections, type CollectionKey } from "@/lib/cms/collections";
-import { FeaturedBadge, VisibilityBadge } from "./content-badges";
+import { FeaturedBadge, SampleContentBadge, VisibilityBadge } from "./content-badges";
 import { useItemActions } from "./use-item-actions";
 
 export interface ListItem {
@@ -15,6 +15,8 @@ export interface ListItem {
   detail: string | null;
   published: boolean;
   featured: boolean;
+  /** Temporary sample content. */
+  demo?: boolean;
 }
 
 type Status = { kind: "success" | "error"; text: string } | null;
@@ -115,6 +117,7 @@ export function CollectionList({
                   <span className="font-semibold break-words">{item.label}</span>
                   <VisibilityBadge published={item.published} />
                   {item.featured && <FeaturedBadge />}
+                  {item.demo && <SampleContentBadge />}
                 </div>
                 {item.detail && <p className="mt-1 text-sm break-words text-muted-foreground">{item.detail}</p>}
               </div>

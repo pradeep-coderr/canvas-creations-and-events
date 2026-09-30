@@ -114,6 +114,25 @@ export async function saveCollectionItem(
     return { ok: false, error: describeDbError(error, `save this ${def.singular}`) };
   }
 
+  // A story's extra photos: replaced in one database step (set_story_images),
+  // so a failure leaves the previous list as it was.
+  if (key === "stories") {
+    const galleryIds = (parsed.data as unknown as { galleryIds: string[] }).galleryIds;
+    const photos = await supabase.rpc("set_story_images", { p_story_id: data.id, p_media_ids: galleryIds });
+    if (photos.error) {
+      console.error("[cms] story photos save failed", { code: photos.error.code });
+      const reason = describeDbError(photos.error, "save the photos");
+      if (!id) {
+        // A new story without its photos isn't kept, so trying again can't duplicate it.
+        await supabase.from(def.table).delete().eq("id", data.id);
+        return { ok: false, error: `The story wasn't created. ${reason}` };
+      }
+      // The story's own fields were saved; its previous photos are unchanged.
+      contentChanged();
+      return { ok: false, error: `The story's details were saved, but its extra photos weren't changed. ${reason}` };
+    }
+  }
+
   contentChanged();
   return {
     ok: true,

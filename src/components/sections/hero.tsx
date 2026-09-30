@@ -28,7 +28,8 @@ export function Hero({
   return (
     <section aria-labelledby="hero-title" className="bg-background">
       <Container className="grid items-center gap-12 pt-8 pb-20 sm:pt-12 sm:pb-24 lg:grid-cols-12 lg:gap-12 lg:pt-10 lg:pb-28 xl:gap-20">
-        <div className="lg:col-span-7">
+        {/* hero-exit: eases up and softens as the page scrolls (reverses on the way back). */}
+        <div className="hero-exit lg:col-span-7">
           <p
             data-sk="home.heroEyebrow"
             className="flex items-center gap-4 text-eyebrow font-semibold text-emphasis uppercase motion-safe:animate-rise"
