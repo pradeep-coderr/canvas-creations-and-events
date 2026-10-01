@@ -19,9 +19,11 @@ const logo = {
 };
 
 // Public-site metadata. Relative URLs resolve against metadataBase (root
-// layout, from NEXT_PUBLIC_SITE_URL). The title uses the editable headline.
+// layout, from NEXT_PUBLIC_SITE_URL). The search title says what and where
+// (site.seo); the editable headline leads the social-media preview.
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${site.name} | ${headlineText(await getSiteSettings())}`;
+  const title = `${site.name} | ${site.seo.title}`;
+  const socialTitle = `${site.name} | ${headlineText(await getSiteSettings())}`;
   return {
     title: { default: title, template: `%s | ${site.name}` },
     description: site.description,
@@ -29,14 +31,14 @@ export async function generateMetadata(): Promise<Metadata> {
       type: "website",
       locale: "en_AU",
       siteName: site.name,
-      title,
+      title: socialTitle,
       description: site.description,
       url: "/",
       images: [logo],
     },
     twitter: {
       card: "summary",
-      title,
+      title: socialTitle,
       description: site.description,
       images: [logo],
     },

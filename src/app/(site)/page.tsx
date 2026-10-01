@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { HomeSections } from "@/components/home/home-sections";
 import { getHomepageContent } from "@/lib/content/public";
-import { localBusinessJsonLd, serializeJsonLd } from "@/lib/structured-data";
+import { localBusinessJsonLd, serializeJsonLd, websiteJsonLd } from "@/lib/structured-data";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -22,6 +22,8 @@ export default async function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(localBusinessJsonLd(content.settings)) }}
       />
+      {/* The site's name for search results (with the names people search for). */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteJsonLd()) }} />
       {/* Same composition as the admin visual editor (/admin/editor). */}
       <HomeSections content={content} />
     </main>

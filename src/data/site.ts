@@ -21,7 +21,15 @@ export const site = {
   shortName: "Canvas Creations",
   slogan: "Turning moments into masterpieces",
   description:
-    "Premium event decoration and styling in South Australia.",
+    "Canvas Creations and Events (Canvas Creation) is an event styling and decoration studio in Adelaide, South Australia, for celebrations and corporate events.",
+
+  // Search engines: what the business does and where, in the page title, and
+  // the names people search for. Only confirmed facts (no services, prices,
+  // service area or claims that the client hasn't provided).
+  seo: {
+    title: "Event Styling & Decoration in Adelaide",
+    alternateNames: ["Canvas Creation", "Canvas Creations", "Canvas Creations & Events"],
+  },
   region: "South Australia",
   locale: "en-AU",
 

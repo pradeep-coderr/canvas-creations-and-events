@@ -3729,3 +3729,26 @@ Typecheck, lint, `supabase db lint`, build: clean.
 - The 5 photo files are uploaded to live storage (`cms-media/images/gallery/`).
 - **The database rows are not inserted yet.** The insert was held back for the owner's approval, so the files are unused until then.
 - After the insert, saving any item in the admin refreshes the cache so the change shows immediately.
+
+### Live domain and search (1 Oct 2026)
+
+**Domain:**
+- `canvascreation.com.au` is on Vercel. DNS is at GoDaddy: an A record `@` → `216.198.79.1` and a CNAME `www` → Vercel's project CNAME.
+- The plain domain redirects (308) to **`https://www.canvascreation.com.au`**, the main address.
+- Canonical, Open Graph, `sitemap.xml` and `robots.txt` use it automatically: `getSiteUrl` falls back to `VERCEL_PROJECT_PRODUCTION_URL`.
+- Still to do in Supabase → Auth → URL Configuration:
+  - Site URL `https://www.canvascreation.com.au`;
+  - Redirect URL `https://www.canvascreation.com.au/**`.
+
+**Search basics (only confirmed facts):**
+- Title: "Canvas Creations and Events | Event Styling & Decoration in Adelaide". The editable headline now leads the social-media preview instead.
+- Description names the business, "Canvas Creation" (the singular, as in the domain), event styling and decoration, Adelaide, South Australia, celebrations and corporate events. It is also used in the app manifest and business details.
+- Structured data:
+  - LocalBusiness gains `alternateName` (Canvas Creation, Canvas Creations, Canvas Creations & Events);
+  - a new WebSite entry gives Google the site name and those variants.
+- Data in `site.seo` (`src/data/site.ts`).
+
+**Not code (owner):**
+- Google Search Console (domain property, verified with a TXT record at GoDaddy): submit the sitemap and request indexing.
+- Google Business Profile with the website link.
+- Bing Webmaster Tools (can import from Search Console).

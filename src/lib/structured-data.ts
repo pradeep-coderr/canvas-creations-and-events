@@ -18,6 +18,7 @@ export function localBusinessJsonLd(settings: SiteSettings) {
     "@type": "LocalBusiness",
     "@id": `${absoluteUrl("/")}#business`,
     name: site.name,
+    alternateName: site.seo.alternateNames,
     slogan: headlineText(settings),
     description: site.description,
     url: absoluteUrl("/"),
@@ -35,6 +36,21 @@ export function localBusinessJsonLd(settings: SiteSettings) {
       addressCountry: site.contact.address.countryCode,
     },
     sameAs: settings.socials.map((social) => social.href),
+  };
+}
+
+/**
+ * schema.org WebSite: tells Google the site's name (and the names people
+ * search for, e.g. "Canvas Creation"), shown above the result.
+ */
+export function websiteJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": `${absoluteUrl("/")}#website`,
+    name: site.name,
+    alternateName: site.seo.alternateNames,
+    url: absoluteUrl("/"),
   };
 }
 
