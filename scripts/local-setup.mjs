@@ -11,6 +11,10 @@
 //       your dev server (http://host.docker.internal:3000), so calendar
 //       reminder notifications work locally. Prints what's still missing.
 //
+//   bun run setup:local -- --check-push
+//       Sends a real test push to every active device in the LOCAL database
+//       and prints each push service's answer (accepted / gone / key mismatch).
+//
 //   bun run setup:local -- --admin you@example.com
 //       Makes that LOCAL user a super admin (needed for Settings → push and
 //       test email). If the user doesn't exist yet, it's created with a
@@ -81,6 +85,54 @@ function localSql(sql) {
   } finally {
     rmSync(file, { force: true });
   }
+}
+
+// --- --check-push: a real push to every active local device -------------------
+if (args.includes("--check-push")) {
+  const need = ["NEXT_PUBLIC_VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"].filter((k) => !env[k]);
+  if (need.length) {
+    console.error(`Missing in ${envFile}: ${need.join(", ")}`);
+    process.exit(1);
+  }
+  const out = localSql(`
+    select s.endpoint, s.p256dh, s.auth, coalesce(s.user_agent, '') as ua, u.email
+    from public.push_subscriptions s join auth.users u on u.id = s.admin_user_id
+    where s.revoked_at is null order by s.created_at;`);
+  const rows = JSON.parse(out.slice(out.indexOf("{"))).rows ?? [];
+  if (rows.length === 0) {
+    console.log("No active devices. Turn notifications on in Admin → Settings on each device first.");
+    process.exit(0);
+  }
+  webpush.setVapidDetails(env.VAPID_SUBJECT, env.NEXT_PUBLIC_VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY);
+  const device = (ua) =>
+    /Android/.test(ua) ? "Android" : /iPhone|iPad/.test(ua) ? "iPhone/iPad" : /Windows/.test(ua) ? "Windows" : /Mac OS/.test(ua) ? "Mac" : "device";
+  const payload = JSON.stringify({
+    title: "Push check",
+    body: "Sent by bun run setup:local -- --check-push",
+    url: "/admin/settings",
+    tag: "push-check",
+  });
+  for (const r of rows) {
+    const service = new URL(r.endpoint).host;
+    const label = `${r.email} · ${device(r.ua)} (${service})`;
+    try {
+      const res = await webpush.sendNotification({ endpoint: r.endpoint, keys: { p256dh: r.p256dh, auth: r.auth } }, payload, {
+        TTL: 600,
+        urgency: "high",
+      });
+      console.log(`✔ ${label}: accepted (${res.statusCode}) — it should appear on that device now`);
+    } catch (error) {
+      const status = error.statusCode;
+      const why =
+        status === 404 || status === 410
+          ? "GONE: that browser dropped this subscription. Turn notifications on again on that device."
+          : status === 403
+            ? "KEY MISMATCH: subscribed with different VAPID keys. Turn notifications on again on that device."
+            : (error.body || error.message || "").toString().slice(0, 160);
+      console.log(`✘ ${label}: ${status ?? "error"} — ${why}`);
+    }
+  }
+  process.exit(0);
 }
 
 // --- --admin email -----------------------------------------------------------

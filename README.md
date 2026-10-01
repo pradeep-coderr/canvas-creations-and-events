@@ -343,7 +343,8 @@ Test notifications against the **local** Supabase, never the live one: test enqu
 6. **Restart** `bun dev`, sign in at `http://localhost:3000/admin`, then open **Settings**:
    - **Turn on notifications** → **Send test notification**: a real push through Google/Mozilla/Apple's push service to this browser. `localhost` counts as secure, so no HTTPS is needed.
    - **Send test enquiry email**: a real email through Resend.
-7. **Real flows:**
+7. **Check every device:** `bun run setup:local -- --check-push` sends a test push to every active device in the local database and prints each push service's answer: accepted, **gone** (the browser dropped it: turn notifications on again there) or **key mismatch**.
+8. **Real flows:**
    - **Enquiry:** send one from the homepage. You get an email and a "New enquiry" push.
    - **Review:** leave one. You get "New review" (or "New feedback").
    - **Reminder:** add a calendar reminder due in a couple of minutes. The local database calls your dev server and you get a "Reminder" push.

@@ -34,6 +34,13 @@ type Busy = null | "enable" | "disable" | "test" | "prefs";
 /** How long to wait for this device to show a test notification. */
 const TEST_WAIT_MS = 20_000;
 
+/** Same key bytes? (a subscription remembers the key it was made with). */
+function sameBytes(a: ArrayBuffer | null | undefined, b: Uint8Array) {
+  if (!a) return false;
+  const x = new Uint8Array(a);
+  return x.length === b.length && x.every((v, i) => v === b[i]);
+}
+
 function base64ToBytes(base64: string) {
   const padded = (base64 + "=".repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(padded);
@@ -166,9 +173,21 @@ export function NotificationPanel({
         return { ok: false, error: "Notifications are blocked for this site. Allow them in the browser's site settings, then try again." };
       }
       const reg = await registration();
-      const sub =
-        (await reg.pushManager.getSubscription()) ??
-        (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64ToBytes(publicKey!) }));
+      const key = base64ToBytes(publicKey!);
+      // Reuse the browser's existing subscription only if it's still good:
+      // made with this site's current key AND known to the server as active.
+      // A subscription the push service reported gone (revoked here), or one
+      // made with older keys, would look "on" but never receive anything.
+      let existing = await reg.pushManager.getSubscription();
+      if (existing) {
+        const sameKey = sameBytes(existing.options.applicationServerKey, key);
+        const { stored } = sameKey ? await getPushDeviceStatus(existing.endpoint) : { stored: false };
+        if (!sameKey || !stored) {
+          await existing.unsubscribe().catch(() => undefined);
+          existing = null;
+        }
+      }
+      const sub = existing ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }));
       const json = sub.toJSON();
       const saved = await savePushSubscription({ endpoint: json.endpoint, keys: json.keys, userAgent: navigator.userAgent.slice(0, 300) });
       await refresh();

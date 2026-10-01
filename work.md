@@ -3900,3 +3900,5 @@ The migration must be pushed **before** the code: the homepage reads the new col
   - turned off, it answers no;
   - an incoming alert shows the in-app banner and chimes.
 - **Dev only:** when the honeypot is filled, typically by a form-filler extension, the enquiry and review forms now say "Not sent (local development only)…" instead of a fake "Thank you". Production stays silent for bots. The enquiry form also shows the server's own error message.
+- **Fix: turning notifications on again now replaces a dead subscription.** Before, "Turn on notifications" reused the browser's existing subscription even when the push service had reported it gone (auto-revoked after a 404/410) or it was made with older VAPID keys. It looked on but never received anything. Found on the owner's Android phone: subscribed at 02:58 and revoked 3 s after the 03:10 enquiry because FCM said gone.
+- **New: `bun run setup:local -- --check-push`** sends a real push to every active local device and prints each push service's answer.
