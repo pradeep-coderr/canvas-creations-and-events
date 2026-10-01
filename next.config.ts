@@ -36,8 +36,35 @@ const securityHeaders = [
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL) : null;
 const localSupabase = supabaseUrl !== null && ["127.0.0.1", "localhost"].includes(supabaseUrl.hostname);
 
+// The public site's own domain, for production builds on Vercel (same order
+// as src/lib/site-url.ts). Null elsewhere, or if it is itself a vercel.app
+// address (a redirect to it would loop).
+function productionOrigin() {
+  if (process.env.VERCEL_ENV !== "production") return null;
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  const origin = configured ? new URL(configured).origin : host ? `https://${host}` : null;
+  return origin && !new URL(origin).hostname.endsWith(".vercel.app") ? origin : null;
+}
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // One public address: in production, *.vercel.app requests (the old
+  // project address, bookmarks, the old installed app) move permanently to
+  // the custom domain, same path and query. Vercel can't redirect its own
+  // vercel.app domain from the dashboard. Preview deployments are untouched.
+  async redirects() {
+    const origin = productionOrigin();
+    if (!origin) return [];
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: ".*\\.vercel\\.app" }],
+        destination: `${origin}/:path*`,
+        permanent: true,
+      },
+    ];
+  },
   images: supabaseUrl
     ? {
         remotePatterns: [

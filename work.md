@@ -3752,3 +3752,5 @@ Typecheck, lint, `supabase db lint`, build: clean.
 - Google Search Console (domain property, verified with a TXT record at GoDaddy): submit the sitemap and request indexing.
 - Google Business Profile with the website link.
 - Bing Webmaster Tools (can import from Search Console).
+
+**Old address:** Vercel can't redirect its own `*.vercel.app` domain from the dashboard (Save stays disabled). `next.config.ts` does it instead: in production builds (`VERCEL_ENV=production`), any `*.vercel.app` host redirects 308 to the custom domain, keeping the path and query (`/_next` assets excluded). Preview builds and local runs are unaffected. Checked locally by host header: the old address, a deep link with a query and a deployment URL all redirect; the custom domain and localhost serve 200.
