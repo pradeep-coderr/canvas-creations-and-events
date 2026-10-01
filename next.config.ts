@@ -49,9 +49,11 @@ function productionOrigin() {
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  // `bun dev` only: let phones/tablets on the same Wi-Fi open the dev site
-  // (http://<this computer's Wi-Fi IP>:3000). Private network ranges only.
-  allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "172.*.*.*"],
+  // `bun dev` only: let other devices open the dev site — on the same Wi-Fi
+  // (http://<this computer's Wi-Fi IP>:3000), or over HTTPS through a
+  // temporary Cloudflare tunnel (needed for push on another device; see
+  // README → "Testing on another device").
+  allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "172.*.*.*", "*.trycloudflare.com"],
   // One public address: in production, *.vercel.app requests (the old
   // project address, bookmarks, the old installed app) move permanently to
   // the custom domain, same path and query. Vercel can't redirect its own
