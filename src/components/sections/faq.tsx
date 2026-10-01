@@ -33,7 +33,7 @@ export function Faq({
           eyebrow={copy.eyebrow}
           title={copy.title}
         />
-        <Reveal className="mt-12 sm:mt-14">
+        <Reveal variant="in" className="mt-12 sm:mt-14">
           {/* Radix Accordion: buttons with aria-expanded/controls, arrow-key
               navigation between questions, one open at a time. */}
           <Accordion type="single" collapsible className="border-t border-foreground/15">

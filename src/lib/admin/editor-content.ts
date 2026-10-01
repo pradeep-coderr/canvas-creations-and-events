@@ -16,7 +16,7 @@ import { rowToStyles } from "@/lib/styles/schema";
 import { VIDEO_STORY_SELECT, aboutToValues, homeToValues, videoToValues } from "@/lib/cms/singletons";
 import { PORTFOLIO_LIMIT } from "@/lib/content/public";
 import { ADMIN_URL_TTL, signImagePaths } from "@/lib/media/server";
-import { videoAdapters, uploadedVideoConfigured } from "@/lib/media/video-providers";
+import { videoAdapters } from "@/lib/media/video-providers";
 import { createClient } from "@/lib/supabase/server";
 import { getCategoryOptions, getImageLibrary, getVideoLibrary } from "./cms";
 
@@ -97,10 +97,21 @@ const featuredOnlyKeys = new Set<CollectionKey>(["services", "testimonials"]);
 // ...and at most this many.
 const homepageLimit: Partial<Record<CollectionKey, number>> = { gallery: PORTFOLIO_LIMIT, testimonials: 3 };
 
+// Lists the public page orders featured-first before applying its limit.
+const featuredFirstKeys = new Set<CollectionKey>(["gallery", "stories", "films"]);
+
 function visibility(key: CollectionKey, rows: Row[]) {
   const featuredOnly = featuredOnlyKeys.has(key);
   let shown = 0;
-  return rows.map((row) => {
+  // Walk the rows in the public page's order (featured first, stable), so
+  // the limit drops the same items visitors don't see; results keep row order.
+  const order = rows.map((row, i) => ({ row, i }));
+  if (featuredFirstKeys.has(key)) order.sort((a, b) => Number(b.row.is_featured === true) - Number(a.row.is_featured === true) || a.i - b.i);
+  const result: { visible: boolean; note?: string }[] = new Array(rows.length);
+  for (const { row, i } of order) result[i] = decide(row);
+  return result;
+
+  function decide(row: Row) {
     const published = row.is_published === true;
     const featured = row.is_featured === true;
     if (!published) return { visible: false };
@@ -109,7 +120,7 @@ function visibility(key: CollectionKey, rows: Row[]) {
     if (limit && shown >= limit) return { visible: false, note: `The homepage shows up to ${limit}, so this one isn't shown` };
     shown++;
     return { visible: true };
-  });
+  }
 }
 
 function toDomain(key: CollectionKey, row: Row, urls: Urls) {
@@ -344,7 +355,6 @@ export async function loadEditorPage(): Promise<EditorPageData | null> {
       items,
       imageOptions,
       videoOptions,
-      uploadedVideoConfigured: uploadedVideoConfigured(),
       categoryOptions,
       hiddenInPreview: hidden,
     },

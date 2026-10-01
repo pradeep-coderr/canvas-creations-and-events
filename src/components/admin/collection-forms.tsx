@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { useWatch, type FieldValues, type Path } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -170,6 +171,10 @@ export function PricingForm(props: ItemFormProps<"pricing">) {
 function PricingFields({ form }: { form: CmsFormApi<CollectionValues<"pricing">> }) {
   const priceType = useWatch({ control: form.control, name: "priceType" });
   const quote = priceType === "custom_quote";
+  // A quote has no amount: clear the hidden field so it can't block saving.
+  useEffect(() => {
+    if (quote && form.getValues("price")) form.setValue("price", "", { shouldDirty: true, shouldValidate: true });
+  }, [quote, form]);
   return (
     <>
       <FormSection title="Package" description="Real packages only: what you actually offer, at the price you charge.">

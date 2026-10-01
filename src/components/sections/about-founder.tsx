@@ -22,7 +22,7 @@ export function AboutFounder({
     <Section id="about" aria-labelledby="about-title">
       <Container className="grid items-center gap-12 lg:grid-cols-12 lg:gap-16 xl:gap-24">
         {/* Text first in the DOM (reading order); the image leads visually on desktop. */}
-        <Reveal className="lg:col-span-6 lg:col-start-7">
+        <Reveal variant="in" className="lg:col-span-6 lg:col-start-7">
           <SectionHeading
           styleKeys={{ eyebrow: "about.eyebrow", title: "about.title" }}
             id="about-title"

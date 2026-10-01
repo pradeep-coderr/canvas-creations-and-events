@@ -72,8 +72,6 @@ export interface EditorData {
   /** The media library (signed URLs), for photo fields. */
   imageOptions: MediaImage[];
   videoOptions: MediaVideo[];
-  /** Is an uploaded-video provider configured on this deployment? */
-  uploadedVideoConfigured: boolean;
   categoryOptions: CategoryOption[];
   /** Sections a visitor wouldn't see (nothing published in them). */
   hiddenInPreview: HomeSectionKey[];

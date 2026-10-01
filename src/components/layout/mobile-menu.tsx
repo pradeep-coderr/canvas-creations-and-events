@@ -12,6 +12,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { scrollPageTo } from "@/components/motion/smooth-scroll";
 import { scrollHomeToTop } from "@/components/shared/scroll-home";
 import type { SiteCopy } from "@/lib/cms/site-settings";
 
@@ -26,7 +27,7 @@ function goTo(href: string) {
       : null;
   if (target) {
     window.history.pushState(null, "", url.hash);
-    target.scrollIntoView(); // honours scroll-padding-top and smooth scrolling
+    scrollPageTo(target); // eased, landing below the header
   } else {
     window.location.assign(href);
   }

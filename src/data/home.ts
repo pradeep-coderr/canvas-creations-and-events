@@ -185,28 +185,10 @@ export const whyCanvas = {
 };
 
 /** Event film or video story. Local files only (public/images/videos/). */
-/**
- * A video ready to render, whatever its source (YouTube, Vimeo or an
- * uploaded-video provider). Provider details stay in the data layer
- * (src/lib/media/video-providers.ts); the page only gets a player URL.
- */
-export interface VideoContent {
-  provider: "youtube" | "vimeo" | "stream";
-  /** Accessible name for the player, e.g. "Styling highlights from a garden wedding". */
-  title: string;
-  caption?: string;
-  /** Embeddable player, loaded only after the visitor presses Play. */
-  playerUrl: string;
-  /** Cover image from the media library (optional). */
-  poster: { src: string; alt: string } | null;
-}
-
+/** The Films section's wording (the films themselves: src/data/films.ts). */
 export const videoStory = {
   eyebrow: "In motion",
   title: "Celebrations, in motion.",
-  // No video yet. Add e.g. { src: "/images/videos/story.mp4",
-  // poster: "/images/videos/story-poster.jpg", title: "…", caption: "…" }.
-  video: null as VideoContent | null,
   emptyText: "Video stories from our events will live here.",
   tiktokCta: "Watch on TikTok",
 };
@@ -265,7 +247,7 @@ export type StoriesCopy = Renderable<typeof storiesSection>;
 export type AboutCopy = Renderable<typeof about>;
 export type ProcessCopy = Renderable<Pick<typeof processSection, "eyebrow" | "title">>;
 export type WhyCanvasCopy = Renderable<Pick<typeof whyCanvas, "eyebrow" | "titleLines">>;
-export type VideoStoryCopy = Renderable<Omit<typeof videoStory, "video">>;
+export type VideoStoryCopy = Renderable<typeof videoStory>;
 export type TestimonialsCopy = Renderable<typeof testimonialsSection>;
 export type FaqCopy = Renderable<typeof faqSection>;
 export type EnquiryCopy = Renderable<typeof enquirySection>;

@@ -43,7 +43,6 @@ import {
 import { featuredServices, type Service } from "@/data/services";
 import { featuredTestimonials, type Testimonial } from "@/data/testimonials";
 import {
-  withSectionLinks,
   defaultSiteSettings,
   settingsFromValues,
   SITE_SETTINGS_SELECT,
@@ -737,7 +736,7 @@ export const getHomepageContent = cache(async () => {
     copy,
     about: aboutCopy,
     video: { copy: videoCopy },
-    settings: withSectionLinks(settings, { pricing: pricing.length > 0, films: films.length > 0 }),
+    settings,
     sectionStyles: styles.sections,
   };
 });

@@ -85,7 +85,7 @@ export function VideoStory({
         {lead ? (
           <>
             <SlotItem slots={itemSlots} item={lead}>
-              <Reveal className="mx-auto mt-12 max-w-5xl sm:mt-14">
+              <Reveal variant="in" className="mx-auto mt-12 max-w-5xl sm:mt-14">
                 <figure>
                   <div className="relative aspect-video w-full overflow-hidden bg-surface-ivory">
                     <VideoPlayer playerUrl={lead.playerUrl} title={lead.title} providerLabel={providerLabels[lead.provider]}>

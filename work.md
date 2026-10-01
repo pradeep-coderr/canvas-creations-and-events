@@ -3526,3 +3526,98 @@ Final gate: `bun install --frozen-lockfile`, typecheck, lint, build, `git diff -
 - **Production visual check after deploy:** homepage, stories, sample labels, lightbox, motion on a phone.
 - **Phase 21:** a new `RESEND_API_KEY`, the Resend login email for `ENQUIRY_NOTIFICATION_EMAIL`, and `VAPID_SUBJECT` are still missing in Vercel. Until then, enquiry emails and push notifications stay "not configured"; enquiries are still saved.
 - **Replace sample content with the client's own photos and stories.** Stories stay labelled "Sample" until each is unticked.
+
+## Phase 23 follow-up — In/out scroll motion, Lenis smooth scrolling & strict review
+
+The owner's report: the motion "doesn't look like an animation"; elements should visibly **come in and go out** with the scroll. They also asked for **Lenis** (`lenis` 1.3.26) for the scroll itself. The Lenis docs were read first, a plan was approved, then implemented.
+
+### Motion now comes in AND goes out (`globals.css` "Scroll motion")
+
+Each element has two scroll-linked animations on its own view timeline: one for coming in (entry) and one for going out (exit). Scrolling back up replays both in reverse.
+
+| Effect | In (entry) | Out (exit) |
+| --- | --- | --- |
+| `.reveal` | fade + rise 64 px desktop / 28 px phones, entry 0 % → cover 35 % | fade + move up 40 / 18 px, exit 25 % → 100 % |
+| `.reveal-in` (FAQ, About text, Contact, film player, single package) | as `.reveal` | **none**: tall or interactive blocks never fade while being read or watched |
+| `.reveal-mask` | clip opens 22 % → 0, opacity 0.4 → 1, image settles 1.14 → 1 | clip closes from the bottom to 22 %, opacity 0.35 |
+| `.reveal-line` | hairline draws across | retracts |
+| `.drift` / `.drift-slow` (desktop) | ±48 / ±24 px while crossing the viewport | — |
+| Hero (scroll) | — | text moves up 4 rem (1.5 rem phones) and fades to 0.2 over 85 vh; photo / frame depth on desktop |
+
+Measured (desktop, story text block): below 0.04 / +62 px → entering 0.51 / +31 px → in 1 / 0 → gone 0 / −40 px, and identical values on the way back.
+
+### Lenis smooth scrolling (`components/motion/smooth-scroll.tsx`)
+
+- **Where it runs:** public site only, mounted in the `(site)` layout. Not in the admin area or the visual editor.
+- **Settings:** `autoRaf`, `lerp 0.1`, `smoothWheel`. `syncTouch` is off, so phones keep native touch scrolling (the Lenis docs flag smoothed touch as unstable on older iOS). Keyboard scrolling stays native.
+- **CSS:** `lenis/dist/lenis.css` is imported. CSS `scroll-behavior: smooth` was removed so it doesn't fight Lenis's easing.
+- **Reduced motion:** Lenis is never started, and it is torn down if the setting changes while the page is open. Links jump.
+- **In-page links** (`/#faq`, also a second click on the same link): glide via `lenis.scrollTo`.
+  - They land below the fixed header. Lenis honours `html`'s `scroll-padding-top` itself, so no extra offset is passed (an extra offset doubled it — caught by the test).
+  - Focus moves to the section (`tabindex=-1`, no ring) so Tab continues from there.
+  - Home/logo and the mobile menu use the same helper (`scrollPageTo`). Without Lenis it falls back to the browser's smooth scroll, or a jump with reduced motion.
+- **Pop-ups** (lightbox, film dialog, mobile menu):
+  - Radix's `body[data-scroll-locked]` pauses Lenis (`stop()`), and Lenis resumes on close.
+  - Dialogs, menus and listboxes are excluded via Lenis's `prevent`, so their own content still scrolls (a stopped Lenis otherwise swallows the wheel).
+
+### Firefox upgrade: scroll-linked there too (`components/motion/scroll-motion.tsx`)
+
+Before, browsers without CSS scroll timelines got a one-shot IntersectionObserver fade. That is replaced. On every scroll frame (Lenis's `scroll` event, plus the native event for keyboard, touch and pages without Lenis), `ScrollMotion` computes each element's progress through the **same `view()` ranges** as the CSS: entry / cover / exit, using layout positions that ignore transforms.
+
+It writes that progress as CSS variables (`--cc-in`, `--cc-out`, `--cc-settle`, `--cc-cover`, plus `--cc-hero` / `--cc-hero-depth` on `html`). `html.js-motion` rules map them to the same opacity, transform and clip values.
+
+So Firefox gets the same in/out, reversible motion, eased by Lenis:
+- one read pass and one write pass per frame, and a value is written only when it changes;
+- no React state;
+- nothing runs where native scroll timelines exist, or with reduced motion;
+- the variables default to "in view", so the server HTML stays fully visible.
+
+### Strict code review (high) — findings fixed
+
+1. **Test push confirmation race:** the panel now listens for the service worker's `cc-push` message *before* sending the test push, and removes the listener on every path.
+2. **Photo replace in the media library:**
+   - reads the old path first and updates only if it is unchanged (`.eq("storage_path", oldPath)`);
+   - clears the stock credit, since the new photo is the owner's;
+   - removes the old file only after the row is updated.
+3. **Pricing form:** switching a package to "custom quote" clears a stale price, which would otherwise fail the quote/price constraint.
+4. **Editor visibility notes:** gallery, stories and films are now counted in the public page's order (featured first), so "not shown (limit)" marks the same items visitors don't see.
+5. **Dead code removed:** `uploadedVideoConfigured` (editor) and the unused `VideoContent` / `videoStory.video` types.
+6. **Missing style key:** the gallery filter buttons' style key is now editable in the Gallery panel.
+7. **One source for the menu:** the layout's section availability. The page's copy of the settings no longer recomputes section links.
+8. **Fallback load flash and stale observers:** the IntersectionObserver issues (an element near the bottom fading out on load; removed nodes still observed) are moot now that the scroll-linked fallback replaced it.
+
+### Tests actually run (local production build + local Supabase with the sample content)
+
+| Suite | Result |
+| --- | --- |
+| `lenis23.mjs` (new) | **21/21** — see below |
+| `motion23.mjs` | **12/12**: desktop and phone in → out, exact reversal, mask open/close, hero, reduced motion static, fallback writes progress for elements above / in / below |
+| `e2e23.mjs` | 42/42 |
+| `home22.mjs` (Home link / logo) | 6/6 |
+| smoke | 33/33 |
+
+`lenis23.mjs` covers:
+- **Smooth scrolling:**
+  - Lenis runs on the public site, and CSS smooth scroll is off;
+  - a wheel step is eased (12 samples: 47 → 480 px) and settles;
+  - wheeling back up returns to the top.
+- **Links:**
+  - a header link glides to `#faq` (0 → 4386 → 7325 … px) and lands 1 px from the header;
+  - the hash updates and focus moves without a ring;
+  - a repeat click works;
+  - the logo returns to the top and clears the hash.
+- **Pop-ups:** with the lightbox open, Lenis is paused and the page does not move under the wheel; it resumes after Escape and scrolling works again.
+- **Phone:** the mobile menu pauses Lenis, and its link lands exactly below the header (72 px).
+- **Reduced motion:** no Lenis, and links jump straight there.
+- **Fallback** (scroll timelines disabled):
+  - progress below 0 → entering 0.31 → 1 → out 1, identical on the way back;
+  - CSS maps 0.31 to opacity 0.31 and +44 px;
+  - the hero progress eases with the Lenis wheel.
+- No console errors.
+
+Typecheck and lint: clean. Production build: OK.
+
+### Still open
+
+- Production visual check after this deploy (wheel smoothness, motion in/out on a phone and in Firefox).
+- Everything still open in Phase 23 above (Resend / VAPID settings in Vercel; replacing sample content).

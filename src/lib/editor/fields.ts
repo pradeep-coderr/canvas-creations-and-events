@@ -131,6 +131,7 @@ export const sections: Record<HomeSectionKey, SectionDef> = {
       home("galleryEmptyText", "Text while there are no photos", "text"),
       home("galleryInstagramCta", "Instagram link text"),
     ],
+    styleKeys: [{ key: "gallery.filter", label: "Filter buttons" }],
   },
   stories: {
     title: "Event stories",

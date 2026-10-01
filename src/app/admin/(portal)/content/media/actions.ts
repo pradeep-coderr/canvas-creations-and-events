@@ -106,6 +106,14 @@ export async function finalizeImageUpload(input: unknown): Promise<MediaResult<M
         .eq("id", parsed.data.replaceId)
         .eq("kind", "image")
         .maybeSingle();
+      if (before.error || !before.data?.storage_path) {
+        console.error("[media] replace: photo not found", { code: before.error?.code });
+        await bucket.remove([storagePath]);
+        return { ok: false, error: "That photo couldn't be found. Nothing was changed. Please refresh and try again." };
+      }
+      const oldPath = before.data.storage_path;
+      // Only if it still has that file (two replaces at once can't orphan one),
+      // and without the old file's credit (the new photo isn't from there).
       const { data: replaced, error: replaceError } = await supabase
         .from("media_assets")
         .update({
@@ -116,20 +124,21 @@ export async function finalizeImageUpload(input: unknown): Promise<MediaResult<M
           original_filename: originalFilename,
           mime_type: processed.mime,
           file_size: processed.size,
+          credit: null,
+          credit_url: null,
         })
         .eq("id", parsed.data.replaceId)
         .eq("kind", "image")
+        .eq("storage_path", oldPath)
         .select("id, created_at, storage_path")
         .maybeSingle();
-      if (replaceError || !replaced || !before.data) {
+      if (replaceError || !replaced) {
         console.error("[media] replace failed", { code: replaceError?.code });
         await bucket.remove([storagePath]);
         return { ok: false, error: "The photo couldn't be replaced. Nothing was changed. Please try again." };
       }
-      if (before.data.storage_path) {
-        const removed = await bucket.remove([before.data.storage_path]);
-        if (removed.error) console.error("[media] old file removal failed after replace", { message: removed.error.message });
-      }
+      const removed = await bucket.remove([oldPath]);
+      if (removed.error) console.error("[media] old file removal failed after replace", { message: removed.error.message });
       mediaChanged(true);
       const { data: signedNew } = await bucket.createSignedUrl(storagePath, 60 * 60);
       return {

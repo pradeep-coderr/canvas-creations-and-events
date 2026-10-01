@@ -7,6 +7,7 @@ import { EditorSection } from "@/components/editor/editor-section";
 import { EditorShell } from "@/components/editor/editor-shell";
 import { HomeSections, type HomeContent, type HomeEditorSlots } from "@/components/home/home-sections";
 import { SiteFrame } from "@/components/layout/site-frame";
+import { ScrollMotion } from "@/components/motion/scroll-motion";
 import { SiteThemeStyle } from "@/components/theme/site-theme-style";
 import { about as localAbout, enquirySection, hero as localHero } from "@/data/home";
 import { loadEditorPage } from "@/lib/admin/editor-content";
@@ -221,6 +222,7 @@ export default async function EditorPage() {
           <HomeSections content={content} slots={slots} />
         </main>
       </SiteFrame>
+      <ScrollMotion />
     </EditorShell>
   );
 }

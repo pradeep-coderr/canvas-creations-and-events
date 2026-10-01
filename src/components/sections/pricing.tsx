@@ -93,7 +93,7 @@ export function Pricing({
 
         {single ? (
           <SlotItem slots={itemSlots} item={packages[0]}>
-            <Reveal>
+            <Reveal variant="in">
               <article
                 aria-labelledby={`package-${packages[0].id}`}
                 className="mx-auto mt-12 grid max-w-5xl gap-10 border-y border-highlight/60 py-10 sm:mt-16 sm:py-14 lg:grid-cols-12 lg:gap-16"

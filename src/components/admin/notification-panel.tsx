@@ -200,11 +200,29 @@ export function NotificationPanel({
       if (!device.stored) {
         return { ok: false, error: "This device's subscription isn't stored on the server. Turn notifications off and on again." };
       }
-      const sent = await sendTestPush(existing.endpoint);
+      // Listen before sending: on a fast device the service worker can report
+      // "shown" before the server action has even returned.
+      const shownIds = new Set<string>();
+      const collect = (event: MessageEvent) => {
+        const data = event.data as { type?: string; testId?: string } | null;
+        if (data?.type === "cc-push" && data.testId) shownIds.add(data.testId);
+      };
+      navigator.serviceWorker.addEventListener("message", collect);
+      let sent: Awaited<ReturnType<typeof sendTestPush>>;
+      try {
+        sent = await sendTestPush(existing.endpoint);
+      } catch (error) {
+        navigator.serviceWorker.removeEventListener("message", collect);
+        throw error;
+      }
       if (sent.lastTest) setDiag((d) => ({ ...d, lastTest: sent.lastTest ?? d.lastTest }));
-      if (!sent.ok) return sent;
+      if (!sent.ok) {
+        navigator.serviceWorker.removeEventListener("message", collect);
+        return sent;
+      }
       setStatus({ kind: "success", text: sent.message });
-      const shown = await waitForTestShown(sent.testId, TEST_WAIT_MS);
+      const shown = shownIds.has(sent.testId) || (await waitForTestShown(sent.testId, TEST_WAIT_MS));
+      navigator.serviceWorker.removeEventListener("message", collect);
       if (!shown) {
         return {
           ok: false,

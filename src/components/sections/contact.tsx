@@ -31,7 +31,7 @@ export function Contact({
           className="lg:col-span-6"
         />
 
-        <Reveal className="lg:col-span-5 lg:col-start-8">
+        <Reveal variant="in" className="lg:col-span-5 lg:col-start-8">
           <address className="not-italic">
             <dl className="border-t border-foreground/15">
               <div className="border-b border-foreground/15 py-6">

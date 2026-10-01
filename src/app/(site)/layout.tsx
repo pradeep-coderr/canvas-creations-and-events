@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { SiteFrame } from "@/components/layout/site-frame";
+import { ScrollMotion } from "@/components/motion/scroll-motion";
+import { SmoothScroll } from "@/components/motion/smooth-scroll";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 import { SiteThemeStyle } from "@/components/theme/site-theme-style";
 import { site } from "@/data/site";
@@ -56,6 +58,8 @@ export default async function SiteLayout({ children }: LayoutProps<"/">) {
       {textCss && <style id="page-styles" dangerouslySetInnerHTML={{ __html: textCss }} />}
       <SiteFrame settings={settings}>{children}</SiteFrame>
       <ServiceWorkerRegistration />
+      <SmoothScroll />
+      <ScrollMotion />
     </>
   );
 }
