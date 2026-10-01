@@ -50,6 +50,8 @@ export async function submitEnquiry(
     // Looks sent to the sender (bots learn nothing); logged so a real person
     // whose browser autofilled the hidden field can be spotted.
     console.warn("[enquiry] ignored: hidden anti-spam field was filled (bot or browser autofill)");
+    // While developing, say so (a form-filler extension fills it too).
+    if (process.env.NODE_ENV !== "production") return { status: "error", message: "Not sent (local development only): the hidden anti-spam field was filled. A form-filler extension does this; type the details yourself. On the live site this is silently ignored, as it would be for a bot." };
     return { status: "sent", notified: false };
   }
 

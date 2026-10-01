@@ -82,6 +82,8 @@ export function EnquiryForm({
   const [status, setStatus] = useState<Status>("idle");
   // False when the enquiry was stored but the business wasn't notified.
   const [notified, setNotified] = useState(true);
+  // The server's explanation when it refused the enquiry (shown with the error).
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const thanksRef = useRef<HTMLHeadingElement>(null);
   const {
     register,
@@ -120,9 +122,11 @@ export function EnquiryForm({
         setNotified(result.notified);
         reset(emptyForm);
       }
+      setErrorMessage(result.status === "error" ? result.message : null);
       setStatus(result.status);
     } catch {
       // The server action itself failed (e.g. network): nothing was confirmed.
+      setErrorMessage(null);
       setStatus(navigator.onLine ? "error" : "offline");
     }
   };
@@ -320,8 +324,12 @@ export function EnquiryForm({
         )}
         {status === "error" && (
           <p className="mt-8 surface p-5 text-sm text-destructive">
-            Something went wrong and your enquiry wasn&apos;t sent. Please try again,
-            or call us on {phone.display}.
+            {errorMessage ?? (
+              <>
+                Something went wrong and your enquiry wasn&apos;t sent. Please try again, or call us on{" "}
+                {phone.display}.
+              </>
+            )}
           </p>
         )}
       </div>

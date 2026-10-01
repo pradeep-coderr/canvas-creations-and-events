@@ -3899,3 +3899,4 @@ The migration must be pushed **before** the code: the homepage reads the new col
   - the test sound plays without errors;
   - turned off, it answers no;
   - an incoming alert shows the in-app banner and chimes.
+- **Dev only:** when the honeypot is filled, typically by a form-filler extension, the enquiry and review forms now say "Not sent (local development only)…" instead of a fake "Thank you". Production stays silent for bots. The enquiry form also shows the server's own error message.
