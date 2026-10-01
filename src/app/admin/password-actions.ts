@@ -17,8 +17,9 @@ import { createClient } from "@/lib/supabase/server";
  *   3. setNewPassword        → updateUser(password) in that session → sign
  *      out → /admin/login?reset=done
  *
- * The request always answers the same, whether or not the address has an
- * account (no account enumeration). A wrong or expired code gets one generic
+ * The request answers the same whether or not the address has an account (no
+ * account enumeration); only a failure to send at all (mail server error,
+ * sending limit) is reported, as "try again in a minute". A wrong or expired code gets one generic
  * message. Codes, tokens and passwords are never logged.
  */
 
@@ -38,8 +39,16 @@ export async function requestPasswordReset(_prev: ResetRequestState, formData: F
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email.data);
-  // Same answer either way (rate limits and unknown addresses included).
-  if (error) console.warn("[admin] password reset code request failed", { code: error.code ?? error.status });
+  if (error) {
+    console.warn("[admin] password reset code request failed", { code: error.code ?? error.status, status: error.status });
+    // Sending failed (mail server problem) or a sending limit was hit: say so,
+    // instead of showing "code sent" for an email that never left. This says
+    // nothing about whether the address has an account.
+    if (!error.status || error.status === 429 || error.status >= 500) {
+      return { error: "We couldn't send a code just now. Please wait a minute and try again." };
+    }
+  }
+  // Otherwise the same answer either way, so unknown addresses can't be told apart.
   return { sent: true, email: email.data, sentAt: Date.now() };
 }
 

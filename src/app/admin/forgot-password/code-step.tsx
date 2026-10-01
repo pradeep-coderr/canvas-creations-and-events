@@ -31,6 +31,7 @@ export function CodeStep({
   email,
   sentAt,
   resending,
+  resendError,
   onResend,
   onVerified,
   onChangeEmail,
@@ -38,6 +39,8 @@ export function CodeStep({
   email: string;
   sentAt: number;
   resending: boolean;
+  /** Why the last "Send a new code" didn't go out (the earlier code still works). */
+  resendError?: string;
   onResend: () => void;
   onVerified: () => void;
   onChangeEmail: () => void;
@@ -173,6 +176,13 @@ export function CodeStep({
           </Button>
         )}
       </form>
+
+      {resendError && !resending && (
+        <p role="alert" className="flex items-start gap-2.5 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm font-medium text-destructive">
+          <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          {resendError}
+        </p>
+      )}
 
       <div className="flex flex-col items-center gap-3 border-t border-border pt-5 text-sm sm:flex-row sm:justify-between">
         {!expired && (

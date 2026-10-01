@@ -31,7 +31,14 @@ const backLink = (
  *   3. a new password (PasswordStep)
  */
 export function ForgotPasswordForm() {
-  const [state, action, pending] = useActionState<ResetRequestState, FormData>(requestPasswordReset, {});
+  // A failed *resend* keeps the code step (and the code already sent) and
+  // just adds the error; a failed first request stays on the email step.
+  const [state, action, pending] = useActionState<ResetRequestState, FormData>(async (prev, data) => {
+    const result = await requestPasswordReset(prev, data);
+    return result.error && prev.sent && prev.email === String(data.get("email") ?? "").trim().toLowerCase()
+      ? { ...prev, error: result.error }
+      : result;
+  }, {});
   const [changingEmail, setChangingEmail] = useState(false);
   const [verified, setVerified] = useState(false);
   const {
@@ -73,6 +80,7 @@ export function ForgotPasswordForm() {
           sentAt={state.sentAt!}
           resending={pending}
           onResend={() => send(state.email!)}
+          resendError={state.error}
           onVerified={onVerified}
           onChangeEmail={() => setChangingEmail(true)}
         />

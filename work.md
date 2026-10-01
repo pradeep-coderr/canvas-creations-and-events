@@ -4009,3 +4009,11 @@ The owner asked for a better sign-in UI: a show/hide password button, "Forgot pa
   - wrong code auto-checked, then cleared and refocused; right code → step 3 automatically;
   - strength Weak → Strong; mismatch caught; saved → sign in; new password works, old doesn't;
   - fits at 360 px; no console errors.
+
+### Reset emails that never left (owner: "sometimes I don't get the code")
+
+- **Live:** all three reset requests on 1 Oct (19:41, 19:43, 19:45 UTC) failed. Supabase returned 500 "couldn't send", but the page still said "code sent". The hosted project's email sending (custom SMTP or template) isn't working yet; the reason is in Dashboard → Logs → Auth.
+- **Locally:** sending works; the last request completed through Resend.
+- **Fix:** a send failure (5xx), a sending limit (429) or an unreachable server now shows "We couldn't send a code just now. Please wait a minute and try again." This reveals nothing about whether the account exists.
+  - A failed **resend** keeps the code step, since the earlier code still works, and shows the message there.
+  - Tested by stopping the local auth service: step 1 stays, with the message.
