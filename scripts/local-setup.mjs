@@ -13,8 +13,8 @@
 //
 //   bun run setup:local -- --admin you@example.com
 //       Makes that LOCAL user a super admin (needed for Settings → push and
-//       test email). Create the user first in local Studio
-//       (http://127.0.0.1:54323 → Authentication → Add user).
+//       test email). If the user doesn't exist yet, it's created with a
+//       generated password, shown once.
 //
 // Secrets are never printed (except by --keys, which only generates them).
 
@@ -90,16 +90,50 @@ if (adminAt !== -1) {
     console.error("Usage: bun run setup:local -- --admin you@example.com");
     process.exit(1);
   }
-  const out = localSql(`
+  // Create the local sign-in if it doesn't exist yet (local Auth admin API,
+  // using the LOCAL development key from `supabase status`; never the live one).
+  const exists = localSql(`select 1 as found from auth.users where lower(email) = '${email}';`).includes("found");
+  let password = null;
+  if (!exists) {
+    const status = Object.fromEntries(
+      execSync("npx supabase status -o env", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
+        .split(/\r?\n/)
+        .filter((l) => l.includes("="))
+        .map((l) => {
+          const i = l.indexOf("=");
+          return [l.slice(0, i), l.slice(i + 1).replace(/^"(.*)"$/, "$1")];
+        }),
+    );
+    const apiHost = (() => {
+      try {
+        return new URL(status.API_URL).hostname;
+      } catch {
+        return "";
+      }
+    })();
+    const key = status.SECRET_KEY || status.SERVICE_ROLE_KEY;
+    if (!["127.0.0.1", "localhost"].includes(apiHost) || !key) {
+      console.error("The local Supabase isn't running (bunx supabase start), so the user can't be created.");
+      process.exit(1);
+    }
+    password = randomBytes(12).toString("base64url");
+    const res = await fetch(`${status.API_URL}/auth/v1/admin/users`, {
+      method: "POST",
+      headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, email_confirm: true }),
+    });
+    if (!res.ok) {
+      console.error(`Couldn't create the local user (${res.status}): ${(await res.text()).slice(0, 200)}`);
+      process.exit(1);
+    }
+  }
+  localSql(`
     insert into public.admin_users (user_id, role)
     select id, 'super_admin' from auth.users where lower(email) = '${email}'
-    on conflict (user_id) do update set role = 'super_admin'
-    returning user_id;`);
-  if (!out.includes("user_id")) {
-    console.error(`No local user ${email}. Create it in http://127.0.0.1:54323 → Authentication → Add user, then rerun.`);
-    process.exit(1);
-  }
-  console.log(`${email} is now a super admin in the LOCAL database. Sign in at http://localhost:3000/admin`);
+    on conflict (user_id) do update set role = 'super_admin';`);
+  console.log(`${email} is a super admin in the LOCAL database.`);
+  if (password) console.log(`Local password (shown once; local only): ${password}`);
+  console.log("Sign in at http://localhost:3000/admin");
   process.exit(0);
 }
 
