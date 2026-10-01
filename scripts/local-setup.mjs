@@ -94,11 +94,25 @@ if (args.includes("--check-push")) {
     console.error(`Missing in ${envFile}: ${need.join(", ")}`);
     process.exit(1);
   }
-  const out = localSql(`
+  const query = `
     select s.endpoint, s.p256dh, s.auth, coalesce(s.user_agent, '') as ua, u.email
     from public.push_subscriptions s join auth.users u on u.id = s.admin_user_id
-    where s.revoked_at is null order by s.created_at;`);
-  const rows = JSON.parse(out.slice(out.indexOf("{"))).rows ?? [];
+    where s.revoked_at is null order by s.created_at;`;
+  // The CLI occasionally returns nothing (database busy): try once more.
+  const readRows = () => {
+    try {
+      const out = localSql(query);
+      const start = out.indexOf("{");
+      return start === -1 ? null : (JSON.parse(out.slice(start)).rows ?? []);
+    } catch {
+      return null;
+    }
+  };
+  const rows = readRows() ?? readRows();
+  if (!rows) {
+    console.error("Couldn't read the devices from the local database. Is it running (bunx supabase status)? Try again in a moment.");
+    process.exit(1);
+  }
   if (rows.length === 0) {
     console.log("No active devices. Turn notifications on in Admin → Settings on each device first.");
     process.exit(0);
