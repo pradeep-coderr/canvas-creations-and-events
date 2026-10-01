@@ -3866,3 +3866,14 @@ Typecheck, lint, `supabase db lint` and build: clean.
 ### Production
 
 The migration must be pushed **before** the code: the homepage reads the new columns.
+
+### Production (done, 1 Oct 2026)
+
+- The reviews migration is pushed to the live database; the code is deployed. The `#reviews` section is live on https://www.canvascreation.com.au.
+- **Push setup:**
+  - `VAPID_SUBJECT` (`mailto:ccandevents2242@gmail.com`) was the only missing push setting in Vercel Production, so push had been switched off. It is now added.
+  - The live `private.app_config.reminder_webhook_url` pointed at the old vercel.app address. That now redirects (308) and pg_net doesn't follow redirects, so it is now `https://www.canvascreation.com.au/api/push/reminders`.
+- **Verified from the database:** a pg_net POST with the stored dispatch secret got 200 `{"ok":true,"reminders":0,"sent":0}`. So push is configured on the live site, the secrets match and the webhook works.
+- **Still needed:**
+  - The live database has 0 subscribed devices. A super admin must turn notifications on at /admin/settings on the new domain (iPhone: from the installed app) and send the test notification. That test is also the only end-to-end check that the VAPID key pair is valid.
+  - `RESEND_API_KEY` is still not set, so emails are off.
