@@ -10,8 +10,6 @@ import { createClient } from "@/lib/supabase/server";
 
 export interface SignInState {
   error?: string;
-  /** What was typed, so the form can keep it after a failed attempt (never the password). */
-  email?: string;
 }
 
 const credentialsSchema = z.object({
@@ -25,15 +23,14 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
     email: formData.get("email"),
     password: formData.get("password"),
   });
-  const typed = String(formData.get("email") ?? "").slice(0, 254);
-  if (!parsed.success) return { error: "Enter your email address and password.", email: typed };
-  if (!isSupabaseConfigured()) return { error: "Sign-in isn't available right now.", email: typed };
+  if (!parsed.success) return { error: "Enter your email address and password." };
+  if (!isSupabaseConfigured()) return { error: "Sign-in isn't available right now." };
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error || !data.user) {
     console.warn("[admin] sign-in failed", { code: error?.code ?? "unknown" });
-    return { error: "Incorrect email or password.", email: typed };
+    return { error: "Incorrect email or password." };
   }
 
   const { data: membership } = await supabase
@@ -44,7 +41,7 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
   if (!membership) {
     await supabase.auth.signOut();
     console.warn("[admin] sign-in refused: not an admin", { userId: data.user.id });
-    return { error: "This account doesn't have access to the admin area.", email: typed };
+    return { error: "This account doesn't have access to the admin area." };
   }
 
   console.info("[admin] signed in", { userId: data.user.id });

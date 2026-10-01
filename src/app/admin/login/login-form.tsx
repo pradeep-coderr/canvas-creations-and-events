@@ -1,26 +1,53 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { startTransition, useActionState, useEffect } from "react";
 import Link from "next/link";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { CircleAlert, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
+import { signInSchema, type SignInValues } from "@/lib/admin/auth-schemas";
 import { signIn, type SignInState } from "../actions";
 
+/**
+ * Sign-in (React Hook Form + Zod in the browser; the server action checks
+ * again). Messages appear under each field and focus moves to the first
+ * problem. After a wrong password the email stays and the password is
+ * cleared and focused.
+ */
 export function LoginForm() {
   const [state, action, pending] = useActionState<SignInState, FormData>(signIn, {});
-  const passwordRef = useRef<HTMLInputElement>(null);
-  // After a failed attempt the email stays filled in; the cursor goes back
-  // to the (cleared) password so it can simply be typed again.
+  const {
+    register,
+    handleSubmit,
+    resetField,
+    setFocus,
+    formState: { errors },
+  } = useForm<SignInValues>({
+    resolver: zodResolver(signInSchema),
+    defaultValues: { email: "", password: "" },
+    shouldFocusError: true,
+  });
+
   useEffect(() => {
-    if (state.error && state.email) passwordRef.current?.focus();
-  }, [state]);
+    if (!state.error) return;
+    resetField("password");
+    setFocus("password");
+  }, [state, resetField, setFocus]);
+
+  const onSubmit = handleSubmit((values) => {
+    const data = new FormData();
+    data.set("email", values.email);
+    data.set("password", values.password);
+    startTransition(() => action(data));
+  });
 
   return (
-    <form action={action} className="space-y-6" aria-describedby={state.error ? "login-error" : undefined}>
-      <Field>
+    <form onSubmit={onSubmit} noValidate className="space-y-6" aria-describedby={state.error ? "login-error" : undefined}>
+      <Field data-invalid={errors.email ? true : undefined}>
         <FieldLabel htmlFor="login-email">Email</FieldLabel>
         <div className="relative">
           <Mail
@@ -29,27 +56,30 @@ export function LoginForm() {
           />
           <Input
             id="login-email"
-            name="email"
             type="email"
             autoComplete="username"
             inputMode="email"
             placeholder="you@example.com"
-            required
-            defaultValue={state.email}
-            key={state.email ?? ""}
+            aria-required
+            aria-invalid={errors.email ? true : undefined}
+            aria-describedby={errors.email ? "login-email-error" : undefined}
             className="pl-10"
+            {...register("email")}
           />
         </div>
+        {errors.email && <FieldError id="login-email-error">{errors.email.message}</FieldError>}
       </Field>
-      <Field>
+      <Field data-invalid={errors.password ? true : undefined}>
         <FieldLabel htmlFor="login-password">Password</FieldLabel>
         <PasswordInput
-          ref={passwordRef}
           id="login-password"
-          name="password"
           autoComplete="current-password"
-          required
+          aria-required
+          aria-invalid={errors.password ? true : undefined}
+          aria-describedby={errors.password ? "login-password-error" : undefined}
+          {...register("password")}
         />
+        {errors.password && <FieldError id="login-password-error">{errors.password.message}</FieldError>}
         <div className="flex justify-end">
           <Link
             href="/admin/forgot-password"

@@ -1,11 +1,14 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { startTransition, useActionState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, CircleAlert, Mail, MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { forgotSchema, type ForgotValues } from "@/lib/admin/auth-schemas";
 import { requestPasswordReset, type ResetRequestState } from "../password-actions";
 
 const backLink = (
@@ -21,10 +24,21 @@ const backLink = (
 export function ForgotPasswordForm({ invalidLink }: { invalidLink: boolean }) {
   const [state, action, pending] = useActionState<ResetRequestState, FormData>(requestPasswordReset, {});
   const doneRef = useRef<HTMLHeadingElement>(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ForgotValues>({ resolver: zodResolver(forgotSchema), defaultValues: { email: "" }, shouldFocusError: true });
 
   useEffect(() => {
     if (state.sent) doneRef.current?.focus();
   }, [state.sent]);
+
+  const onSubmit = handleSubmit((values) => {
+    const data = new FormData();
+    data.set("email", values.email);
+    startTransition(() => action(data));
+  });
 
   if (state.sent) {
     return (
@@ -45,7 +59,7 @@ export function ForgotPasswordForm({ invalidLink }: { invalidLink: boolean }) {
   }
 
   return (
-    <form action={action} noValidate className="space-y-6" aria-describedby={state.error ? "forgot-error" : undefined}>
+    <form onSubmit={onSubmit} noValidate className="space-y-6" aria-describedby={state.error ? "forgot-error" : undefined}>
       {invalidLink && (
         <p
           role="alert"
@@ -55,7 +69,7 @@ export function ForgotPasswordForm({ invalidLink }: { invalidLink: boolean }) {
           That reset link has expired or was already used. Request a new one below.
         </p>
       )}
-      <Field>
+      <Field data-invalid={errors.email ? true : undefined}>
         <FieldLabel htmlFor="forgot-email">Email address</FieldLabel>
         <div className="relative">
           <Mail
@@ -64,16 +78,18 @@ export function ForgotPasswordForm({ invalidLink }: { invalidLink: boolean }) {
           />
           <Input
             id="forgot-email"
-            name="email"
             type="email"
             autoComplete="username"
             inputMode="email"
             placeholder="you@example.com"
-            required
+            aria-required
+            aria-invalid={errors.email || state.error ? true : undefined}
+            aria-describedby={errors.email ? "forgot-email-error" : undefined}
             className="pl-10"
-            aria-invalid={state.error ? true : undefined}
+            {...register("email")}
           />
         </div>
+        {errors.email && <FieldError id="forgot-email-error">{errors.email.message}</FieldError>}
       </Field>
       {state.error && (
         <p
