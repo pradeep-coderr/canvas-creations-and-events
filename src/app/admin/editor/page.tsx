@@ -151,7 +151,7 @@ export default async function EditorPage() {
         instagramCta: live("home", "galleryInstagramCta"),
       },
       process: { eyebrow: t("home", "processEyebrow"), title: t("home", "processTitle") },
-      whyCanvas: { eyebrow: t("home", "whyEyebrow"), titleLines: [t("home", "whyTitleLines")] },
+      whyCanvas: { eyebrow: t("home", "whyEyebrow"), titleLines: [<EditableText key="whyTitleLines" scope="home" field="whyTitleLines" />] },
       // The heading is visually hidden (screen readers only): edited in the panel.
       testimonials: { eyebrow: t("home", "testimonialsEyebrow"), title: live("home", "testimonialsTitle") },
       reviews: {
@@ -178,7 +178,7 @@ export default async function EditorPage() {
     about: {
       eyebrow: t("about", "eyebrow"),
       title: t("about", "title"),
-      body: [t("about", "body")],
+      body: [<EditableText key="body" scope="about" field="body" />],
       image: page.aboutImage,
       cta: { label: live("about", "ctaLabel"), href: localAbout.cta.href },
       // The credit line appears once a founder name is saved (never invented).

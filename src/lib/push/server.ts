@@ -104,7 +104,15 @@ export async function deliver(targets: Target[], payload: PushPayload): Promise<
         errors.push(reason);
         // The service host and status only: never the endpoint (a capability),
         // the keys or the payload.
-        console.warn("[push] delivery failed", { service, status, reason: status ? undefined : reason });
+        console.warn("[push] delivery failed", {
+          service,
+          status,
+          reason: status
+            ? status === 403
+              ? "this device subscribed with different VAPID keys (keys changed); turn notifications on again on that device"
+              : undefined
+            : reason,
+        });
         if (status === 404 || status === 410) {
           await createPublicClient().rpc("revoke_push_endpoint", { p_secret: dispatchSecret!, p_endpoint: t.endpoint });
           console.info("[push] endpoint revoked (gone)", { service, status });
