@@ -344,7 +344,7 @@ Test notifications against the **local** Supabase, never the live one: test enqu
    - then run `bun run setup:local -- --admin you@example.com`.
 6. **Restart** `bun dev`, sign in at `http://localhost:3000/admin`, then open **Settings**:
    - **Turn on notifications** → **Send test notification**: a real push through Google/Mozilla/Apple's push service to this browser. `localhost` counts as secure, so no HTTPS is needed.
-   - **Send test email**: a real email through Resend.
+   - **Send test enquiry email**: a real email through Resend.
 7. **Real flows:**
    - **Enquiry:** send one from the homepage. You get an email and a "New enquiry" push.
    - **Review:** leave one. You get "New review" (or "New feedback").
