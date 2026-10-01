@@ -3887,3 +3887,15 @@ The migration must be pushed **before** the code: the homepage reads the new col
 - **Changes:**
   - Both forms' honeypot fields now carry password-manager ignore attributes.
   - A dropped submission is logged as `[enquiry|review] ignored: hidden anti-spam field was filled` (no visitor details), so this can be told apart next time.
+
+### Alert sound (2 Oct 2026)
+
+- **Admin open and on screen:** a soft two-tone chime (Web Audio, no audio file; `lib/admin/alert-sound.ts`) plays for each push, and that system notification is **silent**, so there's one sound. Before showing a notification, the service worker asks the focused admin window (`cc-can-chime`, 400 ms timeout) whether it can really play the chime: sound on, audio unlocked by a click or key press, page visible.
+- **Otherwise:** a normal notification with the device's own sound and vibration. Websites can't choose the system notification sound.
+- **Settings → Push notifications → Alert sound (this device):** on/off, stored in localStorage and on by default, plus "Play test sound".
+- **`sound26.mjs` 6/6:**
+  - the option is shown and on by default;
+  - it answers no before any click and yes after one;
+  - the test sound plays without errors;
+  - turned off, it answers no;
+  - an incoming alert shows the in-app banner and chimes.

@@ -4,11 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BellRing, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { canPlayChime, playChime, unlockAudioOnInteraction } from "@/lib/admin/alert-sound";
 
 /*
  * In-app alert while the admin is open: the service worker forwards each push
- * (it still shows the system notification). Announced politely; nothing is
- * played automatically — the system notification carries the device's sound.
+ * (it still shows the system notification). Announced politely. While the
+ * admin is on screen, a chime plays (lib/admin/alert-sound.ts) and the system
+ * notification is silent; otherwise the device's own sound plays.
  */
 export function AdminAlerts() {
   const [alert, setAlert] = useState<{ title: string; url: string } | null>(null);
@@ -16,9 +18,17 @@ export function AdminAlerts() {
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
+    const stopUnlock = unlockAudioOnInteraction();
     const onMessage = (event: MessageEvent) => {
-      const data = event.data as { type?: string; title?: string; url?: string; testId?: string } | null;
+      const data = event.data as { type?: string; title?: string; url?: string; testId?: string; chime?: boolean } | null;
+      // The service worker asks before a push: can this window play the chime?
+      // (If yes, the system notification is silent, so there's one sound.)
+      if (data?.type === "cc-can-chime") {
+        event.ports[0]?.postMessage(canPlayChime());
+        return;
+      }
       if (data?.type !== "cc-push" || typeof data.url !== "string" || !data.url.startsWith("/admin")) return;
+      if (data.chime) void playChime();
       // Settings shows its own result for a test notification.
       if (data.testId) return;
       setAlert({ title: typeof data.title === "string" ? data.title : "New notification", url: data.url });
@@ -26,7 +36,10 @@ export function AdminAlerts() {
       timer.current = window.setTimeout(() => setAlert(null), 15000);
     };
     navigator.serviceWorker.addEventListener("message", onMessage);
-    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+    return () => {
+      stopUnlock();
+      navigator.serviceWorker.removeEventListener("message", onMessage);
+    };
   }, []);
 
   return (

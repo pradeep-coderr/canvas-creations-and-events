@@ -168,9 +168,13 @@ function offlinePage() {
 
 /*
  * Web Push (Phase 20) — separate from the caching above, which still never
- * touches /admin. Payloads are minimal ({ title, body, url, tag }). We ask
- * for a normal, non-silent notification; whether it makes a sound or
- * vibrates is decided by the browser and the device's settings.
+ * touches /admin. Payloads are minimal ({ title, body, url, tag }).
+ *
+ * Sound: if an admin window is focused and on screen and says it can play
+ * its chime (audio unlocked, sound on — asked via cc-can-chime, 400 ms
+ * timeout), the system notification is silent and that window chimes:
+ * one sound, not two. Otherwise a normal notification: the device's own
+ * sound and vibration, as the browser and device settings decide.
  */
 self.addEventListener("push", (event) => {
   let data = {};
@@ -185,21 +189,25 @@ self.addEventListener("push", (event) => {
   const testId = typeof data.testId === "string" ? data.testId : undefined;
   event.waitUntil(
     (async () => {
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const admins = windows.filter((client) => new URL(client.url).pathname.startsWith("/admin"));
+      const onScreen = admins.find((client) => client.focused && client.visibilityState === "visible");
+      const chime = onScreen ? await askCanChime(onScreen) : false;
       await self.registration.showNotification(title, {
         body: typeof data.body === "string" ? data.body : "",
         icon: "/icons/icon-192.png",
         badge: "/icons/icon-192.png",
         tag: typeof data.tag === "string" ? data.tag : undefined,
         renotify: true,
-        silent: false,
-        vibrate: [200, 100, 200],
+        silent: chime,
+        vibrate: chime ? undefined : [200, 100, 200],
         data: { url },
       });
       // An open admin window can also show an in-app alert (or, for a test,
-      // confirm that this device really showed the notification).
-      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-      for (const client of windows) {
-        if (new URL(client.url).pathname.startsWith("/admin")) client.postMessage({ type: "cc-push", title, url, testId });
+      // confirm that this device really showed the notification); the one on
+      // screen plays the chime when it said it can.
+      for (const client of admins) {
+        client.postMessage({ type: "cc-push", title, url, testId, chime: chime && client.id === onScreen.id });
       }
     })(),
   );
@@ -221,6 +229,19 @@ self.addEventListener("notificationclick", (event) => {
     })(),
   );
 });
+
+// Asks an admin window whether it can play its chime right now (false on no answer).
+function askCanChime(client) {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => resolve(false), 400);
+    channel.port1.onmessage = (event) => {
+      clearTimeout(timer);
+      resolve(event.data === true);
+    };
+    client.postMessage({ type: "cc-can-chime" }, [channel.port2]);
+  });
+}
 
 // Only same-site admin pages can be opened from a notification.
 function safeAdminUrl(value) {

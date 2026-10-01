@@ -1,3 +1,4 @@
+import { AlertSoundSetting } from "@/components/admin/alert-sound-setting";
 import type { Metadata } from "next";
 import { EmailPanel } from "@/components/admin/email-panel";
 import { InstallApp } from "@/components/admin/install-app";
@@ -64,6 +65,7 @@ export default async function SettingsPage() {
           Alerts on this device for new enquiries, reviews and calendar reminders.
         </p>
         <NotificationPanel publicKey={pushConfigured() ? (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null) : null} prefs={prefs} />
+        <AlertSoundSetting />
       </section>
     </>
   );
