@@ -1,15 +1,16 @@
 "use client";
 
-import { startTransition, useActionState, useEffect, useRef } from "react";
+import { startTransition, useActionState, useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, CircleAlert, Mail, MailCheck } from "lucide-react";
+import { ArrowLeft, CircleAlert, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { forgotSchema, type ForgotValues } from "@/lib/admin/auth-schemas";
 import { requestPasswordReset, type ResetRequestState } from "../password-actions";
+import { ResetCodeForm } from "./reset-code-form";
 
 const backLink = (
   <Link
@@ -21,54 +22,47 @@ const backLink = (
   </Link>
 );
 
-export function ForgotPasswordForm({ invalidLink }: { invalidLink: boolean }) {
+/**
+ * Forgot password, in two steps on one page: 1. the email address → a
+ * 6-digit code is emailed; 2. the code + a new password (ResetCodeForm).
+ */
+export function ForgotPasswordForm() {
   const [state, action, pending] = useActionState<ResetRequestState, FormData>(requestPasswordReset, {});
-  const doneRef = useRef<HTMLHeadingElement>(null);
+  const [changingEmail, setChangingEmail] = useState(false);
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<ForgotValues>({ resolver: zodResolver(forgotSchema), defaultValues: { email: "" }, shouldFocusError: true });
 
-  useEffect(() => {
-    if (state.sent) doneRef.current?.focus();
-  }, [state.sent]);
-
-  const onSubmit = handleSubmit((values) => {
+  const send = (email: string) => {
     const data = new FormData();
-    data.set("email", values.email);
+    data.set("email", email);
     startTransition(() => action(data));
+  };
+  const onSubmit = handleSubmit((values) => {
+    setChangingEmail(false);
+    send(values.email);
   });
 
-  if (state.sent) {
+  if (state.sent && state.email && state.sentAt && !changingEmail) {
     return (
-      <div className="space-y-5 text-center">
-        <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-surface-blush">
-          <MailCheck aria-hidden="true" className="size-6 text-primary" />
-        </span>
-        <h2 ref={doneRef} tabIndex={-1} className="font-display text-display-sm font-title outline-none">
-          Check your email
-        </h2>
-        <p role="status" className="text-sm text-muted-foreground">
-          If an account exists for that address, a password reset link has been sent. Check your inbox (and spam
-          folder), then open the link on this device.
-        </p>
-        <p className="text-sm">{backLink}</p>
+      <div className="space-y-6">
+        <ResetCodeForm
+          key={state.sentAt}
+          email={state.email}
+          sentAt={state.sentAt}
+          resending={pending}
+          onResend={() => send(state.email!)}
+          onChangeEmail={() => setChangingEmail(true)}
+        />
+        <p className="text-center text-sm">{backLink}</p>
       </div>
     );
   }
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-6" aria-describedby={state.error ? "forgot-error" : undefined}>
-      {invalidLink && (
-        <p
-          role="alert"
-          className="flex items-start gap-2.5 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
-        >
-          <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-destructive" />
-          That reset link has expired or was already used. Request a new one below.
-        </p>
-      )}
       <Field data-invalid={errors.email ? true : undefined}>
         <FieldLabel htmlFor="forgot-email">Email address</FieldLabel>
         <div className="relative">
@@ -101,8 +95,8 @@ export function ForgotPasswordForm({ invalidLink }: { invalidLink: boolean }) {
           {state.error}
         </p>
       )}
-      <Button type="submit" size="lg" className="w-full" pending={pending} pendingLabel="Sending reset link…">
-        Send reset link
+      <Button type="submit" size="lg" className="w-full" pending={pending} pendingLabel="Sending code…">
+        Email me a code
       </Button>
       <p className="text-center text-sm">{backLink}</p>
     </form>

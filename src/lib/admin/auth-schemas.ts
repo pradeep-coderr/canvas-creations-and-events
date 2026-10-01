@@ -25,14 +25,25 @@ export type ForgotValues = z.input<typeof forgotSchema>;
 
 export const PASSWORD_MIN = 8;
 
-export const newPasswordSchema = z
+
+/** The emailed one-time code: exactly 6 digits. */
+export const RESET_CODE_LENGTH = 6;
+const code = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, `Enter the ${RESET_CODE_LENGTH}-digit code from the email.`);
+
+/** Step 2 of the reset: the code plus the new password (email comes from step 1). */
+export const resetWithCodeSchema = z
   .object({
+    email,
+    code,
     password: z
       .string()
       .min(PASSWORD_MIN, `Use at least ${PASSWORD_MIN} characters.`)
-      .max(200, "That password is too long.")
+      .max(72, "Use 72 characters or fewer.")
       .refine((v) => /[A-Za-z]/.test(v) && /[0-9]/.test(v), "Use both letters and numbers."),
     confirm: z.string().min(1, "Type the new password again."),
   })
   .refine((v) => v.password === v.confirm, { path: ["confirm"], message: "The passwords don't match." });
-export type NewPasswordValues = z.input<typeof newPasswordSchema>;
+export type ResetWithCodeValues = z.input<typeof resetWithCodeSchema>;

@@ -3902,3 +3902,72 @@ The migration must be pushed **before** the code: the homepage reads the new col
 - **Dev only:** when the honeypot is filled, typically by a form-filler extension, the enquiry and review forms now say "Not sent (local development only)…" instead of a fake "Thank you". Production stays silent for bots. The enquiry form also shows the server's own error message.
 - **Fix: turning notifications on again now replaces a dead subscription.** Before, "Turn on notifications" reused the browser's existing subscription even when the push service had reported it gone (auto-revoked after a 404/410) or it was made with older VAPID keys. It looked on but never received anything. Found on the owner's Android phone: subscribed at 02:58 and revoked 3 s after the 03:10 enquiry because FCM said gone.
 - **New: `bun run setup:local -- --check-push`** sends a real push to every active local device and prints each push service's answer.
+
+## Phase 27 — Admin sign-in revamp and a code-based password reset
+
+The owner asked for a better sign-in UI: a show/hide password button, "Forgot password?" under the input, React Hook Form validation instead of the browser's bubbles, and a short-lived code instead of a reset link.
+
+### Sign-in and password pages
+
+**Layout (`src/app/admin/auth-card.tsx`)**
+- **Large screens:** a brand panel with the logo, the slogan in italic, a gold double frame and a blush/champagne background; the form sits on the right in a rounded card.
+- **Phones:** a single column with the logo above the card.
+- **Everywhere:** "Back to website" and a "Private area" footer.
+
+**`PasswordInput` (`components/ui/password-input.tsx`)**
+- Lock icon and a **show/hide** button. It's a real button: "Show password" / "Hide password", `aria-pressed`, and it never submits.
+- **Caps Lock is on** warning.
+
+**Validation:** all forms use **React Hook Form + Zod** (`lib/admin/auth-schemas.ts`).
+- `noValidate`, so no native bubbles; messages appear under each field, linked by `aria-describedby`.
+- Focus moves to the first problem.
+- The server actions re-check the same rules.
+
+**Sign-in**
+- "Forgot password?" is now under the password input.
+- After a wrong password the email stays filled in, and the password is cleared and focused.
+- Errors appear in an alert box with an icon.
+
+### Password reset with a 6-digit code (replaces the email link)
+
+**Flow:** `/admin/forgot-password`, two steps on one page.
+1. The email address → `resetPasswordForEmail` → Supabase emails a **6-digit code**. The template is `supabase/templates/recovery.html`; the code expires after **10 minutes** (`auth.email.otp_expiry = 600`).
+2. The code goes into a 6-box `CodeInput`:
+   - paste or the phone's code autofill fills every box (`autocomplete="one-time-code"`, number keypad);
+   - typing auto-advances; Backspace and the arrow keys move between boxes;
+   - it sits beside the new password (live checklist) and its confirmation.
+3. `resetPasswordWithCode` → `verifyOtp({ type: "recovery" })` → `updateUser` → sign out → `/admin/login?reset=done`.
+
+**Behaviour**
+- The same answer whether or not the account exists, so no account enumeration.
+- A wrong or expired code gets one generic message, and the boxes are cleared and focused.
+- "Send a new code" is available after 60 s; "Use a different email" goes back to step 1.
+- Codes and passwords are never logged.
+
+**Removed:** `/admin/reset-password` and `/admin/auth/confirm` (the link flow).
+
+### Tests (dev server + local Supabase/Mailpit)
+
+| Suite | Result |
+| --- | --- |
+| `auth27.mjs` | 12/12 |
+| `rhf27.mjs` | 12/12 |
+| `otp27.mjs` | **15/15** |
+
+`otp27.mjs` covers:
+- **The email:** our subject, a 6-digit code, no link.
+- **Code input:** countdown; empty-submit messages with focus on the code; auto-advance; paste.
+- **Codes:** a wrong code is rejected; the right code changes the password (new one works, old one doesn't).
+- **Unknown email:** the same screen, and no email is sent.
+- **Navigation:** back to step 1.
+- **Phone:** fits at 360 px, number keypad and code autofill; no console errors.
+
+### Production: needed before this goes live (Supabase dashboard, hosted)
+
+- **Authentication → Email Templates → Reset password:** subject "Your Canvas Admin password reset code"; body from `supabase/templates/recovery.html`. It must contain `{{ .Token }}`; without it, admins get a link that leads nowhere.
+- **Authentication → Providers (Sign In / Providers) → Email → Email OTP expiration:** `600` seconds.
+- **Recommended:** Authentication → **SMTP Settings** → custom SMTP through Resend:
+  - host `smtp.resend.com`, port `465`, user `resend`, password = a Resend API key;
+  - sender `enquiries@canvascreation.com.au`.
+
+  Supabase's built-in email is heavily rate-limited and meant for testing.

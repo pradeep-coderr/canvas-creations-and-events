@@ -4,14 +4,13 @@ import { ForgotPasswordForm } from "./forgot-form";
 
 export const metadata: Metadata = { title: "Forgot password" };
 
-export default async function ForgotPasswordPage({ searchParams }: PageProps<"/admin/forgot-password">) {
-  const { link } = await searchParams;
+export default function ForgotPasswordPage() {
   return (
     <AuthCard
-      title="Forgot your password?"
-      description="Enter your admin email address and we'll send you a reset link."
+      title="Reset your password"
+      description="We'll email you a 6-digit code, then you choose a new password."
     >
-      <ForgotPasswordForm invalidLink={link === "invalid"} />
+      <ForgotPasswordForm />
     </AuthCard>
   );
 }
