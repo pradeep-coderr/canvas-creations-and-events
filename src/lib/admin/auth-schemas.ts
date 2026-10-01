@@ -25,19 +25,26 @@ export type ForgotValues = z.input<typeof forgotSchema>;
 
 export const PASSWORD_MIN = 8;
 
-
 /** The emailed one-time code: exactly 6 digits. */
 export const RESET_CODE_LENGTH = 6;
-const code = z
-  .string()
-  .trim()
-  .regex(/^\d{6}$/, `Enter the ${RESET_CODE_LENGTH}-digit code from the email.`);
+/** How long a code is valid (Supabase auth.email.otp_expiry; hosted: "Email OTP Expiration"). */
+export const RESET_CODE_TTL_SECONDS = 600;
+/** How long before "Send a new code" is offered again. */
+export const RESEND_AFTER_SECONDS = 60;
 
-/** Step 2 of the reset: the code plus the new password (email comes from step 1). */
-export const resetWithCodeSchema = z
+/** Step 2: the code from the email. */
+export const resetCodeSchema = z.object({
+  email,
+  code: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, `Enter the ${RESET_CODE_LENGTH}-digit code from the email.`),
+});
+export type ResetCodeValues = z.input<typeof resetCodeSchema>;
+
+/** Step 3: the new password (after the code was accepted). */
+export const newPasswordSchema = z
   .object({
-    email,
-    code,
     password: z
       .string()
       .min(PASSWORD_MIN, `Use at least ${PASSWORD_MIN} characters.`)
@@ -46,4 +53,4 @@ export const resetWithCodeSchema = z
     confirm: z.string().min(1, "Type the new password again."),
   })
   .refine((v) => v.password === v.confirm, { path: ["confirm"], message: "The passwords don't match." });
-export type ResetWithCodeValues = z.input<typeof resetWithCodeSchema>;
+export type NewPasswordValues = z.input<typeof newPasswordSchema>;

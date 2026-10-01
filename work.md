@@ -3990,3 +3990,22 @@ The owner asked for a better sign-in UI: a show/hide password button, "Forgot pa
 - Local `auth.rate_limit.email_sent` is 2 → 30 per hour, since it only applies once SMTP is on.
 - **Verified:** a recover request returned 200, the SMTP hand-off took about 4 s with no error, and Mailpit stayed empty.
 - **For automated tests that read codes from Mailpit (`otp27.mjs`):** set `enabled = false` first, otherwise they'd email real addresses.
+
+### Reset flow in three steps with timers (owner's request)
+
+- **Steps on `/admin/forgot-password`:** 1 Email → 2 Code → 3 New password, with a step indicator (`aria-current="step"`).
+  - The code step (`code-step.tsx`) shows only the 6 boxes, split 3 – 3.
+  - It is checked automatically on the 6th digit, or with "Verify code".
+- **Timers on the code step:**
+  - "Code expires in m:ss" (10 min): rose in the last minute; at 0 it says the code has expired and offers "Send a new code".
+  - "Resend in m:ss" (60 s), then a "Send a new code" button.
+  - Countdowns aren't announced every second; screen readers get the expiry once.
+- **Server actions:** `verifyResetCode` (verifyOtp only, which starts the reset session), then `setNewPassword` (updateUser in that session, then sign out). This replaces the single code + password action.
+- **New-password step (`password-step.tsx`):** a 4-segment strength guide (Weak/Fair/Good/Strong: the rules plus length and variety), a rule checklist, and "Start again" if the session has ended.
+- **Code boxes:** read-only, not disabled, while checking, so focus can return to them after a wrong code.
+- **`otp28.mjs` 17/17**, with local auth email temporarily on Mailpit; Resend SMTP was restored afterwards:
+  - indicator and the 'done' step; expiry ~10:00 and resend ~1:00, both counting down;
+  - no password fields on the code step; empty-verify message;
+  - wrong code auto-checked, then cleared and refocused; right code → step 3 automatically;
+  - strength Weak → Strong; mismatch caught; saved → sign in; new password works, old doesn't;
+  - fits at 360 px; no console errors.

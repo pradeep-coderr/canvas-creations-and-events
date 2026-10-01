@@ -2,19 +2,20 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { resetWithCodeSchema } from "@/lib/admin/auth-schemas";
+import { newPasswordSchema, resetCodeSchema } from "@/lib/admin/auth-schemas";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
 /*
  * Admin password reset with a short-lived one-time code (Supabase Auth
- * recovery OTP; no link, no redirect):
+ * recovery OTP; no link, no redirect), in three steps on /admin/forgot-password:
  *
- *   /admin/forgot-password
- *     1. requestPasswordReset → Supabase emails a 6-digit code (valid
- *        10 minutes: auth.email.otp_expiry; template supabase/templates/recovery.html)
- *     2. resetPasswordWithCode → verifyOtp (type "recovery") starts a short
- *        session → updateUser(password) → sign out → /admin/login?reset=done
+ *   1. requestPasswordReset  → Supabase emails a 6-digit code (valid 10
+ *      minutes: auth.email.otp_expiry; template supabase/templates/recovery.html)
+ *   2. verifyResetCode       → verifyOtp (type "recovery") starts a short
+ *      reset session (cookie) — nothing is changed yet
+ *   3. setNewPassword        → updateUser(password) in that session → sign
+ *      out → /admin/login?reset=done
  *
  * The request always answers the same, whether or not the address has an
  * account (no account enumeration). A wrong or expired code gets one generic
@@ -26,7 +27,7 @@ export interface ResetRequestState {
   /** The address the code went to (shown on step 2; it's what was typed). */
   email?: string;
   error?: string;
-  /** Changes on every successful request, so the page can restart its resend timer. */
+  /** When the code was sent (ms): the page's expiry and resend timers count from it. */
   sentAt?: number;
 }
 
@@ -42,54 +43,66 @@ export async function requestPasswordReset(_prev: ResetRequestState, formData: F
   return { sent: true, email: email.data, sentAt: Date.now() };
 }
 
-export interface ResetWithCodeState {
+export interface VerifyCodeState {
+  verified?: boolean;
   error?: string;
-  fieldErrors?: { code?: string; password?: string; confirm?: string };
 }
 
-export async function resetPasswordWithCode(_prev: ResetWithCodeState, formData: FormData): Promise<ResetWithCodeState> {
-  const parsed = resetWithCodeSchema.safeParse({
-    email: formData.get("email"),
-    code: formData.get("code"),
-    password: formData.get("password"),
-    confirm: formData.get("confirm"),
+export async function verifyResetCode(_prev: VerifyCodeState, formData: FormData): Promise<VerifyCodeState> {
+  const parsed = resetCodeSchema.safeParse({ email: formData.get("email"), code: formData.get("code") });
+  if (!parsed.success) return { error: `Enter the 6-digit code from the email.` };
+  if (!isSupabaseConfigured()) return { error: "Password reset isn't available right now." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: parsed.data.email,
+    token: parsed.data.code,
+    type: "recovery",
   });
+  if (error || !data.user) {
+    console.warn("[admin] reset code rejected", { code: error?.code ?? error?.status ?? "no user" });
+    return { error: "That code is wrong or has expired. Check the email, or send a new code." };
+  }
+  console.info("[admin] reset code accepted", { userId: data.user.id });
+  return { verified: true };
+}
+
+export interface NewPasswordState {
+  error?: string;
+  fieldErrors?: { password?: string; confirm?: string };
+  /** The reset session is gone (expired, or the page was opened directly). */
+  restart?: boolean;
+}
+
+export async function setNewPassword(_prev: NewPasswordState, formData: FormData): Promise<NewPasswordState> {
+  const parsed = newPasswordSchema.safeParse({ password: formData.get("password"), confirm: formData.get("confirm") });
   if (!parsed.success) {
-    const fieldErrors: ResetWithCodeState["fieldErrors"] = {};
+    const fieldErrors: NewPasswordState["fieldErrors"] = {};
     for (const issue of parsed.error.issues) {
-      const key = issue.path[0];
-      if (key === "code" || key === "password" || key === "confirm") fieldErrors[key] ??= issue.message;
+      const key = issue.path[0] === "confirm" ? "confirm" : "password";
+      fieldErrors[key] ??= issue.message;
     }
     return { error: "Check the highlighted fields.", fieldErrors };
   }
-  if (!isSupabaseConfigured()) return { error: "Password reset isn't available right now." };
 
-  const { email, code, password } = parsed.data;
   const supabase = await createClient();
-  const { data, error: verifyError } = await supabase.auth.verifyOtp({ email, token: code, type: "recovery" });
-  if (verifyError || !data.user) {
-    console.warn("[admin] reset code rejected", { code: verifyError?.code ?? verifyError?.status ?? "no user" });
-    return {
-      error: "That code is wrong or has expired.",
-      fieldErrors: { code: "That code is wrong or has expired. Check the email, or send a new code." },
-    };
+  const { data } = await supabase.auth.getClaims();
+  if (!data?.claims?.sub) {
+    return { error: "Your reset session has ended. Start again to get a new code.", restart: true };
   }
-
-  const { error } = await supabase.auth.updateUser({ password });
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
   if (error) {
     console.warn("[admin] password update failed", { code: error.code ?? error.status });
-    await supabase.auth.signOut();
-    return {
-      error:
-        error.code === "same_password"
-          ? "Choose a password you haven't used for this account. Send a new code and try again."
-          : error.code === "weak_password"
-            ? "That password is too easy to guess. Send a new code and choose a stronger one."
-            : "The password couldn't be updated. Send a new code and try again.",
-    };
+    if (error.code === "same_password") {
+      return { error: "Choose a password you haven't used for this account.", fieldErrors: { password: "Choose a different password." } };
+    }
+    if (error.code === "weak_password") {
+      return { error: "That password is too easy to guess.", fieldErrors: { password: "Choose a stronger password." } };
+    }
+    return { error: "The password couldn't be updated. Try again, or start again with a new code." };
   }
   // End the short reset session: the admin signs in again with the new password.
   await supabase.auth.signOut();
-  console.info("[admin] password updated with a reset code", { userId: data.user.id });
+  console.info("[admin] password updated with a reset code", { userId: data.claims.sub });
   redirect("/admin/login?reset=done");
 }

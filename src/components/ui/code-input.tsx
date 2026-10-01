@@ -21,6 +21,8 @@ export function CodeInput({
   describedBy,
   labelledBy,
   autoFocus,
+  disabled,
+  readOnly,
 }: {
   length?: number;
   value: string;
@@ -31,6 +33,9 @@ export function CodeInput({
   describedBy?: string;
   labelledBy?: string;
   autoFocus?: boolean;
+  disabled?: boolean;
+  /** While a check is running: unchangeable but still focusable. */
+  readOnly?: boolean;
 }) {
   const refs = React.useRef<(HTMLInputElement | null)[]>([]);
   // Empty boxes are kept as spaces inside the value, so clearing a middle box
@@ -53,10 +58,14 @@ export function CodeInput({
   };
 
   return (
-    <div role="group" aria-labelledby={labelledBy} aria-describedby={describedBy} className="flex gap-2 sm:gap-3">
+    <div role="group" aria-labelledby={labelledBy} aria-describedby={describedBy} className="flex items-center gap-2 sm:gap-2.5">
       {digits.map((d, i) => (
+        <React.Fragment key={i}>
+        {/* A dash after the first half (e.g. 123 – 456) makes the code easier to read. */}
+        {i === Math.ceil(length / 2) && length > 4 && (
+          <span aria-hidden="true" className="h-0.5 w-3 shrink-0 rounded-full bg-border" />
+        )}
         <input
-          key={i}
           ref={(el) => {
             refs.current[i] = el;
           }}
@@ -70,6 +79,9 @@ export function CodeInput({
           autoFocus={autoFocus && i === 0}
           aria-label={`Digit ${i + 1} of ${length}`}
           aria-invalid={invalid || undefined}
+          disabled={disabled}
+          readOnly={readOnly}
+          aria-busy={readOnly || undefined}
           onFocus={(e) => e.target.select()}
           onChange={(e) => {
             const typed = e.target.value.replace(/\D/g, "");
@@ -107,10 +119,12 @@ export function CodeInput({
             }
           }}
           className={cn(
-            "h-14 w-full min-w-0 rounded-md border border-input bg-background text-center font-mono text-2xl font-semibold text-foreground tabular-nums transition-[border-color,box-shadow] duration-200 outline-none hover:border-foreground/45 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 sm:h-16",
+            "h-14 w-full min-w-0 rounded-lg border border-input bg-background text-center font-mono text-2xl font-semibold text-foreground tabular-nums caret-primary shadow-xs transition-[border-color,box-shadow,background-color] duration-200 outline-none hover:border-foreground/45 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60 read-only:opacity-70 sm:h-16 sm:text-3xl",
+            d && !invalid && "border-foreground/40 bg-surface-ivory",
             invalid && "border-destructive ring-3 ring-destructive/15",
           )}
         />
+        </React.Fragment>
       ))}
     </div>
   );
