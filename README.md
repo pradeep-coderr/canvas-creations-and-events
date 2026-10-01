@@ -323,6 +323,32 @@ The public site stays installable too ("Canvas Creations", scope `/`) and keeps 
 | `bun start`         | Serve the production build      |
 | `bun run lint`      | ESLint                          |
 | `bun run typecheck` | Generate route types + `tsc`    |
+| `bun run setup:local` | Local email & push setup (below) |
+
+### Local email & push testing
+
+Test notifications against the **local** Supabase, never the live one: test enquiries, reviews and notification devices then stay out of real data.
+
+1. **Start the local database** (Docker running): `bunx supabase start`. Then run `bunx supabase status` and copy the API URL and the publishable key into `.env.local` (see `.env.example`).
+2. **Push keys:** `bun run setup:local -- --keys` prints a new VAPID key pair and a dispatch secret. Paste the three lines into `.env.local`.
+   - Keep `VAPID_SUBJECT=mailto:…`.
+   - Use a different pair from production.
+3. **Email (Resend):**
+   - Create an API key at resend.com → API Keys and put it in `RESEND_API_KEY`.
+   - Until your domain is verified in Resend:
+     - `RESEND_FROM_EMAIL=Canvas Creations <onboarding@resend.dev>`;
+     - `ENQUIRY_NOTIFICATION_EMAIL` = the email you signed up to Resend with. Resend only delivers there in test mode.
+4. **Store the push secret in the local database:** `bun run setup:local`. This also points the local reminder job at `http://host.docker.internal:3000`. The helper refuses to run unless `.env.local` points at the local Supabase.
+5. **A local super admin:**
+   - create a user in local Studio (`http://127.0.0.1:54323` → Authentication → Add user, with "Auto confirm" ticked);
+   - then run `bun run setup:local -- --admin you@example.com`.
+6. **Restart** `bun dev`, sign in at `http://localhost:3000/admin`, then open **Settings**:
+   - **Turn on notifications** → **Send test notification**: a real push through Google/Mozilla/Apple's push service to this browser. `localhost` counts as secure, so no HTTPS is needed.
+   - **Send test email**: a real email through Resend.
+7. **Real flows:**
+   - **Enquiry:** send one from the homepage. You get an email and a "New enquiry" push.
+   - **Review:** leave one. You get "New review" (or "New feedback").
+   - **Reminder:** add a calendar reminder due in a couple of minutes. The local database calls your dev server and you get a "Reminder" push.
 
 ## Design system
 
