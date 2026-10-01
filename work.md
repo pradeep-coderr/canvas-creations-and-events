@@ -3692,3 +3692,40 @@ Typecheck, lint, `supabase db lint`, build: clean.
 - **Order matters:** push the migration **before** the code deploy. The new code reads `contact_email`; without the column the site falls back to built-in details until it exists.
 - **After the deploy, open Admin → Site details and press Save once.** That refreshes the cached content, so "Corporate events" and the email show straight away instead of after the hourly refresh.
 - **Optional:** set Vercel's `ENQUIRY_NOTIFICATION_EMAIL` to the client's address, so enquiry emails go there.
+
+### Follow-up: Corporate events missing from "Our work" (owner's report)
+
+**What was missing:**
+- The portfolio filter only lists categories that have photos, and Corporate events had none.
+  - "Our work" had no Corporate events button or photos.
+  - Event stories had no corporate story.
+- Only "What we style" showed the new category.
+
+**What was added (sample content, like Phase 23):**
+- 5 licensed Pexels photos in the portfolio under the real Corporate events category:
+  - gala table with candelabra and stage lighting;
+  - dinner table with roses, gold chargers and gift boxes;
+  - banquet room with blue uplighting;
+  - candlelit marquee dinner;
+  - outdoor reception tables, cropped to the tables.
+- One sample story, "Evening gala dinner" (main photo + 2), with a factual description of what the photos show.
+- All of it is `is_demo` (labelled "Sample") and credited to Pexels. The client's own corporate photos replace them later.
+
+**How the photos were chosen:**
+- No identifiable people, and no readable company branding or monograms.
+- Rejected: 35042459 (photos of people on its screens), 16120243 (someone's monogram), 16985187 (company branding), 35042249 (an event emblem), 14636315 (the same room as 14636319).
+
+**Script:** `$TEMP/p19/corp24.mjs` builds the files and `insert.sql`. The SQL is idempotent: it replaces its own previous copy and needs the Corporate events category. `corp24.mjs cleansql` removes just this content.
+- Gotcha: `sample23.mjs clean` (local) also deletes these photos' files, since they are Pexels files too. Re-seed in this order: sample23 → `insert.sql` → upload the files.
+
+**Tests (local):**
+- `corpcheck.mjs` 10/10, desktop and phone:
+  - the filter shows Corporate events, and filtering shows exactly its 5 photos, all labelled Sample;
+  - the story is shown with its category and the Sample label;
+  - no sideways scroll; "What we style" lists it.
+- `e2e23.mjs` 42/42. Its counts now come from the database (21 portfolio photos, 4 stories) instead of being fixed at 16 / 3.
+
+**Production:**
+- The 5 photo files are uploaded to live storage (`cms-media/images/gallery/`).
+- **The database rows are not inserted yet.** The insert was held back for the owner's approval, so the files are unused until then.
+- After the insert, saving any item in the admin refreshes the cache so the change shows immediately.
