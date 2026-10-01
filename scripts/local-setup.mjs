@@ -14,7 +14,8 @@
 //   bun run setup:local -- --admin you@example.com
 //       Makes that LOCAL user a super admin (needed for Settings → push and
 //       test email). If the user doesn't exist yet, it's created with a
-//       generated password, shown once.
+//       generated password, shown once. Add --new-password to give an
+//       existing local user a new generated password.
 //
 // Secrets are never printed (except by --keys, which only generates them).
 
@@ -92,9 +93,11 @@ if (adminAt !== -1) {
   }
   // Create the local sign-in if it doesn't exist yet (local Auth admin API,
   // using the LOCAL development key from `supabase status`; never the live one).
-  const exists = localSql(`select 1 as found from auth.users where lower(email) = '${email}';`).includes("found");
+  const found = localSql(`select id as user_id from auth.users where lower(email) = '${email}';`);
+  const userId = found.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/)?.[0] ?? null;
+  const resetPassword = args.includes("--new-password");
   let password = null;
-  if (!exists) {
+  if (!userId || resetPassword) {
     const status = Object.fromEntries(
       execSync("npx supabase status -o env", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
         .split(/\r?\n/)
@@ -117,13 +120,14 @@ if (adminAt !== -1) {
       process.exit(1);
     }
     password = randomBytes(12).toString("base64url");
-    const res = await fetch(`${status.API_URL}/auth/v1/admin/users`, {
-      method: "POST",
+    // New user: create it. Existing user + --new-password: set a new password.
+    const res = await fetch(`${status.API_URL}/auth/v1/admin/users${userId ? `/${userId}` : ""}`, {
+      method: userId ? "PUT" : "POST",
       headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, email_confirm: true }),
+      body: JSON.stringify(userId ? { password, email_confirm: true } : { email, password, email_confirm: true }),
     });
     if (!res.ok) {
-      console.error(`Couldn't create the local user (${res.status}): ${(await res.text()).slice(0, 200)}`);
+      console.error(`Couldn't ${userId ? "set the password for" : "create"} the local user (${res.status}): ${(await res.text()).slice(0, 200)}`);
       process.exit(1);
     }
   }
@@ -133,6 +137,7 @@ if (adminAt !== -1) {
     on conflict (user_id) do update set role = 'super_admin';`);
   console.log(`${email} is a super admin in the LOCAL database.`);
   if (password) console.log(`Local password (shown once; local only): ${password}`);
+  else console.log("This local user already had a password. Forgotten it? Add --new-password to set a new one.");
   console.log("Sign in at http://localhost:3000/admin");
   process.exit(0);
 }
