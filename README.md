@@ -339,6 +339,9 @@ Test notifications against the **local** Supabase, never the live one: test enqu
      - `RESEND_FROM_EMAIL=Canvas Creations <onboarding@resend.dev>`;
      - `ENQUIRY_NOTIFICATION_EMAIL` = the email you signed up to Resend with. Resend only delivers there in test mode.
 4. **Store the push secret in the local database:** `bun run setup:local`. This also points the local reminder job at `http://host.docker.internal:3000`. The helper refuses to run unless `.env.local` points at the local Supabase.
+4b. **Local auth emails (password-reset codes) through Resend:** `supabase/config.toml` has `[auth.email.smtp]` on, reading the password from **`supabase/.env`** (git-ignored): `SUPABASE_AUTH_SMTP_PASS=re_…`, a Resend API key. Restart with `bunx supabase stop && bunx supabase start` after changing it.
+   - Codes then go to real inboxes, from `enquiries@canvascreation.com.au`.
+   - Without a key, set `enabled = false` in that section to catch them in Mailpit (`http://127.0.0.1:54324`) instead.
 5. **A local super admin:** `bun run setup:local -- --admin you@example.com`. If that local user doesn't exist yet, it's created with a generated password, shown once in your terminal. Add `--new-password` to give an existing local user a new password. Local Studio isn't needed.
 6. **Restart** `bun dev`, sign in at `http://localhost:3000/admin`, then open **Settings**:
    - **Turn on notifications** → **Send test notification**: a real push through Google/Mozilla/Apple's push service to this browser. `localhost` counts as secure, so no HTTPS is needed.

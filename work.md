@@ -3983,3 +3983,10 @@ The owner asked for a better sign-in UI: a show/hide password button, "Forgot pa
   - after sign-out, pages are locked again;
   - three open-redirect attempts all stay on `/admin`.
 - Signed-out probes of 7 protected paths all returned 307 to sign-in; the 3 public paths returned 200; `otp27` still passes 15/15.
+
+### Local auth email through Resend (owner's request)
+
+- `supabase/config.toml` `[auth.email.smtp]` uses smtp.resend.com:465 (user `resend`, sender `enquiries@canvascreation.com.au`). The password comes from git-ignored `supabase/.env` (`SUPABASE_AUTH_SMTP_PASS`).
+- Local `auth.rate_limit.email_sent` is 2 → 30 per hour, since it only applies once SMTP is on.
+- **Verified:** a recover request returned 200, the SMTP hand-off took about 4 s with no error, and Mailpit stayed empty.
+- **For automated tests that read codes from Mailpit (`otp27.mjs`):** set `enabled = false` first, otherwise they'd email real addresses.
