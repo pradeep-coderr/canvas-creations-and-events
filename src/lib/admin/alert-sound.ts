@@ -3,8 +3,9 @@
 /*
  * The admin's alert chime, played on a COMPUTER when a notification arrives
  * while the admin is open and on screen (the system notification is then
- * silent, so it's one sound, not two). Phones always keep the system sound. Closed or in the background, the device's own
- * notification sound plays instead — websites can't choose that sound.
+ * silent, so it's one sound, not two). Phones always keep the system sound.
+ * Closed or in the background, the device's own notification sound plays
+ * instead — websites can't choose that sound.
  *
  * Generated with the Web Audio API (two soft bell tones; no audio file).
  * Browsers only allow sound after someone has clicked or typed on the page,
