@@ -3971,3 +3971,15 @@ The owner asked for a better sign-in UI: a show/hide password button, "Forgot pa
   - sender `enquiries@canvascreation.com.au`.
 
   Supabase's built-in email is heavily rate-limited and meant for testing.
+
+### Admin route gate (proxy)
+
+- The proxy (`src/lib/supabase/proxy.ts`) is now the **first layer**. A signed-out GET/HEAD to any `/admin/*` page except `/admin/login`, `/admin/forgot-password` and `/admin/manifest.webmanifest` redirects to `/admin/login?next=<path>` before any admin code runs.
+- **Cache:** protected admin responses are `Cache-Control: private, no-store`.
+- **Admin membership** is still checked by every page and server action (`requireAdmin` / `requireSuperAdmin`), and RLS enforces it in the database: three layers.
+- **After sign-in:** `safeAdminNext` (`lib/admin/safe-next.ts`) only allows same-site `/admin` paths, never login or forgot-password. Anything else goes to `/admin`, so there's no open redirect. Unit-checked against 12 inputs.
+- **`gate27.mjs` 10/10:**
+  - a deep link goes to sign-in and back to the page after signing in; an already-signed-in visit goes straight there;
+  - after sign-out, pages are locked again;
+  - three open-redirect attempts all stay on `/admin`.
+- Signed-out probes of 7 protected paths all returned 307 to sign-in; the 3 public paths returned 200; `otp27` still passes 15/15.

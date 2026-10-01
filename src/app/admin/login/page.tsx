@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { CircleCheck } from "lucide-react";
+import { safeAdminNext } from "@/lib/admin/safe-next";
 import { getAdmin } from "@/lib/admin/session";
 import { AuthCard } from "../auth-card";
 import { LoginForm } from "./login-form";
@@ -8,8 +9,9 @@ import { LoginForm } from "./login-form";
 export const metadata: Metadata = { title: "Sign in" };
 
 export default async function AdminLoginPage({ searchParams }: PageProps<"/admin/login">) {
-  if (await getAdmin()) redirect("/admin");
-  const { reset } = await searchParams;
+  const { reset, next: nextParam } = await searchParams;
+  const next = safeAdminNext(nextParam);
+  if (await getAdmin()) redirect(next);
 
   return (
     <AuthCard title="Welcome back" description="Sign in to manage enquiries, reviews and the website.">
@@ -22,7 +24,10 @@ export default async function AdminLoginPage({ searchParams }: PageProps<"/admin
           Your password was updated. Sign in with your new password.
         </p>
       )}
-      <LoginForm />
+      {next !== "/admin" && (
+        <p className="mb-6 text-sm text-muted-foreground">Sign in to continue to that page.</p>
+      )}
+      <LoginForm next={next} />
     </AuthCard>
   );
 }

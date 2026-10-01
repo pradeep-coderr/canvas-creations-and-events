@@ -54,6 +54,7 @@ export async function requireSuperAdmin(): Promise<AdminSession> {
 /** Redirects to the sign-in page unless the request is from an admin. */
 export async function requireAdmin(): Promise<AdminSession> {
   const admin = await getAdmin();
+  // (The proxy normally gets here first and keeps the page to return to.)
   if (!admin) redirect("/admin/login");
   return admin;
 }

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { safeAdminNext } from "@/lib/admin/safe-next";
 import { requireAdmin } from "@/lib/admin/session";
 import { enquiryStatusSchema, type EnquiryStatus } from "@/lib/enquiry-status";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -45,7 +46,8 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
   }
 
   console.info("[admin] signed in", { userId: data.user.id });
-  redirect("/admin");
+  // Back to the admin page they were asked to sign in for (admin pages only).
+  redirect(safeAdminNext(formData.get("next")));
 }
 
 export async function signOut() {

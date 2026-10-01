@@ -18,7 +18,7 @@ import { signIn, type SignInState } from "../actions";
  * problem. After a wrong password the email stays and the password is
  * cleared and focused.
  */
-export function LoginForm() {
+export function LoginForm({ next = "/admin" }: { next?: string }) {
   const [state, action, pending] = useActionState<SignInState, FormData>(signIn, {});
   const {
     register,
@@ -42,6 +42,7 @@ export function LoginForm() {
     const data = new FormData();
     data.set("email", values.email);
     data.set("password", values.password);
+    data.set("next", next);
     startTransition(() => action(data));
   });
 
