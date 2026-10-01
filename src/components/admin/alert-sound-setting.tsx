@@ -37,7 +37,7 @@ export function AlertSoundSetting() {
             setNote(next ? "Sound on." : "Sound off: alerts while the admin is open will be silent.");
           }}
         />
-        <Label htmlFor={`${id}-sound`}>Play a chime for new alerts while the admin is open</Label>
+        <Label htmlFor={`${id}-sound`}>On a computer: play a chime for new alerts while the admin is open</Label>
       </div>
       <div>
         <Button
@@ -54,8 +54,8 @@ export function AlertSoundSetting() {
         </Button>
       </div>
       <p className="max-w-prose text-sm text-muted-foreground">
-        When the admin is closed or in the background, notifications use this phone&apos;s or computer&apos;s own
-        notification sound (set in the device&apos;s settings).
+        Phones always use their own notification sound. On a computer, the chime replaces it while the admin is
+        open on screen; otherwise the computer&apos;s own notification sound plays (set in the device&apos;s settings).
       </p>
       <p role="status" className="text-sm text-muted-foreground empty:hidden">
         {note ?? ""}

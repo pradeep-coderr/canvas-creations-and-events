@@ -1,9 +1,9 @@
 "use client";
 
 /*
- * The admin's alert chime, played when a notification arrives while the
- * admin is open and on screen (the system notification is then silent, so
- * it's one sound, not two). Closed or in the background, the device's own
+ * The admin's alert chime, played on a COMPUTER when a notification arrives
+ * while the admin is open and on screen (the system notification is then
+ * silent, so it's one sound, not two). Phones always keep the system sound. Closed or in the background, the device's own
  * notification sound plays instead — websites can't choose that sound.
  *
  * Generated with the Web Audio API (two soft bell tones; no audio file).
@@ -47,9 +47,23 @@ export function unlockAudioOnInteraction() {
   };
 }
 
-/** True only if a chime would really be heard now (enabled, unlocked, on screen). */
+/**
+ * Phones and tablets: the chime would play at MEDIA volume while notifications
+ * use the ringer/notification volume — with media muted, the admin would hear
+ * nothing. So on these the system notification always keeps its own sound.
+ */
+function isPhoneOrTablet() {
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.matchMedia("(pointer: coarse)").matches;
+}
+
+/**
+ * True only if the chime would really be heard now and may replace the
+ * system sound: a computer, sound on, audio unlocked, page on screen.
+ */
 export function canPlayChime() {
-  return alertSoundEnabled() && ctx?.state === "running" && document.visibilityState === "visible";
+  return (
+    !isPhoneOrTablet() && alertSoundEnabled() && ctx?.state === "running" && document.visibilityState === "visible"
+  );
 }
 
 /** Two soft bell tones (~0.9 s). Safe to call anytime; silent if audio is locked. */
