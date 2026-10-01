@@ -43,8 +43,8 @@ export const site = {
       display: "0426 071 109",
       href: "tel:+61426071109",
     },
-    // Not provided yet — do not invent one.
-    email: null as string | null,
+    // Provided by the client (1 Oct 2026). Editable in Site details.
+    email: "ccandevents2242@gmail.com" as string | null,
     // Business area (Phase 20). No street or postcode is published.
     address: {
       street: null as string | null,

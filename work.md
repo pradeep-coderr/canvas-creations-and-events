@@ -3621,3 +3621,74 @@ Typecheck and lint: clean. Production build: OK.
 
 - Production visual check after this deploy (wheel smoothness, motion in/out on a phone and in Firefox).
 - Everything still open in Phase 23 above (Resend / VAPID settings in Vercel; replacing sample content).
+
+## Phase 24 — Calendar & date picker for phone and desktop, client requests
+
+The owner reported two problems: the date picker only had month arrows, so changing the month or year was slow, and the admin calendar didn't work well on phones.
+
+### Date picker (`components/ui/date-picker.tsx`, `ui/month-year-panel.tsx`)
+
+- **Month heading opens a month-and-year grid.** Tapping "October 2026 ▾" shows a year stepper over 12 months, so any month or year is one or two taps away. The arrows still step one month.
+- **Limits.** On the enquiry form, past dates, past months and past years are disabled (it keeps `disablePast`). Dates can be chosen up to 5 years ahead.
+- **Shortcuts.** "Go to today" appears while another month is shown. "Clear date" appears when a date is set; reminders turn it off.
+- **Re-tapping the chosen day** keeps it and closes the picker.
+- **Phones (< 640 px):** a bottom sheet titled with the field name, with 50 px days and 48 px month buttons. It is safe-area aware.
+- **Wider screens:** a popover under the field.
+- **Keyboard:** focus starts on the chosen day, and the arrow keys move between days. Escape closes and returns focus to the field.
+- **Where it's used:** the public enquiry form, and now the admin reminder dialog. It replaces the browser's native date input there, so all admin and public date fields look and work the same. Past dates are allowed for reminders.
+
+### Admin calendar (`components/admin/calendar-view.tsx`)
+
+- **Month heading (all sizes)** opens the month-and-year picker and jumps there.
+- **Phones (< 768 px).** A compact month grid replaces the old "list of busy days":
+  - 48 px day buttons;
+  - up to 3 dots per day: rose = enquiry, gold = reminder, red = overdue, grey = done;
+  - today is outlined and the chosen day is filled;
+  - arrow keys, Home and End move between days;
+  - **swiping left or right changes month**;
+  - the chosen day's enquiries and reminders are listed under the grid, with "Add" for that day.
+- **Desktop and tablet grid:**
+  - "+N more" opens a popover with all of that day's items (it used to say "see Agenda");
+  - the per-day "+" is always visible on touch screens (`pointer-coarse`), since hover can't reveal it there.
+- No sideways scroll at 320, 375, 768 or 1024 px.
+
+### Client requests
+
+- **"Corporate events" in "What we style":** migration `20261001090000_contact_email_corporate_events.sql` adds it as a real, published category (not sample), after the existing ones. It is idempotent.
+- **Email `ccandevents2242@gmail.com`:**
+  - The same migration adds `site_settings.contact_email`, with a format check (≤ 254 chars).
+  - It is editable in **Site details → Contact details** and in the visual editor (Contact panel, Header & footer). An empty value hides it everywhere.
+  - It is shown in the Contact section (Email row), the footer, the mobile menu, the enquiry form's "couldn't send" message, the error page, and Google's business details (JSON-LD `email`).
+- **One place for contact details** (owner's question): phone, email, address and social links all come from Site details. The public error page used to read the built-in defaults. It now gets them from the layout through a small context (`components/shared/site-contact.tsx`), so nothing on the public site hard-codes them any more.
+  - FAQ answers are written text: if the number changes, edit those answers too.
+
+### Tests actually run (local production build + local Supabase)
+
+| Suite | Result |
+| --- | --- |
+| `cal24.mjs` (new) | **42/42** — see below |
+| `client24.mjs` (new) | **12/12** — see below |
+| `e2e23.mjs` | 42/42 (after re-seeding the sample content; the suite trims a sample story's photos and can't simply be re-run) |
+| `lenis23` / `home22` / smoke | 21/21 · 6/6 · 33/33 |
+| `e2e20.mjs` (calendar part) | Calendar checks pass. Its reminder step was updated for the new picker, and its phone check for the compact grid. Its other failures were stale test state: it changes the local test admin's password (restored) and needs a freshly reset database. |
+
+`cal24.mjs` covers:
+- **Date picker, desktop:** popover, month/year grid, past months and years disabled, picking a day, reopening on that month, "Go to today", keyboard, Escape, "Clear date".
+- **Date picker, phone:** bottom sheet at full width, 50 px days, 48 px months, pick and close.
+- **Admin calendar, desktop:**
+  - full grid, "+2 more" popover with all 5 items, month/year jump;
+  - reminder dialog: the new picker, a day picked and saved on that day.
+- **Admin calendar, phone:**
+  - compact grid; today selected and listed; 3 dots on a busy day; tap lists all 5;
+  - arrow keys; "Add" on the chosen day; the date sheet over the dialog;
+  - swipe to the next month and back; no sideways scroll at four widths.
+
+`client24.mjs` covers: Contact / footer / mobile-menu email, JSON-LD email, the Site details field, an invalid email refused, empty hides it everywhere, and Corporate events listed once the cache refreshes.
+
+Typecheck, lint, `supabase db lint`, build: clean.
+
+### Production notes
+
+- **Order matters:** push the migration **before** the code deploy. The new code reads `contact_email`; without the column the site falls back to built-in details until it exists.
+- **After the deploy, open Admin → Site details and press Save once.** That refreshes the cached content, so "Corporate events" and the email show straight away instead of after the hourly refresh.
+- **Optional:** set Vercel's `ENQUIRY_NOTIFICATION_EMAIL` to the client's address, so enquiry emails go there.

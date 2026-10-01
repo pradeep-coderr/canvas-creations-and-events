@@ -52,6 +52,13 @@ export function SiteFooter({ settings }: { settings: SiteCopy }) {
                   {phone.display}
                 </a>
               </p>
+              {settings.email && (
+                <p>
+                  <a href={settings.email.href} className={linkClass}>
+                    {settings.email.address}
+                  </a>
+                </p>
+              )}
               <p className="text-muted-foreground">
                 <AddressText address={address} />
               </p>

@@ -37,6 +37,7 @@ export const siteColumns = {
   footerFollowHeading: "footer_follow_heading",
   basedInLabel: "based_in_label",
   phoneDisplay: "phone_display",
+  contactEmail: "contact_email",
   addressStreet: "address_street",
   addressLocality: "address_locality",
   addressRegion: "address_region",
@@ -69,6 +70,13 @@ const phone = z
     return digits >= 8 && digits <= 15;
   }, "Use a phone number with 8 to 15 digits.");
 
+const email = z
+  .string()
+  .trim()
+  .max(254, "Keep this to 254 characters or fewer.")
+  .refine((v) => v === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), "Use an email address, e.g. hello@example.com, or leave it empty.")
+  .transform((v) => v || null);
+
 const social = (host: RegExp, name: string) =>
   z
     .string()
@@ -99,6 +107,7 @@ export const siteSchema = z.object({
   footerFollowHeading: line(),
   basedInLabel: line(),
   phoneDisplay: phone,
+  contactEmail: email,
   addressStreet: optionalLine(),
   addressLocality: line(),
   addressRegion: line(),
@@ -168,6 +177,8 @@ export interface SiteSettings {
   footerHeadings: { explore: string; contact: string; follow: string };
   basedInLabel: string;
   phone: { display: string; href: string };
+  /** Public contact email (null: not shown anywhere). */
+  email: { address: string; href: string } | null;
   address: { street: string | null; locality: string; region: string; postcode: string | null };
   socials: { platform: "instagram" | "facebook" | "tiktok"; label: string; href: string }[];
   form: {
@@ -216,6 +227,7 @@ export function settingsFromValues(v: SiteValues): SiteSettings {
     footerHeadings: { explore: v.footerExploreHeading, contact: v.footerContactHeading, follow: v.footerFollowHeading },
     basedInLabel: v.basedInLabel,
     phone: { display: v.phoneDisplay, href: phoneHref(v.phoneDisplay) },
+    email: v.contactEmail ? { address: v.contactEmail, href: `mailto:${v.contactEmail}` } : null,
     address: {
       street: v.addressStreet || null,
       locality: v.addressLocality,
@@ -262,6 +274,7 @@ export const defaultSiteValues: SiteValues = {
   footerFollowHeading: "Follow",
   basedInLabel: "Based in",
   phoneDisplay: site.contact.phone.display,
+  contactEmail: site.contact.email ?? "",
   addressStreet: site.contact.address.street ?? "",
   addressLocality: site.contact.address.locality,
   addressRegion: site.contact.address.region,

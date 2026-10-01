@@ -24,8 +24,9 @@ export function SiteSettingsForm({ defaultValues }: { defaultValues: SiteValues 
             />
           </FormSection>
 
-          <FormSection title="Contact details" description="Used in the header, footer, Contact section, enquiry form and Google's business details.">
+          <FormSection title="Contact details" description="The one place to change your phone, email, address and social links: they update the header, footer, Contact section, mobile menu, enquiry form, error page and Google's business details.">
             <TextField form={form} name="phoneDisplay" label="Phone number" hint={PHONE_HINT} />
+            <TextField form={form} name="contactEmail" label="Email address" optional hint="Shown in Contact, the footer and the mobile menu. Leave empty to hide it." />
             <TextField form={form} name="addressStreet" label="Street" optional hint="Leave empty to show only the area, e.g. “Adelaide, South Australia”." />
             <TextField form={form} name="addressLocality" label="City or suburb" />
             <TextField form={form} name="addressRegion" label="State" />

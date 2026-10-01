@@ -213,6 +213,7 @@ export function EnquiryForm({
                     <DatePicker
                       id={id}
                       labelId={`${id}-label`}
+                      title={text[f.name]}
                       value={field.value}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
@@ -292,6 +293,17 @@ export function EnquiryForm({
               >
                 {phone.display}
               </a>
+              {settings.email && (
+                <>
+                  {" "}or email{" "}
+                  <a
+                    href={settings.email.href}
+                    className="font-semibold break-all underline decoration-primary/40 underline-offset-4 hover:text-primary"
+                  >
+                    {settings.email.address}
+                  </a>
+                </>
+              )}
               . Your details are still in the form.
             </span>
           </p>

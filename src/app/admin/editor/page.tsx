@@ -85,6 +85,7 @@ export default async function EditorPage() {
     },
     basedInLabel: t("site", "basedInLabel"),
     phone: { href: saved.phone.href, display: live("site", "phoneDisplay") },
+    email: saved.email ? { href: saved.email.href, address: live("site", "contactEmail") } : null,
     address: {
       street: t("site", "addressStreet"),
       locality: t("site", "addressLocality"),

@@ -226,6 +226,7 @@ export const sections: Record<HomeSectionKey, SectionDef> = {
       home("contactTitle", "Contact heading"),
       home("contactDescription", "Contact text", "text"),
       siteField("phoneDisplay", "Phone number", PHONE_HINT),
+      siteField("contactEmail", "Email address", "Leave empty to hide it everywhere.", { optional: true }),
       siteField("basedInLabel", "“Based in” label"),
       siteField("addressStreet", "Street", "Leave empty to show only the area.", { optional: true }),
       siteField("addressLocality", "City or suburb"),
@@ -235,7 +236,7 @@ export const sections: Record<HomeSectionKey, SectionDef> = {
       siteField("facebookUrl", "Facebook link", "Leave empty to hide Facebook everywhere.", { optional: true }),
       siteField("tiktokUrl", "TikTok link", "Leave empty to hide TikTok everywhere.", { optional: true }),
     ],
-    note: "The phone number, address and links are also used in the header, footer and Google's business details.",
+    note: "The phone number, email, address and links are also used in the header, footer and Google's business details.",
   },
 };
 
@@ -260,6 +261,7 @@ export const chromeSection: SectionDef = {
     siteField("footerContactHeading", "Footer: contact heading"),
     siteField("footerFollowHeading", "Footer: social heading", "Also the “Follow” label in Contact."),
     siteField("phoneDisplay", "Phone number", PHONE_HINT),
+    siteField("contactEmail", "Email address", "Leave empty to hide it everywhere.", { optional: true }),
   ],
   note: "Link destinations stay as they are; only the wording changes.",
 };

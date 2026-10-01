@@ -3,6 +3,7 @@ import { SiteFrame } from "@/components/layout/site-frame";
 import { ScrollMotion } from "@/components/motion/scroll-motion";
 import { SmoothScroll } from "@/components/motion/smooth-scroll";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
+import { SiteContactProvider } from "@/components/shared/site-contact";
 import { SiteThemeStyle } from "@/components/theme/site-theme-style";
 import { site } from "@/data/site";
 import { headlineText, withSectionLinks } from "@/lib/cms/site-settings";
@@ -56,7 +57,10 @@ export default async function SiteLayout({ children }: LayoutProps<"/">) {
       <SiteThemeStyle />
       {/* Text style presets (visual editor): generated from fixed options only. */}
       {textCss && <style id="page-styles" dangerouslySetInnerHTML={{ __html: textCss }} />}
-      <SiteFrame settings={settings}>{children}</SiteFrame>
+      <SiteFrame settings={settings}>
+        {/* Contact details for the error page (everything else gets them as props). */}
+        <SiteContactProvider contact={{ phone: saved.phone, email: saved.email }}>{children}</SiteContactProvider>
+      </SiteFrame>
       <ServiceWorkerRegistration />
       <SmoothScroll />
       <ScrollMotion />

@@ -130,6 +130,17 @@ export function MobileMenu({ settings }: { settings: SiteCopy }) {
             >
               {settings.mobileCallLabel} {settings.phone.display}
             </a>
+            {settings.email && (
+              <>
+                <br />
+                <a
+                  href={settings.email.href}
+                  className="mt-1 inline-block font-semibold text-foreground underline decoration-primary/40 underline-offset-4 hover:text-primary"
+                >
+                  {settings.email.address}
+                </a>
+              </>
+            )}
           </p>
           <ul className="flex justify-center gap-6 text-sm">
             {settings.socials.map((social) => (

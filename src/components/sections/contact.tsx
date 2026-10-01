@@ -9,7 +9,7 @@ import { defaultSiteSettings, type SiteCopy } from "@/lib/cms/site-settings";
 const linkClass =
   "underline decoration-primary/40 decoration-1 underline-offset-[6px] transition-colors hover:text-primary hover:decoration-primary";
 
-/** Direct contact details (site details: phone, address, social links). */
+/** Direct contact details (site details: phone, email, address, social links). */
 export function Contact({
   copy = contactSection,
   settings = defaultSiteSettings,
@@ -17,7 +17,7 @@ export function Contact({
   copy?: ContactCopy;
   settings?: SiteCopy;
 }) {
-  const { phone, address } = settings;
+  const { phone, email, address } = settings;
   return (
     <Section id="contact" aria-labelledby="contact-title">
       <Container className="grid gap-12 lg:grid-cols-12 lg:gap-16">
@@ -42,6 +42,16 @@ export function Contact({
                   </a>
                 </dd>
               </div>
+              {email && (
+                <div className="border-b border-foreground/15 py-6">
+                  <dt className="text-eyebrow font-semibold text-emphasis uppercase">Email</dt>
+                  <dd className="mt-2 font-display text-display-sm break-all sm:break-normal">
+                    <a href={email.href} className={linkClass}>
+                      {email.address}
+                    </a>
+                  </dd>
+                </div>
+              )}
               <div className="border-b border-foreground/15 py-6">
                 <dt className="text-eyebrow font-semibold text-emphasis uppercase" data-sk="site.basedInLabel">{settings.basedInLabel}</dt>
                 <dd className="mt-2 font-display text-display-sm">

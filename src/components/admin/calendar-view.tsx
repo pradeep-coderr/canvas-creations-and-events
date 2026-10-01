@@ -3,11 +3,12 @@
 import { useId, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, CalendarDays, Check, ChevronLeft, ChevronRight, List, Pencil, Plus, Trash2 } from "lucide-react";
+import { Bell, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, List, Pencil, Plus, Trash2 } from "lucide-react";
 import { deleteReminder, saveReminder, setReminderCompleted } from "@/app/admin/(portal)/calendar/actions";
 import { StatusBadge } from "@/app/admin/(portal)/status-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MonthYearPanel } from "@/components/ui/month-year-panel";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { describeActionFailure } from "@/lib/admin/action-error";
 import {
@@ -36,7 +39,10 @@ import { cn } from "@/lib/utils";
 
 /*
  * The admin calendar: enquiries on their event dates and reminders.
- * Month (a grid on wider screens, a day list on phones) and Agenda views.
+ * Month and Agenda views. The month is a full grid from tablet width; on
+ * phones it is a compact grid (dots for what's on, swipe for the next or
+ * previous month) with the chosen day's items listed under it. The month
+ * heading opens a month-and-year picker to jump anywhere.
  * Every change goes through the reminder server actions with a real pending
  * state; the page data refreshes after each save.
  */
@@ -80,6 +86,7 @@ export function CalendarView({
     text: string;
   } | null>(null);
   const addRef = useRef<HTMLButtonElement>(null);
+  const router = useRouter();
 
   const items: CalendarItem[] = [...enquiries, ...reminders];
   const byDate = new Map<string, CalendarItem[]>();
@@ -119,9 +126,7 @@ export function CalendarView({
               <ChevronLeft aria-hidden="true" />
             </Link>
           </Button>
-          <p className="text-center sm:min-w-40 font-display text-display-sm font-title" aria-live="polite">
-            {monthLabel(month)}
-          </p>
+          <MonthJump month={month} today={today} onJump={(m) => router.push(href(m) as never)} />
           <Button asChild variant="ghost" size="icon" aria-label="Next month">
             <Link href={href(shiftMonth(month, 1)) as never}>
               <ChevronRight aria-hidden="true" />
@@ -181,6 +186,8 @@ export function CalendarView({
 
       {view === "month" ? (
         <MonthView
+          key={month}
+          onMonth={(m) => router.push(href(m) as never)}
           month={month}
           today={today}
           byDate={byDate}
@@ -238,33 +245,70 @@ export function CalendarView({
   );
 }
 
+/** The month heading: opens a month-and-year picker to jump anywhere. */
+function MonthJump({ month, today, onJump }: { month: string; today: string; onJump: (month: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={`${monthLabel(month)}. Choose month and year`}
+          className="inline-flex h-11 items-center justify-center gap-1.5 rounded-md px-2 font-display text-display-sm font-title outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/40 sm:min-w-44"
+        >
+          <span aria-live="polite">{monthLabel(month)}</span>
+          <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="center" className="w-72 p-3">
+        <MonthYearPanel
+          value={month}
+          current={today.slice(0, 7)}
+          onSelect={(m) => {
+            setOpen(false);
+            if (m !== month) onJump(m);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+type DayHandlers = {
+  isOverdue: (r: CalendarReminder) => boolean;
+  onEdit: (r: CalendarReminder) => void;
+  onDelete: (r: CalendarReminder) => void;
+  onStatus: (s: { kind: "success" | "error"; text: string }) => void;
+};
+
 function MonthView({
   month,
   today,
   byDate,
-  isOverdue,
   onAdd,
-  onEdit,
-  onDelete,
-  onStatus,
+  onMonth,
+  ...handlers
 }: {
   month: string;
   today: string;
   byDate: Map<string, CalendarItem[]>;
-  isOverdue: (r: CalendarReminder) => boolean;
   onAdd: (date: string) => void;
-  onEdit: (r: CalendarReminder) => void;
-  onDelete: (r: CalendarReminder) => void;
-  onStatus: (s: { kind: "success" | "error"; text: string }) => void;
-}) {
+  onMonth: (month: string) => void;
+} & DayHandlers) {
   const days = monthGrid(month);
   const inMonth = (d: string) => d.startsWith(month);
-  // Phones: the days of this month that have something (and today), as a list.
-  const listed = days.filter((d) => inMonth(d) && (byDate.has(d) || d === today));
+  // Phones: the chosen day (today when it is in this month, else the first
+  // day with something on, else the 1st). The view is keyed by month.
+  const [selected, setSelected] = useState(
+    () =>
+      (today.startsWith(month) ? today : null) ??
+      days.find((d) => inMonth(d) && byDate.has(d)) ??
+      `${month}-01`,
+  );
 
   return (
     <>
-      <div className="hidden sm:block">
+      <div className="hidden md:block">
         <div
           role="grid"
           aria-label={monthLabel(month)}
@@ -307,7 +351,8 @@ function MonthView({
                       </span>
                       <button
                         type="button"
-                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity group-hover/day:opacity-100 focus-visible:opacity-100"
+                        // Hidden until hover with a mouse; always shown on touch screens.
+                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity group-hover/day:opacity-100 hover:bg-muted focus-visible:opacity-100 pointer-coarse:opacity-100"
                         aria-label={`Add reminder on ${dayLabel(d)}`}
                         onClick={() => onAdd(d)}
                       >
@@ -317,11 +362,17 @@ function MonthView({
                     <ul className="mt-1 grid min-w-0 grid-cols-1 gap-1">
                       {list.slice(0, 3).map((item) => (
                         <li key={`${item.kind}-${item.id}`} className="min-w-0">
-                          <Chip item={item} overdue={item.kind === "reminder" && isOverdue(item)} onEdit={onEdit} />
+                          <Chip
+                            item={item}
+                            overdue={item.kind === "reminder" && handlers.isOverdue(item)}
+                            onEdit={handlers.onEdit}
+                          />
                         </li>
                       ))}
                       {list.length > 3 && (
-                        <li className="px-1 text-xs text-muted-foreground">+{list.length - 3} more (see Agenda)</li>
+                        <li>
+                          <MoreItems date={d} list={list} isOverdue={handlers.isOverdue} onEdit={handlers.onEdit} />
+                        </li>
                       )}
                     </ul>
                   </div>
@@ -332,22 +383,196 @@ function MonthView({
         </div>
       </div>
 
-      <div className="sm:hidden">
-        {listed.length === 0 ? (
-          <p className="bg-background p-6 text-center text-sm text-muted-foreground">Nothing this month.</p>
-        ) : (
-          <DayList
-            days={listed}
-            today={today}
-            byDate={byDate}
-            isOverdue={isOverdue}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onStatus={onStatus}
-          />
-        )}
+      <div className="grid gap-6 md:hidden">
+        <CompactMonth
+          month={month}
+          today={today}
+          days={days}
+          byDate={byDate}
+          isOverdue={handlers.isOverdue}
+          selected={selected}
+          onSelect={setSelected}
+          onMonth={onMonth}
+        />
+        <section aria-labelledby="selected-day-title" className="grid gap-3">
+          <div className="flex items-center justify-between gap-3 border-b border-border pb-2">
+            <h2 id="selected-day-title" className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+              {dayLabel(selected)}
+              {selected === today && (
+                <span className="rounded-sm bg-primary px-2 py-0.5 text-xs text-primary-foreground">Today</span>
+              )}
+            </h2>
+            <Button type="button" variant="outline" size="sm" onClick={() => onAdd(selected)}>
+              <Plus data-icon="inline-start" aria-hidden="true" />
+              Add<span className="sr-only"> reminder on {dayLabel(selected)}</span>
+            </Button>
+          </div>
+          <DayItems list={byDate.get(selected) ?? []} {...handlers} />
+        </section>
       </div>
     </>
+  );
+}
+
+/** Desktop grid: all of a busy day's items, in a popover. */
+function MoreItems({
+  date,
+  list,
+  isOverdue,
+  onEdit,
+}: {
+  date: string;
+  list: CalendarItem[];
+  isOverdue: (r: CalendarReminder) => boolean;
+  onEdit: (r: CalendarReminder) => void;
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="w-full rounded-sm px-1.5 py-0.5 text-left text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          +{list.length - 3} more<span className="sr-only"> on {dayLabel(date)}</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="grid w-64 gap-2 p-3">
+        <p className="text-sm font-semibold">{dayLabel(date)}</p>
+        <ul className="grid gap-1">
+          {list.map((item) => (
+            <li key={`${item.kind}-${item.id}`} className="min-w-0">
+              <Chip item={item} overdue={item.kind === "reminder" && isOverdue(item)} onEdit={onEdit} />
+            </li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * Phones: a compact month grid. Each day is a button (48 px tall) with up to
+ * three dots for what is on: enquiries (rose), reminders (gold), overdue
+ * (red). Arrow keys move between days; swiping left or right changes month.
+ */
+function CompactMonth({
+  month,
+  today,
+  days,
+  byDate,
+  isOverdue,
+  selected,
+  onSelect,
+  onMonth,
+}: {
+  month: string;
+  today: string;
+  days: string[];
+  byDate: Map<string, CalendarItem[]>;
+  isOverdue: (r: CalendarReminder) => boolean;
+  selected: string;
+  onSelect: (date: string) => void;
+  onMonth: (month: string) => void;
+}) {
+  const gridRef = useRef<HTMLDivElement>(null);
+  const swipe = useRef<{ x: number; y: number } | null>(null);
+  const inMonth = (d: string) => d.startsWith(month);
+  const first = `${month}-01`;
+  const last = days.filter(inMonth).at(-1)!;
+
+  const move = (date: string) => {
+    if (date < first || date > last) return;
+    onSelect(date);
+    requestAnimationFrame(() => gridRef.current?.querySelector<HTMLButtonElement>(`[data-date="${date}"]`)?.focus());
+  };
+  const onKeyDown = (event: React.KeyboardEvent, d: string) => {
+    const delta = ({ ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 } as Record<string, number>)[event.key];
+    if (delta !== undefined) {
+      event.preventDefault();
+      move(addDays(d, delta));
+    } else if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      move(event.key === "Home" ? first : last);
+    }
+  };
+
+  return (
+    <div
+      ref={gridRef}
+      role="grid"
+      aria-label={`${monthLabel(month)}. Swipe or use the arrows above to change month.`}
+      className="touch-pan-y select-none"
+      onPointerDown={(e) => {
+        if (e.pointerType !== "mouse") swipe.current = { x: e.clientX, y: e.clientY };
+      }}
+      onPointerUp={(e) => {
+        const start = swipe.current;
+        swipe.current = null;
+        if (!start) return;
+        const dx = e.clientX - start.x;
+        const dy = e.clientY - start.y;
+        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) onMonth(shiftMonth(month, dx < 0 ? 1 : -1));
+      }}
+      onPointerCancel={() => {
+        swipe.current = null;
+      }}
+    >
+      <div role="row" className="grid grid-cols-7">
+        {weekdays.map((w) => (
+          <div key={w} role="columnheader" className="py-2 text-center text-xs font-semibold text-muted-foreground">
+            <span aria-hidden="true">{w.slice(0, 1)}</span>
+            <span className="sr-only">{w}</span>
+          </div>
+        ))}
+      </div>
+      {Array.from({ length: 6 }, (_, week) => (
+        <div key={week} role="row" className="grid grid-cols-7">
+          {days.slice(week * 7, week * 7 + 7).map((d) => {
+            if (!inMonth(d)) return <div key={d} role="gridcell" aria-hidden="true" className="h-12" />;
+            const list = byDate.get(d) ?? [];
+            const isSelected = d === selected;
+            const dots = list
+              .slice(0, 3)
+              .map((item) =>
+                item.kind === "enquiry"
+                  ? "bg-primary"
+                  : item.completed
+                    ? "bg-muted-foreground/40"
+                    : isOverdue(item)
+                      ? "bg-destructive"
+                      : "bg-highlight",
+              );
+            return (
+              <div key={d} role="gridcell" aria-selected={isSelected} className="p-0.5">
+                <button
+                  type="button"
+                  data-date={d}
+                  tabIndex={isSelected ? 0 : -1}
+                  aria-label={`${dayLabel(d)}${d === today ? ", today" : ""}${list.length ? `, ${list.length} item${list.length === 1 ? "" : "s"}` : ", nothing planned"}`}
+                  onClick={() => onSelect(d)}
+                  onKeyDown={(e) => onKeyDown(e, d)}
+                  className={cn(
+                    "flex h-12 w-full flex-col items-center justify-center gap-1 rounded-lg text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/40",
+                    isSelected
+                      ? "bg-primary font-semibold text-primary-foreground"
+                      : d === today
+                        ? "font-semibold text-primary ring-1 ring-primary/50 ring-inset"
+                        : "hover:bg-muted",
+                  )}
+                >
+                  <span className="leading-none tabular-nums">{Number(d.slice(8))}</span>
+                  <span aria-hidden="true" className="flex h-1.5 gap-0.5">
+                    {dots.map((c, i) => (
+                      <span key={i} className={cn("size-1.5 rounded-full", isSelected ? "bg-primary-foreground" : c)} />
+                    ))}
+                  </span>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -419,32 +644,38 @@ function DayList({
               )}
               {d > today && <span className="sr-only">(upcoming)</span>}
             </h3>
-            {list.length === 0 ? (
-              <p className="mt-2 text-sm text-muted-foreground">Nothing planned.</p>
-            ) : (
-              <ul className="mt-2 grid gap-2">
-                {list.map((item) =>
-                  item.kind === "enquiry" ? (
-                    <li key={`e-${item.id}`}>
-                      <EnquiryRow enquiry={item} />
-                    </li>
-                  ) : (
-                    <ReminderRow
-                      key={`r-${item.id}`}
-                      reminder={item}
-                      overdue={isOverdue(item)}
-                      onEdit={() => onEdit(item)}
-                      onDelete={() => onDelete(item)}
-                      onStatus={onStatus}
-                    />
-                  ),
-                )}
-              </ul>
-            )}
+            <div className="mt-2">
+              <DayItems list={list} isOverdue={isOverdue} onEdit={onEdit} onDelete={onDelete} onStatus={onStatus} />
+            </div>
           </li>
         );
       })}
     </ol>
+  );
+}
+
+/** One day's enquiries and reminders, as rows. */
+function DayItems({ list, isOverdue, onEdit, onDelete, onStatus }: { list: CalendarItem[] } & DayHandlers) {
+  if (list.length === 0) return <p className="text-sm text-muted-foreground">Nothing planned.</p>;
+  return (
+    <ul className="grid gap-2">
+      {list.map((item) =>
+        item.kind === "enquiry" ? (
+          <li key={`e-${item.id}`}>
+            <EnquiryRow enquiry={item} />
+          </li>
+        ) : (
+          <ReminderRow
+            key={`r-${item.id}`}
+            reminder={item}
+            overdue={isOverdue(item)}
+            onEdit={() => onEdit(item)}
+            onDelete={() => onDelete(item)}
+            onStatus={onStatus}
+          />
+        ),
+      )}
+    </ul>
   );
 }
 
@@ -682,14 +913,18 @@ function ReminderDialog({
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor={`${id}-date`}>Date</Label>
-              <Input
+              <Label id={`${id}-date-label`} htmlFor={`${id}-date`}>
+                Date
+              </Label>
+              <DatePicker
                 id={`${id}-date`}
-                type="date"
+                labelId={`${id}-date-label`}
+                title="Reminder date"
                 value={values.date}
+                clearable={false}
                 aria-invalid={errors.date ? true : undefined}
                 aria-describedby={describedBy("date")}
-                onChange={(e) => set("date", e.target.value)}
+                onChange={(v) => set("date", v)}
               />
               {err("date")}
             </div>
