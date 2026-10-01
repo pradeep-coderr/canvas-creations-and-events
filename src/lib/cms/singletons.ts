@@ -47,6 +47,11 @@ const homeColumns = {
   whyEyebrow: "why_eyebrow",
   testimonialsEyebrow: "testimonials_eyebrow",
   testimonialsTitle: "testimonials_title",
+  reviewsEyebrow: "reviews_eyebrow",
+  reviewsTitle: "reviews_title",
+  reviewsDescription: "reviews_description",
+  reviewsEmptyText: "reviews_empty_text",
+  reviewsCtaLabel: "reviews_cta_label",
   faqEyebrow: "faq_eyebrow",
   faqTitle: "faq_title",
   enquiryEyebrow: "enquiry_eyebrow",
@@ -75,6 +80,8 @@ const homeTextFields = new Set<HomeField>([
   "sampleNotice",
   "enquiryDescription",
   "contactDescription",
+  "reviewsDescription",
+  "reviewsEmptyText",
 ]);
 
 const titleLine = z

@@ -174,6 +174,17 @@ export const sections: Record<HomeSectionKey, SectionDef> = {
     ],
     note: "Only shown on the website when at least one testimonial is published and featured.",
   },
+  reviews: {
+    title: "Reviews",
+    fields: [
+      home("reviewsEyebrow", "Reviews label"),
+      home("reviewsTitle", "Reviews heading"),
+      home("reviewsDescription", "Reviews text", "text"),
+      home("reviewsEmptyText", "Text while there are no reviews yet", "text"),
+      home("reviewsCtaLabel", "Review button text", "line", "Opens the review form."),
+    ],
+    note: "Reviews come from clients through the form. Approve, hide or add them under Reviews in the admin; only approved reviews appear here.",
+  },
   whyCanvas: {
     title: "Why Canvas",
     collection: "principles",

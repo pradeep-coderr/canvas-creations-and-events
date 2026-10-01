@@ -3754,3 +3754,115 @@ Typecheck, lint, `supabase db lint`, build: clean.
 - Bing Webmaster Tools (can import from Search Console).
 
 **Old address:** Vercel can't redirect its own `*.vercel.app` domain from the dashboard (Save stays disabled). `next.config.ts` does it instead: in production builds (`VERCEL_ENV=production`), any `*.vercel.app` host redirects 308 to the custom domain, keeping the path and query (`/_next` assets excluded). Preview builds and local runs are unaffected. Checked locally by host header: the old address, a deep link with a query and a deployment URL all redirect; the custom domain and localhost serve 200.
+
+## Phase 25 — Reviews & feedback
+
+The owner asked for a review and feedback section, ahead of the VAPID / push work.
+
+Decisions, confirmed with the owner:
+- Clients submit reviews on the website and an admin approves them.
+- A review has star ratings (1–5) and written words.
+- One form, where the client chooses whether the review may appear on the website. If they choose no, it is **private feedback** for the team and can never be shown.
+
+Deliberately not added:
+- an average-rating badge;
+- `aggregateRating` / Review structured data. Google ignores self-hosted ratings for local businesses, and the JSON-LD stays free of user-submitted data.
+
+### Database (`20261001130000_reviews.sql`)
+
+**`public.reviews` table:**
+- Columns: name, optional email (private), optional event, rating 1–5, message 10–1500, `can_publish`, status `new | approved | hidden`, source `website | admin`, `approved_at`.
+- Constraints mirror the form's limits.
+- `approved` requires `can_publish`. Admin-added reviews must have permission (`can_publish`).
+
+**Trigger `private.reviews_guard`:**
+- keeps `approved_at` in step with the status;
+- refuses any change to a client's own words, rating, email or consent, so a published review is always what the client wrote.
+
+**Access rules (RLS):**
+- Visitors (anon) can INSERT new website reviews through a column-level grant only. They can't set the status, source or dates, and can't read anything back; the server makes the id.
+- Visitors can SELECT approved reviews, public columns only. `status` is readable so the site can filter on it; the email never is.
+  - Found by the build: filtering on `status` needs SELECT on that column. It was missing from the first version of the grant.
+- Admins (`private.is_admin()`) read, approve, hide, add and delete.
+
+**Also in the migration:**
+- `home_content` gets editable section wording: `reviews_eyebrow`, `reviews_title`, `reviews_description`, `reviews_empty_text`, `reviews_cta_label`.
+- `push_subscriptions.notify_reviews` is added, and `push_targets` now also serves kind `review`.
+
+### Website
+
+**Section:** `#reviews`, between About and FAQ (`sections/reviews.tsx`).
+- Approved reviews, newest first (up to 6), each with:
+  - the client's own stars, shown as one image ("Rated 5 out of 5");
+  - their words, name and event.
+- Centred rows, so one or two reviews don't sit to one side.
+- Before any review is approved: an invitation to be the first.
+- The wording is editable in Content → Homepage → Reviews and in the visual editor's Reviews panel.
+
+**Form ("Leave a review")** opens in a dialog (`sections/review-form.tsx`):
+- **Rating:** five radio buttons drawn as stars, with arrow keys, 44 px targets and a word for each rating (Poor … Excellent).
+- **Fields:** name; event (optional); review with a character count; email (optional, "never shown").
+- **Website choice:** a required yes/no.
+- **Behaviour:**
+  - errors listed per field, with focus moved to the first one;
+  - honeypot and offline check;
+  - the server re-validates (`lib/submit-review.ts`, same shape as enquiries);
+  - the thank-you message depends on the website choice.
+- In the editor the form is a preview and doesn't send.
+
+**Alerts** after a review is stored, best effort, after the response:
+- **Push "New review" / "New feedback":** stars and name only, opens `/admin/reviews`. There is a per-device "New reviews and feedback" option in Settings.
+- **Email to the business:** same Resend settings as enquiries; escaped, with an idempotency key, and Reply-To the client when they gave an email.
+
+### Admin: Reviews tab (`/admin/reviews`)
+
+- **Filters:** New · On the website · Hidden · Private feedback · All, with counts.
+- **Each review shows:** stars, words, name, event, email link and date.
+- **Actions:**
+  - Approve and show; Hide from website; Don't show; Back to New; Mark as read (private feedback); Delete (with confirmation).
+  - Private feedback has no Approve button, and the database refuses it anyway.
+- **Add a review:** for reviews the client sent another way. The admin must confirm the client's permission; it can be shown straight away.
+- Changes refresh the public homepage immediately (`updateTag`).
+
+### Tests (local production build + local Supabase)
+
+**`reviews25.mjs`: 27/27**
+- **Public form:**
+  - section and invitation shown;
+  - an empty submit lists 4 errors and focuses the rating; the rating works by keyboard;
+  - a review is sent, stored as New, and is not public;
+  - the form opens fresh afterwards;
+  - private feedback is stored with its email;
+  - honeypot: nothing stored;
+  - phone dialog fits, with 44 px stars.
+- **Admin:**
+  - Reviews tab; New list; private feedback has no Approve button;
+  - approve → shown on the homepage with stars, name and event, and HTML shown as text;
+  - no email or private feedback on the page;
+  - hide → gone;
+  - admin add needs the permission tick, then is shown;
+  - delete with confirmation;
+  - editor shows the section; 320 px admin has no sideways scroll; no console errors.
+
+**Database checks (SQL, as anon and as a non-admin):**
+- insert allowed;
+- self-approve, reading unapproved reviews or emails, update and delete all refused;
+- trigger blocks edits; private feedback can't be approved;
+- a non-admin sees nothing.
+
+**Regression:**
+
+| Suite | Result |
+| --- | --- |
+| e2e23 | 42/42 |
+| cal24 | 42/42 |
+| smoke | 33/33 |
+| lenis23 | 21/21 |
+| home22 | 6/6 |
+| client24 | 12/12 |
+
+Typecheck, lint, `supabase db lint` and build: clean.
+
+### Production
+
+The migration must be pushed **before** the code: the homepage reads the new columns.

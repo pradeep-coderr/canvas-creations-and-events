@@ -945,7 +945,7 @@ function ReminderDialog({
           <label className="flex min-h-11 items-center gap-3 text-sm">
             <input
               type="checkbox"
-              className="size-4 accent-(--primary)"
+              className="size-4 accent-primary"
               checked={values.allDay}
               onChange={(e) => set("allDay", e.target.checked)}
             />

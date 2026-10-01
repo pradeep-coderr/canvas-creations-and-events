@@ -36,6 +36,7 @@ const homeGroups = [
   ["home-process", "Process"],
   ["home-why", "Why Canvas"],
   ["home-testimonials", "Testimonials"],
+  ["home-reviews", "Reviews"],
   ["home-faq", "FAQ"],
   ["home-enquiry", "Enquiry"],
   ["home-contact", "Contact"],
@@ -175,6 +176,13 @@ export function HomeForm({ defaultValues, imageOptions }: { defaultValues: HomeV
 
           <FormSection id="home-testimonials" title="Testimonials section" description="Only shown when at least one testimonial is published and featured.">
             <Heading form={form} prefix="testimonials" />
+          </FormSection>
+
+          <FormSection id="home-reviews" title="Reviews section" description="The reviews themselves come from clients and are approved under Reviews.">
+            <Heading form={form} prefix="reviews" />
+            <TextAreaField form={form} name="reviewsDescription" label="Text" rows={2} />
+            <TextAreaField form={form} name="reviewsEmptyText" label="Text while there are no reviews yet" rows={2} />
+            <TextField form={form} name="reviewsCtaLabel" label="Button text" hint="Opens the review form." />
           </FormSection>
 
           <FormSection id="home-faq" title="FAQ section">

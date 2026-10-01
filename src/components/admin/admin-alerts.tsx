@@ -34,7 +34,7 @@ export function AdminAlerts() {
       {alert && (
         <div role="status" className="pointer-events-auto flex max-w-md items-center gap-3 border border-border bg-background p-3 pl-4 shadow-lift">
           <BellRing aria-hidden="true" className="size-5 shrink-0 text-primary" />
-          <p className="min-w-0 flex-1 text-sm font-semibold">{alert.title === "New enquiry" ? "New enquiry received" : alert.title}</p>
+          <p className="min-w-0 flex-1 text-sm font-semibold">{alert.title === "New enquiry" ? "New enquiry received" : alert.title === "New review" ? "New review received" : alert.title}</p>
           <Button asChild size="sm" className="h-11">
             <Link href={alert.url as never} onClick={() => setAlert(null)}>
               View

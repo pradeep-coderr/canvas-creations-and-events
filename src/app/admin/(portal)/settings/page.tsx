@@ -16,13 +16,16 @@ export default async function SettingsPage() {
   const [{ data }, { data: emailCheck }] = await Promise.all([
     supabase
       .from("push_subscriptions")
-      .select("endpoint, notify_enquiries, notify_reminders")
+      .select("endpoint, notify_enquiries, notify_reminders, notify_reviews")
       .eq("admin_user_id", admin.userId)
       .is("revoked_at", null),
     supabase.from("notification_checks").select("ok, detail, checked_at").eq("kind", "email").maybeSingle(),
   ]);
   const prefs = Object.fromEntries(
-    (data ?? []).map((s) => [s.endpoint, { enquiries: s.notify_enquiries, reminders: s.notify_reminders }]),
+    (data ?? []).map((s) => [
+      s.endpoint,
+      { enquiries: s.notify_enquiries, reminders: s.notify_reminders, reviews: s.notify_reviews },
+    ]),
   );
 
   return (
@@ -58,7 +61,7 @@ export default async function SettingsPage() {
           Push notifications
         </h2>
         <p className="mt-2 mb-5 text-sm text-muted-foreground">
-          Alerts on this device for new enquiries and calendar reminders.
+          Alerts on this device for new enquiries, reviews and calendar reminders.
         </p>
         <NotificationPanel publicKey={pushConfigured() ? (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null) : null} prefs={prefs} />
       </section>

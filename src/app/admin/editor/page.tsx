@@ -11,6 +11,7 @@ import { ScrollMotion } from "@/components/motion/scroll-motion";
 import { SiteThemeStyle } from "@/components/theme/site-theme-style";
 import { about as localAbout, enquirySection, hero as localHero } from "@/data/home";
 import { loadEditorPage } from "@/lib/admin/editor-content";
+import { getApprovedReviews } from "@/lib/content/public";
 import { settingsFromValues, withSectionLinks, type SiteCopy } from "@/lib/cms/site-settings";
 import { requireAdmin } from "@/lib/admin/session";
 import type { CollectionKey } from "@/lib/cms/collections";
@@ -153,6 +154,14 @@ export default async function EditorPage() {
       whyCanvas: { eyebrow: t("home", "whyEyebrow"), titleLines: [t("home", "whyTitleLines")] },
       // The heading is visually hidden (screen readers only): edited in the panel.
       testimonials: { eyebrow: t("home", "testimonialsEyebrow"), title: live("home", "testimonialsTitle") },
+      reviews: {
+        eyebrow: t("home", "reviewsEyebrow"),
+        title: t("home", "reviewsTitle"),
+        description: t("home", "reviewsDescription"),
+        emptyText: t("home", "reviewsEmptyText"),
+        // Inside the button: edited in the section panel.
+        ctaLabel: live("home", "reviewsCtaLabel"),
+      },
       faq: { eyebrow: t("home", "faqEyebrow"), title: t("home", "faqTitle") },
       enquiry: {
         eyebrow: t("home", "enquiryEyebrow"),
@@ -193,6 +202,9 @@ export default async function EditorPage() {
     stories: page.collections.stories,
     films: page.collections.films,
     testimonials: page.collections.testimonials,
+    reviews: await getApprovedReviews(),
+    // The form doesn't send from the editor (it's a preview of the page).
+    reviewsEnabled: false,
     faqs: page.collections.faqs,
     processSteps: page.collections.process,
     principles: page.collections.principles,

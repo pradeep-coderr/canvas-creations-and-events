@@ -70,13 +70,17 @@ export async function removePushSubscription(endpoint: unknown): Promise<PushRes
 export async function setPushPreferences(input: unknown): Promise<PushResult> {
   const admin = await requireSuperAdmin();
   const parsed = z
-    .object({ endpoint: z.string().url().max(1000), enquiries: z.boolean(), reminders: z.boolean() })
+    .object({ endpoint: z.string().url().max(1000), enquiries: z.boolean(), reminders: z.boolean(), reviews: z.boolean() })
     .safeParse(input);
   if (!parsed.success) return { ok: false, error: "Those settings weren't valid." };
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("push_subscriptions")
-    .update({ notify_enquiries: parsed.data.enquiries, notify_reminders: parsed.data.reminders })
+    .update({
+      notify_enquiries: parsed.data.enquiries,
+      notify_reminders: parsed.data.reminders,
+      notify_reviews: parsed.data.reviews,
+    })
     .eq("endpoint", parsed.data.endpoint)
     .eq("admin_user_id", admin.userId)
     .is("revoked_at", null)

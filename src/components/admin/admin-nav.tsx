@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 const sections = [
   { label: "Enquiries", href: "/admin", match: (p: string) => p === "/admin" || p.startsWith("/admin/enquiries") },
+  { label: "Reviews", href: "/admin/reviews", match: (p: string) => p.startsWith("/admin/reviews") },
   { label: "Content", href: "/admin/content", match: (p: string) => p.startsWith("/admin/content") },
   { label: "Calendar", href: "/admin/calendar", match: (p: string) => p.startsWith("/admin/calendar") },
   { label: "Design", href: "/admin/design", match: (p: string) => p.startsWith("/admin/design") },
@@ -16,7 +17,7 @@ const superSections = [
   { label: "Settings", href: "/admin/settings", match: (p: string) => p.startsWith("/admin/settings") },
 ] as const;
 
-/** Enquiries | Content | Design (the "Edit website" button beside it opens the editor). The current section is marked with aria-current and an underline, not colour alone. */
+/** Enquiries | Reviews | Content | Calendar | Design (the "Edit website" button beside it opens the editor). The current section is marked with aria-current and an underline, not colour alone. */
 export function AdminNav({ superAdmin = false }: { superAdmin?: boolean }) {
   const pathname = usePathname();
   const items = superAdmin ? [...sections, ...superSections] : sections;

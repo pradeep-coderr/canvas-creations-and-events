@@ -17,7 +17,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
  * browser and the device's settings; we only ask for a normal, non-silent one.
  */
 
-export type PushKind = "enquiry" | "reminder";
+export type PushKind = "enquiry" | "reminder" | "review";
 
 export interface PushPayload {
   title: string;
@@ -148,6 +148,26 @@ export async function notifyNewEnquiry(enquiry: { id: string; name: string; even
     // Never affects the stored enquiry.
     console.error("[push] new enquiry alert failed", {
       enquiryId: enquiry.id,
+      message: error instanceof Error ? error.message.slice(0, 120) : "unknown",
+    });
+  }
+}
+
+/** "New review" — name and stars only; the words stay in the admin. */
+export async function notifyNewReview(review: { id: string; name: string; rating: number; canPublish: boolean }) {
+  try {
+    const result = await pushToAdmins("review", {
+      title: review.canPublish ? "New review" : "New feedback",
+      body: `${"★".repeat(review.rating)}${"☆".repeat(5 - review.rating)} · ${review.name}\n${
+        review.canPublish ? "Tap to approve or hide it." : "Private feedback — tap to read it."
+      }`,
+      url: "/admin/reviews",
+      tag: `review-${review.id}`,
+    });
+    console.info("[push] new review alert", { reviewId: review.id, sent: result.sent, failed: result.failed });
+  } catch (error) {
+    console.error("[push] new review alert failed", {
+      reviewId: review.id,
       message: error instanceof Error ? error.message.slice(0, 120) : "unknown",
     });
   }

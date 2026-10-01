@@ -198,6 +198,15 @@ export const testimonialsSection = {
   title: "From our clients",
 };
 
+/** Reviews & feedback section wording (the reviews themselves come from clients). */
+export const reviewsSection = {
+  eyebrow: "Reviews",
+  title: "Kind words from our clients",
+  description: "Celebrated with us? We'd love to hear how it went.",
+  emptyText: "Be the first to share your experience with Canvas Creations and Events.",
+  ctaLabel: "Leave a review",
+};
+
 export const faqSection = {
   eyebrow: "FAQ",
   title: "Questions, answered.",
@@ -250,5 +259,6 @@ export type WhyCanvasCopy = Renderable<Pick<typeof whyCanvas, "eyebrow" | "title
 export type VideoStoryCopy = Renderable<typeof videoStory>;
 export type TestimonialsCopy = Renderable<typeof testimonialsSection>;
 export type FaqCopy = Renderable<typeof faqSection>;
+export type ReviewsCopy = Renderable<typeof reviewsSection>;
 export type EnquiryCopy = Renderable<typeof enquirySection>;
 export type ContactCopy = Renderable<typeof contactSection>;

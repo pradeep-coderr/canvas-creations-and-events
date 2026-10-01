@@ -6,6 +6,7 @@ import { films as localFilms, type Film } from "@/data/films";
 import { galleryPreview, type GalleryItem } from "@/data/gallery";
 import { pricingPackages, type PricingPackage } from "@/data/pricing";
 import { eventStories, type EventStory, type StoryImage } from "@/data/stories";
+import type { PublicReview } from "@/lib/review";
 import {
   about,
   categoriesSection,
@@ -17,6 +18,7 @@ import {
   intro,
   pricingSection,
   processSection,
+  reviewsSection,
   storiesSection,
   servicesSection,
   testimonialsSection,
@@ -35,6 +37,7 @@ import {
   type StoriesCopy,
   type ProcessCopy,
   type ProcessStep,
+  type ReviewsCopy,
   type ServicesCopy,
   type TestimonialsCopy,
   type VideoStoryCopy,
@@ -450,6 +453,37 @@ export function getFeaturedTestimonials(): Promise<Testimonial[]> {
   );
 }
 
+/** How many approved reviews the homepage shows (newest first). */
+export const REVIEWS_LIMIT = 6;
+
+/**
+ * Approved reviews, newest first. Public columns only (the anon role can't
+ * read emails, or anything not approved). Empty without a database.
+ */
+export function getApprovedReviews(): Promise<PublicReview[]> {
+  return fromCms(
+    "reviews",
+    async (db) => {
+      const { data, error } = await db
+        .from("reviews")
+        .select("id, name, event_type, rating, message")
+        .eq("status", "approved")
+        .order("approved_at", { ascending: false })
+        .limit(REVIEWS_LIMIT)
+        .overrideTypes<{ id: string; name: string; event_type: string | null; rating: number; message: string }[], { merge: false }>();
+      if (error) throw error;
+      return data.map((row) => ({
+        id: row.id,
+        name: row.name,
+        eventType: row.event_type,
+        rating: row.rating,
+        message: row.message,
+      }));
+    },
+    [],
+  );
+}
+
 export function getFaqs(): Promise<FaqItem[]> {
   return fromCms(
     "faqs",
@@ -532,6 +566,7 @@ export interface HomeCopy {
   process: ProcessCopy;
   whyCanvas: WhyCanvasCopy;
   testimonials: TestimonialsCopy;
+  reviews: ReviewsCopy;
   faq: FaqCopy;
   enquiry: EnquiryCopy;
   contact: ContactCopy;
@@ -548,6 +583,7 @@ const localHomeCopy: HomeCopy = {
   process: processSection,
   whyCanvas,
   testimonials: testimonialsSection,
+  reviews: reviewsSection,
   faq: faqSection,
   enquiry: enquirySection,
   contact: contactSection,
@@ -587,6 +623,11 @@ interface HomeRow {
   why_title_lines: string[];
   testimonials_eyebrow: string;
   testimonials_title: string;
+  reviews_eyebrow: string;
+  reviews_title: string;
+  reviews_description: string;
+  reviews_empty_text: string;
+  reviews_cta_label: string;
   faq_eyebrow: string;
   faq_title: string;
   enquiry_eyebrow: string;
@@ -639,6 +680,13 @@ export function getHomeCopy(): Promise<HomeCopy> {
         process: { eyebrow: r.process_eyebrow, title: r.process_title },
         whyCanvas: { eyebrow: r.why_eyebrow, titleLines: r.why_title_lines },
         testimonials: { eyebrow: r.testimonials_eyebrow, title: r.testimonials_title },
+        reviews: {
+          eyebrow: r.reviews_eyebrow,
+          title: r.reviews_title,
+          description: r.reviews_description,
+          emptyText: r.reviews_empty_text,
+          ctaLabel: r.reviews_cta_label,
+        },
         faq: { eyebrow: r.faq_eyebrow, title: r.faq_title },
         enquiry: {
           eyebrow: r.enquiry_eyebrow,
@@ -703,7 +751,7 @@ export function getVideoCopy(): Promise<VideoStoryCopy> {
 
 /** Everything the homepage shows from the CMS, fetched in parallel. */
 export const getHomepageContent = cache(async () => {
-  const [services, categories, portfolio, stories, pricing, films, testimonials, faqs, processSteps, principles, copy, aboutCopy, videoCopy, settings, styles] =
+  const [services, categories, portfolio, stories, pricing, films, testimonials, reviews, faqs, processSteps, principles, copy, aboutCopy, videoCopy, settings, styles] =
     await Promise.all([
       getFeaturedServices(),
       getCategories(),
@@ -712,6 +760,7 @@ export const getHomepageContent = cache(async () => {
       getPricingPackages(),
       getFilms(),
       getFeaturedTestimonials(),
+      getApprovedReviews(),
       getFaqs(),
       getProcessSteps(),
       getPrinciples(),
@@ -730,6 +779,7 @@ export const getHomepageContent = cache(async () => {
     pricing,
     films,
     testimonials,
+    reviews,
     faqs,
     processSteps,
     principles,

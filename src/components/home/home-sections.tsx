@@ -23,6 +23,8 @@ import type { PricingPackage } from "@/data/pricing";
 import type { EventStory } from "@/data/stories";
 import type { Service } from "@/data/services";
 import type { Testimonial } from "@/data/testimonials";
+import type { PublicReview } from "@/lib/review";
+import { Reviews } from "@/components/sections/reviews";
 import type { SiteCopy } from "@/lib/cms/site-settings";
 import { sectionAttrs, type PageStyles } from "@/lib/styles/schema";
 import type { HomeCopy } from "@/lib/content/public";
@@ -46,6 +48,10 @@ export interface HomeContent {
   films: Film[];
   stories: EventStory[];
   testimonials: Testimonial[];
+  /** Approved client reviews (newest first). */
+  reviews: PublicReview[];
+  /** Whether the review form can send (a database is configured). */
+  reviewsEnabled?: boolean;
   faqs: FaqItem[];
   processSteps: ProcessStep[];
   principles: Principle[];
@@ -62,6 +68,7 @@ export type HomeSectionKey =
   | "about"
   | "process"
   | "testimonials"
+  | "reviews"
   | "whyCanvas"
   | "video"
   | "faq"
@@ -170,6 +177,10 @@ export function HomeSections({ content, slots }: { content: HomeContent; slots?:
       </S>
       <S section="about" styles={ss}>
         <AboutFounder copy={content.about} imageAction={slots?.aboutImage} />
+      </S>
+      {/* Reviews: client reviews (approved by an admin) and the form to leave one. */}
+      <S section="reviews" styles={ss}>
+        <Reviews reviews={content.reviews} copy={copy.reviews} enabled={content.reviewsEnabled ?? true} />
       </S>
       <S section="faq" styles={ss}>
         <Faq faqs={content.faqs} copy={copy.faq} itemSlots={slots?.faqs} />

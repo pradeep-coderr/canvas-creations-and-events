@@ -102,6 +102,7 @@ export const SECTION_KEYS = [
   "about",
   "process",
   "testimonials",
+  "reviews",
   "whyCanvas",
   "video",
   "faq",
