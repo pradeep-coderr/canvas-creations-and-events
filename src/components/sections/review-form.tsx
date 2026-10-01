@@ -299,7 +299,17 @@ export function ReviewForm({ label, enabled }: { label: React.ReactNode; enabled
               {/* Honeypot for bots: hidden from people and assistive technology. */}
               <div aria-hidden="true" className="absolute -left-[10000px] h-px w-px overflow-hidden">
                 <label htmlFor={`${id}-hp`}>Leave this field empty</label>
-                <input id={`${id}-hp`} name="hp_field" type="text" tabIndex={-1} autoComplete="off" />
+                <input
+                  id={`${id}-hp`}
+                  name="hp_field"
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
+                  data-bwignore
+                  data-form-type="other"
+                />
               </div>
 
               <p role="alert" className="text-sm font-medium text-destructive empty:hidden">

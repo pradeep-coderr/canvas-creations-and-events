@@ -39,6 +39,7 @@ function toRow(id: string, review: Review) {
 export async function submitReview(input: unknown, honeypot?: unknown): Promise<ReviewResult> {
   const parsed = reviewSchema.safeParse(input);
   if (typeof honeypot === "string" && honeypot.trim() !== "") {
+    console.warn("[review] ignored: hidden anti-spam field was filled (bot or browser autofill)");
     return { status: "sent", canPublish: parsed.success ? parsed.data.canPublish : false };
   }
   if (!isSupabaseConfigured()) return { status: "unavailable" };

@@ -47,6 +47,9 @@ export async function submitEnquiry(
   honeypot?: unknown,
 ): Promise<EnquiryResult> {
   if (typeof honeypot === "string" && honeypot.trim() !== "") {
+    // Looks sent to the sender (bots learn nothing); logged so a real person
+    // whose browser autofilled the hidden field can be spotted.
+    console.warn("[enquiry] ignored: hidden anti-spam field was filled (bot or browser autofill)");
     return { status: "sent", notified: false };
   }
 

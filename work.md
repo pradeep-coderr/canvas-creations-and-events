@@ -3877,3 +3877,13 @@ The migration must be pushed **before** the code: the homepage reads the new col
 - **Still needed:**
   - The live database has 0 subscribed devices. A super admin must turn notifications on at /admin/settings on the new domain (iPhone: from the installed app) and send the test notification. That test is also the only end-to-end check that the VAPID key pair is valid.
   - `RESEND_API_KEY` is still not set, so emails are off.
+
+### Local email & push testing (owner, 2 Oct 2026)
+
+- Tested on the owner's machine against the local Supabase with `bun run setup:local`, which writes no secrets to files.
+- Resend test email arrived; the push test notification was delivered.
+- A real enquiry sent through the dev server arrived as a "New enquiry" push and an email.
+- The owner's first enquiry was never stored, so no alert was possible. The cause is unconfirmed: a form error, or browser autofill filling the hidden anti-spam field.
+- **Changes:**
+  - Both forms' honeypot fields now carry password-manager ignore attributes.
+  - A dropped submission is logged as `[enquiry|review] ignored: hidden anti-spam field was filled` (no visitor details), so this can be told apart next time.
