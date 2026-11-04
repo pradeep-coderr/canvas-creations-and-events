@@ -10,6 +10,8 @@ import {
 } from "@/lib/enquiry-status";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { VerdictBadge } from "@/components/admin/visitor-info";
+import { checkEmailDomains, loadVisitorIndex, viewVisitor } from "@/lib/visitor/admin";
 import { StatusBadge } from "./status-badge";
 
 export const metadata: Metadata = { title: "Enquiries" };
@@ -21,6 +23,10 @@ interface EnquiryListRow {
   event_date: string | null;
   status: EnquiryStatus;
   created_at: string;
+  email: string | null;
+  phone: string | null;
+  message: string;
+  meta: unknown;
 }
 
 export default async function AdminEnquiriesPage({ searchParams }: PageProps<"/admin">) {
@@ -32,7 +38,7 @@ export default async function AdminEnquiriesPage({ searchParams }: PageProps<"/a
   const supabase = await createClient();
   let query = supabase
     .from("enquiries")
-    .select("id, name, event_type, event_date, status, created_at")
+    .select("id, name, event_type, event_date, status, created_at, email, phone, message, meta")
     .order("created_at", { ascending: false })
     .limit(200);
   if (status) query = query.eq("status", status);
@@ -43,7 +49,14 @@ export default async function AdminEnquiriesPage({ searchParams }: PageProps<"/a
   ]);
   if (error) console.error("[admin] enquiry list failed", { code: error.code });
 
-  const enquiries = (data ?? []) as EnquiryListRow[];
+  const rows = (data ?? []) as EnquiryListRow[];
+  // "Looks real / Check this / Likely spam" (enquiries from a chat are judged in the chat).
+  const index = rows.some((r) => r.meta) ? await loadVisitorIndex(supabase) : null;
+  if (index) await checkEmailDomains(index, rows.filter((r) => r.meta).map((r) => r.email));
+  const enquiries = rows.map((r) => ({
+    ...r,
+    visitor: index ? viewVisitor(index, { kind: "e", id: r.id, meta: r.meta, contact: r.email ?? r.phone, phone: r.phone, text: r.message }) : null,
+  }));
   const counts = new Map<string, number>();
   for (const row of allStatuses ?? []) counts.set(row.status, (counts.get(row.status) ?? 0) + 1);
   const total = allStatuses?.length ?? 0;
@@ -108,7 +121,10 @@ export default async function AdminEnquiriesPage({ searchParams }: PageProps<"/a
                 className="flex flex-col gap-2 px-4 py-4 transition-colors hover:bg-accent sm:flex-row sm:items-center sm:gap-6 sm:px-6"
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold">{e.name}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="truncate font-semibold">{e.name}</span>
+                    <VerdictBadge assessment={e.visitor?.assessment} quietWhenReal />
+                  </span>
                   <span className="block text-sm text-muted-foreground">
                     {[e.event_type, e.event_date && formatEventDate(e.event_date)]
                       .filter(Boolean)

@@ -4,13 +4,17 @@ import { Reveal } from "@/components/motion/reveal";
 import { Eyebrow } from "@/components/shared/eyebrow";
 import { sortedCategories, type Category } from "@/data/categories";
 import { categoriesSection, type CategoriesCopy } from "@/data/home";
+import { Balloon } from "./balloon";
+import { BALLOON_TONES } from "./balloon-tones";
 import { SlotItem, type ItemSlots } from "./item-slots";
 
 /**
- * Typographic list of the kinds of celebrations the studio styles. Renders
- * nothing until verified categories exist in src/data/categories.ts.
- * Wraps instead of scrolling sideways, so every item stays visible and no
- * horizontal overflow is possible.
+ * The kinds of celebrations the studio styles, as a balloon garland: one
+ * balloon per category, each with its name on a hanging tag, bobbing gently.
+ * A balloon opens the gallery showing that category. Renders nothing until
+ * categories exist. On large screens the balloons rise in an arc (the
+ * middle ones highest); below that they wrap into a grid, so nothing
+ * scrolls sideways.
  */
 export function CategoryStrip({
   categories = sortedCategories,
@@ -22,34 +26,43 @@ export function CategoryStrip({
   itemSlots?: ItemSlots<Category>;
 }) {
   if (categories.length === 0 && !itemSlots?.after) return null;
+  const n = categories.length;
 
   return (
-    <Section aria-labelledby="categories-title" className="py-16 sm:py-20 lg:py-24">
+    <Section id="what-we-style" aria-labelledby="categories-title" className="overflow-clip py-16 sm:py-20 lg:py-24">
       <Container className="text-center">
         <Eyebrow data-sk="home.categoriesEyebrow">{copy.eyebrow}</Eyebrow>
-        <h2
-          id="categories-title"
-          data-sk="home.categoriesTitle"
-          className="mt-4 font-display text-display-md font-title"
-        >
+        <h2 id="categories-title" data-sk="home.categoriesTitle" className="mt-4 font-display text-display-md font-title">
           {copy.title}
         </h2>
-        <Reveal>
-          {/* Spacing, not separators: a separator can't be kept off the
-              start of a wrapped line. Stacked on phones, wrapped row above. */}
-          <ul className="mx-auto mt-10 flex max-w-4xl flex-col items-center gap-y-3 sm:mt-12 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-12 sm:gap-y-4">
-            {categories.map((category) => (
+        <ul className="mx-auto mt-12 grid max-w-5xl grid-cols-2 items-start justify-items-center gap-x-4 gap-y-10 sm:mt-14 sm:grid-cols-3 sm:gap-y-12 lg:flex lg:justify-center lg:gap-x-4 xl:gap-x-8">
+          {categories.map((category, i) => {
+            // The arc: 0 at the ends, 1 in the middle (large screens only).
+            const arc = n > 2 ? Math.sin((Math.PI * i) / (n - 1)) : 1;
+            return (
               <li
                 key={category.id}
-                className="font-display text-display-sm text-foreground/90 italic"
+                className="lg:mt-[calc((1-var(--arc))*3.5rem)]"
+                style={{ "--arc": arc.toFixed(3) } as React.CSSProperties}
               >
-                <SlotItem slots={itemSlots} item={category}>
-                  {category.label}
-                </SlotItem>
+                {/* Each balloon floats up into place as the garland scrolls in. */}
+                <Reveal className="balloon-rise">
+                  <Balloon
+                    categoryId={category.id}
+                    tone={BALLOON_TONES[i % BALLOON_TONES.length]}
+                    index={i}
+                    href={itemSlots ? undefined : "/#gallery"}
+                    label={
+                      <SlotItem slots={itemSlots} item={category}>
+                        {category.label}
+                      </SlotItem>
+                    }
+                  />
+                </Reveal>
               </li>
-            ))}
-          </ul>
-        </Reveal>
+            );
+          })}
+        </ul>
         {itemSlots?.after}
       </Container>
     </Section>

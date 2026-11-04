@@ -17,7 +17,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
  * browser and the device's settings; we only ask for a normal, non-silent one.
  */
 
-export type PushKind = "enquiry" | "reminder" | "review";
+export type PushKind = "enquiry" | "reminder" | "review" | "chat";
 
 export interface PushPayload {
   title: string;
@@ -166,7 +166,7 @@ export async function notifyNewReview(review: { id: string; name: string; rating
   try {
     const result = await pushToAdmins("review", {
       title: review.canPublish ? "New review" : "New feedback",
-      body: `${"★".repeat(review.rating)}${"☆".repeat(5 - review.rating)} · ${review.name}\n${
+      body: `${review.rating} out of 5 stars · ${review.name}\n${
         review.canPublish ? "Tap to approve or hide it." : "Private feedback — tap to read it."
       }`,
       url: "/admin/reviews",
@@ -176,6 +176,31 @@ export async function notifyNewReview(review: { id: string; name: string; rating
   } catch (error) {
     console.error("[push] new review alert failed", {
       reviewId: review.id,
+      message: error instanceof Error ? error.message.slice(0, 120) : "unknown",
+    });
+  }
+}
+
+/** "New chat" / "New chat message" — the name only; the words stay in the admin. */
+const CHAT_ALERT_TITLES = {
+  new: "New chat",
+  message: "New chat message",
+  details: "Quote details received",
+  accepted: "Quote accepted",
+} as const;
+
+export async function notifyChat(chat: { conversationId: string; name: string | null; kind: keyof typeof CHAT_ALERT_TITLES }) {
+  try {
+    const result = await pushToAdmins("chat", {
+      title: CHAT_ALERT_TITLES[chat.kind],
+      body: `${chat.name ?? "A visitor"}\nTap to open the chat.`,
+      url: `/admin/chats?c=${chat.conversationId}`,
+      tag: `chat-${chat.conversationId}`,
+    });
+    console.info("[push] chat alert", { conversationId: chat.conversationId, sent: result.sent, failed: result.failed });
+  } catch (error) {
+    console.error("[push] chat alert failed", {
+      conversationId: chat.conversationId,
       message: error instanceof Error ? error.message.slice(0, 120) : "unknown",
     });
   }

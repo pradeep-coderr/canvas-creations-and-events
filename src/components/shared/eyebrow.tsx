@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 export function Eyebrow({ className, ...props }: React.ComponentProps<"p">) {
   return (
     <p
+      data-eyebrow=""
       className={cn(
         "font-sans text-eyebrow font-semibold text-emphasis uppercase",
         className,

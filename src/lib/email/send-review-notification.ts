@@ -4,6 +4,7 @@ import { site } from "@/data/site";
 import { formatDateTime } from "@/lib/datetime";
 import type { Review } from "@/lib/review";
 import { getEmailConfig } from "./config";
+import { escapeHtml } from "./html";
 
 /*
  * "New review" email to the business (same Resend settings as enquiries).
@@ -16,21 +17,14 @@ const colour = { text: "#302a29", muted: "#756a67", accent: "#9b605a", surface: 
 const fontSerif = "Georgia, 'Times New Roman', serif";
 const fontSans = "Arial, Helvetica, sans-serif";
 
-const escapeHtml = (value: string) =>
-  value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 const singleLine = (value: string) => value.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
-export const starsText = (rating: number) => "★".repeat(rating) + "☆".repeat(5 - rating);
+export const starsText = (rating: number) => `${rating} out of 5 stars`;
 
 export function buildReviewNotification(id: string, review: Review, receivedAt: Date, adminUrl: string) {
   const kind = review.canPublish ? "review" : "private feedback";
   const subject = `New ${kind} from ${singleLine(review.name)} (${review.rating}/5)`;
   const rows: [string, string][] = [
-    ["Rating", `${starsText(review.rating)} (${review.rating} of 5)`],
+    ["Rating", starsText(review.rating)],
     ["Name", review.name],
     ...(review.email ? [["Email", review.email] as [string, string]] : []),
     ...(review.eventType ? [["Event", review.eventType] as [string, string]] : []),

@@ -5,6 +5,7 @@ import { PanelTop, SlidersHorizontal } from "lucide-react";
 import { isStyleKey, sectionAttrs } from "@/lib/styles/schema";
 import type { HomeSectionKey } from "@/components/home/home-sections";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Sheet,
@@ -35,6 +36,42 @@ import { EditorMediaField } from "./editor-media";
  * server action. In preview, the wrapper disappears; sections a visitor
  * wouldn't see (nothing published) are hidden.
  */
+
+/** The hero panel's background: a chosen photo (or, with none, the animated glow), and whether it's shown. */
+function BackgroundFields() {
+  const editor = useEditor();
+  const id = useId();
+  const show = editor.value("home", "showBackground") !== false;
+  return (
+    <fieldset className="grid gap-4 border-t border-border pt-5">
+      <legend className="text-sm font-semibold">Background</legend>
+      <p className="-mt-2 text-xs text-muted-foreground">
+        Behind the hero and “The studio”: a soft animated glow in the brand colours, or a blurred photo if you choose one. It
+        shows on the page once saved.
+      </p>
+      <div className="flex items-center gap-3">
+        <Checkbox
+          id={id}
+          checked={show}
+          onCheckedChange={(checked) => editor.setDraft("home", "showBackground", checked === true)}
+        />
+        <label htmlFor={id} className="text-sm">
+          Show the background
+        </label>
+      </div>
+      {show && (
+        <EditorMediaField
+          scope="home"
+          field="backgroundImageId"
+          label="Photo"
+          use="hero"
+          emptyText="No photo chosen: the animated glow is shown."
+          hint="A wide, calm photo works best: it's blurred and softened behind the text."
+        />
+      )}
+    </fieldset>
+  );
+}
 
 /** One labelled control bound to an editor draft. */
 function PanelField({ def }: { def: EditableField }) {
@@ -131,7 +168,8 @@ function SectionPanel({
   const editor = useEditor();
   const scopes = [...new Set(def.fields.map((f) => f.scope))];
   const photoField = section === "hero" ? "heroImageId" : section === "about" ? "imageId" : null;
-  const extraFields = photoField ? [photoField] : [];
+  // The hero panel also sets the background photo behind the hero and "The studio".
+  const extraFields = [...(photoField ? [photoField] : []), ...(section === "hero" ? ["backgroundImageId", "showBackground"] : [])];
   // The scope the photo fields belong to (the section's own record).
   const ownScope = section === "about" ? "about" : "home";
   // This section's style presets: its own, its texts', and its list's parts.
@@ -194,6 +232,7 @@ function SectionPanel({
               }
             />
           )}
+          {section === "hero" && <BackgroundFields />}
           {def.styleKeys && def.styleKeys.length > 0 && (
             <fieldset className="grid gap-4 border-t border-border pt-5">
               <legend className="text-sm font-semibold">

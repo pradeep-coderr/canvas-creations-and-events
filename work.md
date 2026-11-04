@@ -4017,3 +4017,1185 @@ The owner asked for a better sign-in UI: a show/hide password button, "Forgot pa
 - **Fix:** a send failure (5xx), a sending limit (429) or an unreachable server now shows "We couldn't send a code just now. Please wait a minute and try again." This reveals nothing about whether the account exists.
   - A failed **resend** keeps the code step, since the earlier code still works, and shows the message there.
   - Tested by stopping the local auth service: step 1 stays, with the message.
+
+## Phase 28 — Small site changes and the website chat
+
+Work done 3–19 Oct 2026. It is not committed yet: the owner reviews the code first. (Three commits made without asking were undone with `git reset --mixed HEAD~3`; from now on nothing is committed or pushed without the owner's yes.)
+
+The chat was designed first as a clickable mock-up in an Artifact canvas, https://claude.ai/artifact/QrTCR4iZxvnq8zgwRN7qAY: the widget, the inbox, and the Round 1 ideas.
+
+### Small site changes (owner's list, kept small on purpose)
+
+- **Footer social icons:** solid brand shapes in brand colours (`components/shared/social-icon.tsx`).
+- **Admin ↔ website switch:**
+  - the admin header has "View website";
+  - the site header has a **Login** button, or **Admin** when signed in (`components/layout/admin-switch.tsx`); both are the same size.
+- **Labels:** the nav says "About us" and "Contact us". This was also updated in the live database.
+- **About image:** uses the hero's plain CC monogram.
+- **Hero contact:** "Prefer to talk?" became an email link with the subject "Enquiry from the website". The phone number stays in the footer, the Contact section and the mobile call button.
+- **Background photo:**
+  - one blurred ballroom photo (Max Titov, Unsplash License, `public/images/backgrounds/blush-ballroom.jpg`) behind the hero and "The studio";
+  - a soft wash keeps the text and design in front (`components/shared/background-photo.tsx`). The default wash applies only when no custom wash is given, which fixed a double wash on The studio.
+- **Hero heading:**
+  - "Canvas Creations and Events" sits above "Turning moments into masterpieces";
+  - the business name is larger than the headline, and stays on one line on phones.
+- **Dev fixes:**
+  - the service worker no longer caches on dev hosts, because it served stale dev chunks (`public/sw.js`, `DEV_HOST`, VERSION v3);
+  - the "fetch failed" errors came from local Supabase/Docker being stopped.
+
+### Website chat: what it is
+
+- **A draggable chat button** on every site page (`components/chat/chat-widget.tsx`):
+  - it snaps to the nearest edge;
+  - it is hidden while the chat is open (close it with ×).
+- **A menu bot with no AI.** Answers come from the site's own content and FAQs (`lib/chat/bot.ts`, `lib/chat/knowledge.ts`, `lib/chat/context.ts`):
+  - **Starter chips:** Plan my event, What we style, Pricing & packages, Check a date, Talk to the team.
+  - **Typed questions:** matched to topics (location, price, dates, styles and more) and to published FAQs, plural tolerant.
+  - **It is never silent:** "what?" or "ok" gets CLARIFY or ACK, and repeated misses get STILL_UNSURE with a way to reach the team.
+  - **Mock starting price: $350** (`MOCK_PRICE_FROM`). This must be replaced with the real price.
+- **"Plan my event":** a guided flow through occasion → date → guests → venue → theme → budget.
+  - Each step offers answer chips; the date step adds a date picker and "Use this date".
+  - Typing in the box answers the current question too.
+  - It ends with a summary and asks for contact details.
+- **Contact details are asked only when needed:** a quote, a date check, or talking to the team. Name, plus an email or phone, plus an optional date.
+- **Bot answers aren't stored:** they're rebuilt the same way from the message history and the current site content (`botReplies`), so the admin sees exactly what the visitor saw.
+- **The bot steps back:** once the team replies it goes quiet. Each chat has a **Bot on/off** switch, and system messages record `bot_off` / `bot_on`.
+- **Visitor side:**
+  - "Seen" on their messages;
+  - an Away note when the team is offline;
+  - day separators, a "new messages" pill, and a message box that grows as they type;
+  - polling every 4 s while open and every 30 s while minimised.
+
+### Database (`supabase/migrations/20261018090000_chat.sql`, not yet applied live)
+
+- **Tables:**
+  - `chat_conversations`: token hash, status, name, contact, date, topic, unread counts, read and seen times, preview, alert and email throttles;
+  - `chat_messages`: sender visitor/team/system, plus `choice`, `kind` and `plan_step`;
+  - `chat_settings` (Online/Away);
+  - `chat_quick_replies` (5 starters).
+- **Visitors never touch the tables.** They use SECURITY DEFINER RPCs keyed by a SHA-256 hash of a token kept in their browser: `chat_send`, `chat_share_contact`, `chat_fetch`.
+- **Admins** work through RLS with column grants. Realtime is on for the inbox.
+- **Spam limits:**
+  - 30 messages per 10 min, and 500 per chat;
+  - 300 new chats per hour;
+  - 3 contact shares per 10 min;
+  - alerts at most once per 10 min per chat.
+- **Create enquiry from a chat:**
+  - `enquiries.source` (website/chat) and `enquiries.chat_id` (one enquiry per chat);
+  - chat enquiries need an email **or** a phone;
+  - **website form enquiries still need an email** (`enquiries_website_email_check`).
+- **Push:** `push_subscriptions.notify_chats`; `push_targets` handles kind `chat`.
+
+### Admin: Chats tab (`/admin/chats`)
+
+- **List:** search (name, contact, message), filters (Open / Unread / Closed with counts) and unread badges, including on the admin nav.
+- **Live updates:** Realtime (`setAuth` before subscribing, otherwise payloads arrive empty), plus a toast, a chime and the unread count in the tab title.
+- **Online/Away switch.**
+- **Conversation:**
+  - reply status: Seen / Sent by email / Delivered;
+  - "Bot answer" labels; plan answers labelled by step; day separators;
+  - Mark unread; Close/Reopen; Delete (with confirmation); Bot on/off.
+- **Reading:** a chat counts as read only while it's really on screen, so "Seen" is honest.
+- **Quick replies** (`quick-replies.tsx`):
+  - fill in `{name}` and `{date}`, and leave `[brackets]` for you to edit;
+  - a row of chips on wider screens, a sheet on phones;
+  - an "Edit list" manager (add, edit, reorder, delete).
+- **Email fallback:** if the visitor has left and gave an email, a reply also goes by email ("You have a reply"), at most once per 15 min (`lib/email/send-chat-reply.ts`).
+- **Details:** name, contact, date, topic, started, and the **Event plan**.
+- **Create enquiry / View enquiry:**
+  - fills name, email or phone, event type (from the occasion), date, venue, and a message with guests, theme, budget and the visitor's last 8 typed messages;
+  - the enquiry appears in Enquiries and on the Calendar;
+  - the enquiry page shows "From: A website chat (open it)", and "Call {phone}" when there's no email.
+- **Responsive (19 Oct, owner: "admin chat is not responsive"):**
+  - **Phone header:** back, name, Bot on/off, ⓘ Details, and a ⋯ menu (Mark unread, Close chat, Delete chat). The avatar is hidden so the name fits.
+  - **Tablet/laptop:** Bot, Close and Delete as buttons; Mark unread in ⋯ until very wide screens (2xl).
+  - **Details below xl:** they open in a right-hand sheet, with the same content as the desktop side panel.
+  - **Layout:** bubbles take 85% of the width on phones; the reply box starts at one line.
+  - **Checked:** at 390, 820, 1100 and 1440 px, with no sideways scroll.
+- **Settings:** a "Website chats" push-notification preference.
+
+### Live password reset fixed (19 Oct 2026)
+
+- The owner reports that a password reset on the live site now succeeds: the code email arrives and the new password is saved. This closes the Phase 27 note "Reset emails that never left" (Supabase SMTP 500).
+
+### Code review and fixes (19 Oct 2026)
+
+A read-only review in four parts: the migration, the visitor chat, the admin inbox, and the site changes. It found no high-severity bugs. Every finding below was checked against the code, then fixed and tested.
+
+**Database (`20261018090000_chat.sql`)**
+- **Per-visitor limits (owner approved):**
+  - at most **20 new chats an hour from one connection**; the site-wide cap went from 300 to 1000;
+  - at most **5 new hand-overs an hour** from one connection;
+  - push alerts stop once there are more than **60 new hand-overs an hour** across the site (the chats still reach the inbox).
+  - **How it works:**
+    - the server action passes the visitor's IP plus a server key, `CHAT_SERVER_KEY`, which the database stores only as a hash in `private.chat_server_key`;
+    - `private.chat_client` hashes the IP into `chat_conversations.client_hash`, which admins can't see;
+    - a direct API call without the key is counted by its own connection;
+    - with no key set, there are no per-visitor limits, only the site-wide ones.
+- **`chat_share_contact`:**
+  - rejects an empty name or contact;
+  - a multi-line or very long date answer becomes one line of at most 60 characters, so it no longer blocks the hand-over;
+  - records `handed_over_at`.
+- **`chat_send`:** two first messages at the same moment (a double tap) now go into one chat, with no error.
+- **`chat_fetch`:** also re-sends the last minute's messages, so a reply that commits late is never skipped; the chat drops duplicates.
+- **Website form:** the "Public can submit new enquiries" policy now also requires `source = 'website'` and `chat_id is null`, so a signed-in non-admin can't create chat enquiries.
+
+**Visitor chat (`chat-widget.tsx`, `lib/chat/actions.ts`)**
+- **Opening the chat:** the button opens on a normal click, so screen readers, switch access and the keyboard all work; a drag no longer counts as a tap.
+- **Focus:**
+  - opening the chat moves focus into it (the close button on phones, so the keyboard doesn't pop up);
+  - on phones, Tab stays inside the chat; Escape closes it from anywhere inside.
+- **Sending:**
+  - a message that was saved but couldn't be refreshed no longer says "That didn't send"; the chat checks again 1.5 s later;
+  - a background check is skipped while a send is on its way;
+  - a waiting bubble is replaced by its saved copy, so nothing shows twice;
+  - a typed message that fails goes back into the box.
+- **After hand-over:** when the bot is back on and asks for details again, the visitor sees "We have your details… Update my details" instead of an empty dead end.
+- **Smaller fixes:**
+  - the button stays on screen after a resize or rotation;
+  - polls with nothing new don't re-render;
+  - the date picker's earliest date is the visitor's own today (it used UTC).
+
+**Admin (`chats/actions.ts`, `inbox.tsx`, `quick-replies.tsx`, `send-chat-reply.ts`)**
+- **Create enquiry:**
+  - the date from the contact form wins over the plan's answer, so "Not sure yet" plus a later date gives that date;
+  - each quoted message is shortened to 200 characters, and the oldest are dropped first, so the newest always fit in 2000.
+- **"You have a reply" email:**
+  - the 15-minute slot is claimed in one database step, so two quick replies can't both send;
+  - if the email fails, the slot is given back, and the chat never shows "Sent by email";
+  - `sendChatReplyEmail` now returns whether the email went.
+- **Read state:** opening a chat marks it read only up to the newest message on screen (`setChatRead(…, upTo)`).
+- **Realtime:**
+  - each visit gets its own channel topic, so a channel still closing from a previous visit is never reused;
+  - the chime and toast are for typed messages, not menu taps.
+- **Errors:**
+  - an Online/Away failure shows an error;
+  - saving a quick reply that was deleted elsewhere says so;
+  - a `$` in a name is filled in as typed.
+- **Unread badge:** replying refreshes the admin layout.
+
+**Site and shared**
+- **Search box:** "Clear search" keeps focus in the box.
+- **Service worker:** on dev hosts, a new worker takes over at once (`skipWaiting`), so an old worker can't keep serving stale dev code.
+- **Login/Admin button:** it updates when the page is shown again (`pageshow`, `visibilitychange`), for example after signing in in another tab.
+- **Background photo:** it requests `sizes="50vw"`, because it's blurred anyway, and no longer competes with the hero's image (no `fetchPriority`).
+- **Settings:** a failed load of notification preferences is logged, because it usually means the database is behind the code.
+
+**Tests (local, dev server + local Supabase)**
+- **Database: 9/9**
+  - the 21st new chat from one visitor is refused, and another visitor still gets in;
+  - a wrong key can't claim someone else's IP;
+  - a double tap gives one chat;
+  - an empty name or contact is rejected;
+  - a long multi-line date is stored as one clean line;
+  - the fetch overlap works;
+  - anon can't insert a "chat" enquiry.
+  - The website form, with its real columns, still saves with source "website".
+- **Browser: 10/10**
+  - **Phone:** a screen-reader click opens the chat; focus moves to the close button; 25 Tab / Shift+Tab presses stay inside; Escape closes and focus returns to the button; Enter opens it.
+  - **Chat flow:** no duplicate bubble; after bot off → on, "We have your details" appears, and "Update my details" shows the form.
+  - **Admin:** the inbox goes Live, and Create enquiry works.
+- **Enquiry check:** with a plan date of "Not sure yet" and the contact-form date "14 March 2027", the enquiry date is 2027-03-14. The message was 1,657 characters and kept messages 3–10.
+- **Migration:** the whole file runs cleanly from scratch, checked in a rolled-back transaction on the local database.
+- **Build:** the production build compiles; lint and type-check pass.
+- **Not tested locally:** the email-claim race and the email fallback, because it would send a real email; the code was read and type-checked.
+
+### More quick replies (owner's request, 19 Oct 2026)
+
+- **15 starter replies** (the seed in `20261018090000_chat.sql`), in the order a chat usually goes:
+  - Welcome
+  - Need details
+  - Date is free
+  - Date taken
+  - Starting price
+  - Quote coming
+  - Quote sent
+  - Venue photo
+  - Inspiration
+  - Deposit
+  - Booking confirmed
+  - Setup time
+  - Follow-up
+  - Call you?
+  - Thanks
+- **New placeholder `{price}`:** filled with the website's starting price (now the mock $350); `{name}` and `{date}` work as before, and `[brackets]` are left to edit.
+- **Desktop and tablet:** the first 4 replies show as buttons above the reply box. **All replies (15)** opens a list with search and an "Edit list" link.
+- **Phones:** the quick-replies sheet now has a search box.
+- **Manager dialog:** it scrolls when the list is long, and it explains `{price}`.
+- **Code:** `chats/quick-replies.tsx` (`QuickReplyList`, `ROW_COUNT`, `fillQuickReply(..., priceFrom)`); `inbox.tsx` passes `ctx.priceFrom`.
+- **Local database:** the 5 old starters were replaced with the 15.
+- **Live:** the seed runs with the chat migration. The owner can edit, reorder or delete any reply in Edit list. Check the [deposit], [when] and [2 to 3 hours] wording first.
+- **Tested** on desktop and phone:
+  - the row shows Welcome, Need details, Date is free, Date taken, then "All replies (15)";
+  - searching "price" finds "Starting price", and picking it fills "Our packages start from $350…";
+  - the phone sheet lists all 15, with search;
+  - type-check and lint pass.
+
+### Quotes in chat (owner's request, 19 Oct 2026)
+
+The owner chose "both: form, then quote". When a visitor wants a quote, the team sends a quote form, then a quote the visitor can accept, all inside the chat.
+
+**Flow**
+1. **Admin → Chats → Quote → Send quote form.**
+   - A "Quote details" form appears in the visitor's chat: occasion (with suggestions), date (empty = not sure), guests, budget, venue, and colours or theme.
+   - If the chat has no contact details yet, it also asks for their name and email or phone.
+2. **The visitor fills it in:**
+   - the answers arrive as a "Quote details" card;
+   - the Details panel's Event plan, the chat's date and its topic all update;
+   - the team gets a push alert ("Quote details received").
+3. **Admin → Quote → Create a quote…** (`QuoteDialog`):
+   - line items (up to 15), with a live total, an optional deposit and an optional note;
+   - a new quote starts from the last one, and "Send a new quote" replaces the earlier one.
+4. **The visitor sees "Your quote"** (items, total, deposit, note) with:
+   - **Accept quote**, which needs a confirm step ("Accept this quote for $550.50?");
+   - **Ask a question**, which puts the cursor in the message box.
+5. **Accepting:**
+   - shows "Accepted" on both sides, and "Accepted the quote · $550.50" in the inbox;
+   - the Details panel shows Quote: total, deposit and status;
+   - the team always gets a push alert ("Quote accepted").
+6. **Create enquiry** now includes the quote form's answers (newer than the plan's) and the quote: its items, total, deposit, and whether it was accepted.
+
+If the visitor has left the site and gave an email, quotes and quote forms are always emailed ("You have a reply"), skipping the 15-minute gap.
+
+**Database (`20261018090000_chat.sql`, "Quotes in chat")**
+- `chat_messages.data jsonb` (an object, at most 8 KB).
+- `kind` now also covers `quote_form` and `quote` (team), and `quote_details` and `quote_accept` (visitor).
+- The admin insert policy allows a team quote form, or a quote with items and a total.
+- **`chat_quote_details(token, body, details)`:**
+  - only the six known fields, each one line of at most 100 characters;
+  - only after the team has sent a quote form;
+  - the message limits apply, and the alert is throttled to once per 10 minutes.
+- **`chat_quote_accept(token, quoteId)`:**
+  - only the chat's own latest quote (an older one gets "replaced");
+  - accepting twice adds nothing;
+  - it always alerts.
+- `chat_fetch` returns `data`.
+
+**Code**
+- **Shared:** `lib/chat/quote.ts` (schemas, `money`, `asQuote`, `asQuoteDetails`, message texts).
+- **Visitor:**
+  - `components/chat/chat-quote.tsx` (`QuoteFormCard`, `QuoteOffer`);
+  - `chat-widget.tsx` (quote items, `sendQuoteDetails`, `accept`);
+  - `lib/chat/actions.ts` (`submitQuoteDetails`, `acceptQuote`).
+- **Admin:**
+  - `chats/quote-tools.tsx` (`QuoteMenu`, `QuoteDialog`, `QuoteCard`, `QuoteDetailsCard`, `QuoteAccepted`);
+  - `chats/actions.ts` (`postTeamMessage` shared by replies and quotes, `sendQuoteForm`, `sendQuote`, quote lines in Create enquiry);
+  - `inbox.tsx` (quote messages, Quote button, Details → Quote);
+  - `page.tsx` (selects `data`).
+- **Bot and alerts:** `lib/chat/knowledge.ts` (the bot ignores quote messages); `lib/chat/bot.ts` (`ChatEvent` kinds, `ChatMessage.data`); `lib/push/server.ts` (alert titles).
+- **Phones:** in the admin reply bar, Send is just an arrow, so the reply box has room next to the quick-reply and Quote buttons.
+
+**Tests (local)**
+- **End to end, two browsers (visitor on a phone, admin on desktop): 17/17**
+  - **Quote form:** sent, and appears with name/contact fields; an empty form shows errors; the details are saved, with the chat's name, contact, date (Sat 8 May 2027) and topic updated; the form then shows "details sent".
+  - **Quote:** the admin sees the details card and Event plan; an empty quote shows errors; the live total is $550.50; the quote is saved.
+  - **Accepting:** the visitor sees the card, confirms and accepts; there is exactly one acceptance in the database; the admin sees "Accepted the quote · $550.50".
+  - **Enquiry:** Birthdays, 2027-05-08, Elizabeth Park hall, and the message includes "Quote (accepted in the chat)", the total and the guests.
+- **Database: 8/8**
+  - details are refused before any quote form, with an unknown field, or with a multi-line field;
+  - "Not sure yet" doesn't set a date;
+  - a replaced quote can't be accepted, and neither can another visitor's;
+  - a second accept changes nothing;
+  - anon can't post a quote directly.
+- **Phone admin:** no sideways scroll.
+- **Migration:** the whole file runs cleanly from scratch (rolled back).
+- **Build:** type-check, lint and the production build pass.
+
+### Visitor info: real or spam? (owner's request, 20 Oct 2026)
+
+The owner chose "everything + privacy page" and city-level location. Every chat and website enquiry now records a few facts about the visit. The admin sees **Looks real / Check this / Likely spam**, with the reasons. Nothing is hidden or deleted automatically.
+
+**What's recorded** (`meta` on `chat_conversations` and `enquiries`)
+- **From the host (Vercel headers), on the server:** country, state and city; the connection's time zone.
+- **From the browser's user agent, on the server:** browser, operating system, device type, and a script/automation flag.
+- **Also on the server:**
+  - the browser's language;
+  - a **keyed hash** of the IP, used only to count repeats (the IP itself is never stored).
+- **From the browser:**
+  - screen size, time zone, language and touch;
+  - `navigator.webdriver`;
+  - first page and the page they wrote from;
+  - the outside referrer and UTM tags;
+  - pages viewed and time on site this visit (`sessionStorage`, this tab only, via `VisitTracker` in the site layout);
+  - seconds from starting to sending, and keystrokes vs pastes in the message box.
+- **Signed:** the server signs the record with an HMAC using `CHAT_SERVER_KEY`. A record written straight to the database fails the check and shows "Not sent through the website". Without the key, info is still recorded but unsigned, with no IP hash.
+- **Chats:** the info comes with the first message only (`chat_send(..., p_meta)`).
+
+**The judgement** (`lib/visitor/assess.ts`)
+- **Spam signs:**
+  - an invalid signature;
+  - `webdriver`, or a headless/script browser;
+  - sent within 3 s of starting (a form never focused counts as 0 s);
+  - 2+ links, or a pasted message with a link and no typing;
+  - the same text from someone else in the last 30 days;
+  - a throwaway email domain;
+  - 5+ others from the same connection in 30 days.
+- **Check signs:**
+  - outside Australia;
+  - a device time zone outside Australia;
+  - one link;
+  - a phone number that isn't Australian;
+  - 2–4 others from the same connection.
+- **Good signs:** in Australia (with the city); 30 s+ on the site; 2+ pages; came from search, social or a campaign link; typed the message.
+- **Verdict:** any spam sign gives Likely spam, any check sign gives Check this, otherwise Looks real.
+
+**Admin**
+- **Enquiries list and chat list:** a badge on rows that are *Check this* or *Likely spam* (Looks real stays quiet).
+- **Visitor panel**, on the chat Details panel/sheet and the enquiry page:
+  - the verdict and its reasons;
+  - location (approximate), device, screen and language, where they came from, first page, the page they wrote from, this visit, time to send, and typed or pasted.
+- **Enquiries made from a chat** show the chat's info.
+- **Older rows** show "No visitor info".
+
+**Privacy**
+- **New page `/privacy`:** what's collected, why, who sees it (Vercel, Supabase, Resend; possibly outside Australia), how long it's kept, and how to see, correct or delete it, with the OAIC mentioned.
+- **Linked from:** the footer, the chat's footer note, a line under the enquiry form, and `sitemap.ts`.
+- **The owner should review the wording.** It isn't legal advice.
+
+**Code**
+- `lib/visitor/assess.ts`: schema, types, `assessVisitor`, `source`, `duration`.
+- `lib/visitor/server.ts`: `buildVisitorMeta`, `verifyVisitorMeta`, `readUserAgent`.
+- `lib/visitor/signals.ts`: `recordPageView`, `createTypingCounter`, `clientSignals`.
+- `lib/visitor/admin.ts`: `loadVisitorIndex` (repeats and copies over 30 days) and `viewVisitor`.
+- `components/admin/visitor-info.tsx`: `VerdictBadge`, `VisitorInfo`.
+- `components/shared/visit-tracker.tsx`.
+- **Wired into:** `chat-widget.tsx`, `lib/chat/actions.ts`, `enquiry-form.tsx`, `lib/submit-enquiry.ts`, `chats/page.tsx`, `chats/inbox.tsx`, `(portal)/page.tsx`, `enquiries/[id]/page.tsx`, `site-footer.tsx`, `sitemap.ts`, `(site)/privacy/page.tsx`.
+- **Migration:**
+  - `chat_conversations.meta`, plus the admin select grant;
+  - `chat_send` gains `p_meta`;
+  - `enquiries.meta`, plus the anon insert grant;
+  - both columns hold an object of at most 4 KB.
+
+**Tests (local, with the Vercel location headers simulated): 12/12**
+- **Real-looking visitor:** an iPhone in Elizabeth, SA, arriving with `utm_source=instagram`, visiting `/privacy` and back, about 40 s on the site, then typing a chat message.
+  - The info is stored and signed, with the IP hashed (the raw IP isn't in the row).
+  - The admin shows **Looks real**: in Australia (Elizabeth, SA), on the site 42 s, 2 pages, came from instagram (spring), typed.
+- **Overseas script:** filled in the enquiry form instantly with 4 links, a mailinator address and a US phone. It shows **Likely spam**: script (HeadlessChrome), 0 s, 4 links, throwaway email, outside Australia, plus a check sign for the device time zone.
+- **Forged enquiry** inserted directly with made-up info: **Likely spam**, "Not sent through the website".
+- **Enquiries list:** both are marked Likely spam; older enquiries show no badge.
+- **Also checked:** the privacy page opens; the migration runs cleanly from scratch (rolled back); lint, type-check and the build pass.
+
+**Going live:** this uses the same `CHAT_SERVER_KEY` as the per-visitor chat limits (Vercel env plus its hash in the database). Without it, records aren't signed and repeats can't be counted. Location only appears on Vercel, never locally (except in tests).
+
+### Fix: "Admin" showed after signing out (owner's report, 20 Oct 2026)
+
+- **Report:** after signing out, "Back to website" showed **Admin** instead of **Login**.
+- **Cause:** `admin-switch.tsx` accepted *any* Supabase login cookie (`sb-*-auth-token`). Cookies ignore the port, so on `localhost` another local project's Supabase login made the site think you were signed in. The sign-out itself worked: no cookie of this project was left behind.
+- **Fix:** only this project's cookie counts. Its name, `sb-<first part of the Supabase host>-auth-token` (or `.0` when split), comes from `NEXT_PUBLIC_SUPABASE_URL`.
+- **Tested:**
+  - signed in → Admin;
+  - signed out → Back to website → Login;
+  - browser back/forward → Login;
+  - with another project's `sb-otherproject-auth-token` cookie on localhost → Login (it showed Admin before the fix);
+  - lint and type-check pass.
+
+### "Save password?" for quick admin sign-in (owner's request, 20 Oct 2026)
+
+- **Sign-in:** after the server accepts the email and password, the page asks the browser to save them (`navigator.credentials.store(new PasswordCredential(...))`, in `lib/admin/save-password.ts`).
+  - **Chrome / Edge / Android:** show "Save password?" (Google Password Manager), so next time the browser fills in the login.
+  - **Safari and Firefox:** don't support that request; they offer to save from the form itself, whose fields are already `autocomplete="username"` and `"current-password"`.
+  - **Never in the way:** it's skipped if unsupported or slower than 1.5 s, and nothing is offered after a wrong password.
+- **How the flow changed:**
+  - `signIn` now returns `{ next }` instead of redirecting; the form offers to save, then goes there (`router.replace`).
+  - The login page's "already signed in → admin" redirect is skipped only during the sign-in form's own request (the `next-action` header), so the form can finish first. Opening `/admin/login` while signed in still goes straight to the admin.
+- **Password reset:**
+  - the new-password step now has a hidden `username` field (the email), so password managers update the right saved login;
+  - after a successful reset, the browser is asked to update the saved password (`setNewPassword` returns `{ done }`, then the page goes to `/admin/login?reset=done`).
+- **Tested** (browser, recording the save request since a headless browser can't show the bubble):
+  - the fields are what password managers expect;
+  - a wrong password shows the error and offers nothing;
+  - the right password asks to save (email + password) once, then opens the requested page (`/admin/chats`), signed in;
+  - opening `/admin/login` while signed in still goes to `/admin`;
+  - lint, type-check and the build pass.
+- **Reset tested end to end** (local auth email briefly on Mailpit, then switched back to Resend), in this order:
+  1. email the code, enter it, and reach step 3 (the hidden username holds the email);
+  2. Save new password → `/admin/login?reset=done`, with "Your password was updated";
+  3. the browser is asked to update the saved password;
+  4. signing in with the new password works.
+- **Owner's report "Cannot read properties of undefined (reading 'set')"** on Save new password: the reset page was open while `password-step.tsx` was being changed, and hot reload kept the old page state. It doesn't happen on a freshly loaded page (the test above); reloading the page fixes it.
+
+### More visitor info (owner's request, 20 Oct 2026)
+
+The owner chose all four extra groups. The Privacy page was updated to match.
+
+**A. Returning visitor and interests**
+- **Visits:** `visits` and `firstSeen` (localStorage `cc-visitor`, this browser), counted once per new tab session.
+- **Pages:** `paths`, the pages viewed this visit (up to 20).
+- **Sections:** `sections`, the home-page sections that came into view (IntersectionObserver on `main section[id]`). A section counts once a third of it shows, or once it fills 40% of the screen, which matters for tall ones like the Gallery.
+- **Labels:** `SECTION_LABELS` names them: The studio, Services, Gallery, Stories, Reviews, About us, FAQ, Contact, Enquiry form.
+
+**B. Behaviour before sending**
+- **Movement:** scroll and mouse bursts (one per 400 / 250 ms) and taps/clicks.
+- **Active time:** active seconds (any activity in the last 15 s while the tab is showing), saved into the visit every 3 s (`trackVisitActivity`, started once by `VisitTracker`).
+- **Enquiry form:**
+  - time per field (`fieldSeconds`, focus/blur on the form);
+  - keystrokes, Backspace/Delete `corrections` and pastes, now counted across the whole form.
+
+**C. Contact checks**
+- **Email:**
+  - the admin page checks that the domain can receive mail (MX lookup, cached for a day per server, 1.5 s limit; `checkEmailDomains` in `lib/visitor/admin.ts`);
+  - a domain that doesn't exist, or has no mail record or a "null MX" (RFC 7505), gives "The email's domain can't receive mail" (spam);
+  - a timeout or DNS error counts as unknown, never as bad.
+- **Phone:** `phoneKind()` gives an Australian mobile, a landline with its states (02 NSW/ACT, 03 VIC/TAS, 07 QLD, 08 SA/WA/NT), 13/1300/1800, or other. Enquiries now check the phone as well as the email.
+
+**D. Device and location**
+- **Phone details:** OS version and phone model, from Chromium's client hints (`getHighEntropyValues`, 0.5 s limit).
+- **Settings:** dark mode, connection type, and Do Not Track / Global Privacy Control.
+- **Location:** postcode (`x-vercel-ip-postal-code`), shown as "Elizabeth SA 5112, AU".
+
+**New signs in the verdict**
+- **Good:**
+  - returning visitor (visit N, first came …);
+  - looked at 2+ of Services/Gallery/Stories/Reviews/About us/FAQ;
+  - corrected their typing;
+  - an Australian mobile;
+  - the email address can receive mail.
+- **Spam:**
+  - no scrolling, mouse, taps or typing at all before sending;
+  - an email domain that can't receive mail.
+- **Wording:** "Typed their message" is now "Typed it in themselves" (it counts the whole form).
+
+**Admin Visitor panel:** new rows for Settings, Visits, Pages, Sections seen, Activity and Time per field. Device shows the model and OS version, and Message shows corrections.
+
+**Tests (local, with the Vercel headers and an Android Pixel 8 simulated): 10/10 in the browser**
+- **Returning visitor:**
+  - visit 4, first seen 12 Oct;
+  - sections Services, Gallery, Reviews (and FAQ, Contact, Enquiry form);
+  - scrolls, mouse and active time counted;
+  - time per field, plus a correction;
+  - Pixel 8 · Android 14 · postcode 5112;
+  - settings recorded.
+  - The admin shows Looks real with the new good signs and details.
+- **Bot:**
+  - no scrolls, mouse or taps;
+  - the admin shows Likely spam: 0 s, no activity, not an Australian phone, a device time zone outside Australia.
+- **Email rule** (checked separately against a public DNS server, because this Windows machine's DNS refuses MX lookups): gmail.com and outlook.com → can receive mail; a made-up domain and example.com (null MX) → can't. On Vercel the system DNS is used.
+- **Build:** lint, type-check and the build pass.
+
+### Admin header redesign (owner's request, 20 Oct 2026)
+
+- **Wide screens (1280 px+):** one row: logo · section tabs (with icons) · View website (icon) · Install app (icon, only when the browser can install it) · **Edit website** · account button.
+- **Laptop and tablet:** logo and actions on the first row, the tabs on a second row aligned with the logo.
+- **Phones:** a compact top row (logo, Install icon, **Edit**, account) and a tab row that scrolls sideways. The current tab is scrolled into view, and a soft fade shows when more tabs are off-screen; the scrollbar is hidden.
+- **Account button** (`components/admin/admin-account-menu.tsx`): a round button with the admin's initials. Its menu shows "Signed in as <email>", **View website** (below 1024 px, where the header has no room for it) and **Sign out** (which says "Signing out…" while it works). This replaces the email text and the separate Sign out button.
+- **Tabs** (`admin-nav.tsx`):
+  - icons: Inbox, MessageCircle, Star, FileText, CalendarDays, Palette, Settings;
+  - the underline sits on the header's bottom border in both layouts;
+  - the Chats unread badge is unchanged.
+- **Header:**
+  - it sticks to the top while scrolling, slightly see-through with a blur;
+  - one tab list in the page (CSS `order` places it in the row or below, never duplicated);
+  - Install app is a round icon button with a tooltip everywhere (`InstallApp compact`).
+- **Chats inbox:** it uses the 44 px the header gives back on wide screens (`xl:h-[calc(100dvh-10.25rem)]`).
+- **Full width (owner's follow-up):** the header spans the whole window with edge padding (16 / 24 / 32 px) instead of the 1200 px content box, so wide screens have no large empty sides. Then the admin pages too (owner's yes): the page content uses the same full width and edge padding as the header (`(portal)/layout.tsx`). Checked at 1900 px: the Enquiries list, an enquiry, Chats, Reviews, Content, Calendar, Design and Settings. Lists, cards, the calendar and the chat inbox use the extra room; the enquiry page keeps its two columns; Settings keeps its own reading width.
+- **Checked at 1440, 1280, 1100, 820 and 390 px:** no sideways page scroll; header 65 px on wide screens, 109 px with two rows, 101 px on phones.
+  - On a phone, the current tab (Calendar) is scrolled into view.
+  - The account menu opens; Sign out goes to `/admin/login`, and admin pages are locked again.
+  - Lint and type-check pass.
+
+### Website header: full width (owner's request, 20 Oct 2026)
+
+- `site-header.tsx`: the public header spans the window with edge padding (16 / 24 / 32 px), like the admin header: logo at the left edge, Login/Admin and Enquire Now at the right, the menu in the middle.
+- **Then the pages too (owner's request):** the shared `Container` (`components/layout/container.tsx`) is full width by default (`max-w-none`) with the headers' edge padding (16 / 24 / 32 px), so every section of the website and the admin lines up with its header. The `narrow` reading width (`max-w-3xl`) is unchanged. **Not yet checked in the browser:** the dev server had stopped.
+- **Checked at 1900, 1100 and 390 px:** no sideways scroll; the phone header is unchanged (logo, Login, Menu).
+
+### Admin Notifications tab (owner's request, 20 Oct 2026)
+
+- **New tab:** **Notifications** (bell icon), after Chats, with a count of new items for this admin (99+ at most).
+- **The feed** (`lib/admin/notifications.ts`) covers the last 30 days, newest first, built from existing tables:
+  - new website enquiries (name, event type and date; enquiries made from a chat are skipped, being the team's own action);
+  - chats where the visitor shared details or asked for the team, sent quote details, or accepted a quote;
+  - new reviews ("5 out of 5 stars");
+  - reminders that are due or overdue and not done.
+- **Each item** links to its enquiry, chat, review list or calendar.
+- **Page** (`/admin/notifications`):
+  - grouped by Today / Yesterday / date, with an icon per kind;
+  - new items are bold, tinted and dotted;
+  - All / New filter, and **Mark all as read**.
+- **Marked as read when the page is opened:** about 1.5 s after opening, and the tab badge clears. Items stay highlighted for that visit.
+- **Read state:**
+  - kept per admin in new table `admin_notification_reads` (migration `20261020150000_admin_notifications.sql`), so it's the same on every device;
+  - RLS: each admin reads and moves only their own marker; update is allowed on `read_at` only, so the action updates first and inserts only on the first visit (an upsert would need to rewrite `user_id`);
+  - before the first visit, the last 7 days count as new.
+- **Tested: 7/7**
+  - the tab shows a count;
+  - the feed lists a test enquiry, a review (5 out of 5 stars) and a due reminder, plus the existing chats and enquiries, grouped under Today and marked new;
+  - opening the page saves the marker and clears the badge;
+  - items link correctly;
+  - no sideways scroll on a phone.
+  - Lint and type-check pass; test data removed.
+
+### Notifications bell in the header (owner's request, 20 Oct 2026)
+
+- **Bell** (`components/admin/admin-notifications-bell.tsx`), between Edit website and the account button, on every screen size:
+  - a count of new notifications on it (99+ at most);
+  - its menu shows the latest 8 (icon, title, detail, time today or the date);
+  - **Mark all as read**, and **View all notifications** (`/admin/notifications`);
+  - opening it reads them, so the count clears while they stay highlighted until it closes;
+  - tapping an item opens its page and closes the menu.
+- **The Notifications tab came back** (owner's follow-up): it's after Chats, without a count, since the count is on the bell. With 8 tabs, the one-row header now starts at 1536 px (`2xl`; it was 1280 px). Below that the tabs get their own row, so all 8 show in full at 1280. The chat inbox's extra height follows the same breakpoint. Checked in a production build at 1900 px: the tabs are 64 px tall and line up with the logo and buttons. (The dev server's live CSS briefly lagged, showing them lower.)
+- **Shared row** (`components/admin/notification-item.tsx`): the bell and the page show items the same way. The `compact` style is for the bell; `notificationDay` gives the groups.
+- **Loading:** the admin layout loads the feed once (`loadNotifications`) for both the count and the menu; `countUnreadNotifications` was removed.
+- **Tested: 6/6**
+  - bell with a count; no tab;
+  - the menu lists a test enquiry and a 4-star review plus the existing items, with View all;
+  - opening it clears the count;
+  - an item opens its enquiry and closes the menu;
+  - on a phone, the header fits and the menu stays on screen.
+  - Type-check and lint pass; test data removed.
+
+### Where the code lives
+
+**Website chat**
+
+| File | What it does |
+| --- | --- |
+| `src/components/chat/chat-widget.tsx` | The visitor's chat: draggable button, window, `PlanAnswers`, `ContactCard`, polling |
+| `src/app/(site)/layout.tsx` | Mounts `<ChatWidget>` with the bot context on every site page |
+| `src/lib/chat/bot.ts` | Choices, labels, greeting, Plan my event steps, schemas, shared types |
+| `src/lib/chat/knowledge.ts` | Typed-question matching, `botReplies`, `botActive`, fallbacks |
+| `src/lib/chat/context.ts` | Server-only: the bot's context from the CMS (categories, price, FAQs, contact, Away) |
+| `src/lib/chat/dates.ts` | Day labels ("Today", "Yesterday", dates) |
+| `src/lib/chat/actions.ts` | Visitor server actions: `fetchChat`, `sendChatMessage`, `shareChatContact` |
+
+**Admin Chats tab**
+
+| File | What it does |
+| --- | --- |
+| `src/app/admin/(portal)/chats/page.tsx` | Loads the list, counts, search, the open chat, quick replies and its enquiry |
+| `src/app/admin/(portal)/chats/inbox.tsx` | The inbox UI (list, conversation, details panel/sheet, toast, Realtime) |
+| `src/app/admin/(portal)/chats/quick-replies.tsx` | Quick-reply picker (row/sheet), manager dialog, `fillQuickReply` |
+| `src/app/admin/(portal)/chats/actions.ts` | Admin actions: see below |
+| `src/app/admin/(portal)/enquiries/[id]/page.tsx` | Email optional; "From" row; "Call {phone}" |
+| `src/app/admin/(portal)/layout.tsx` | "View website" button; unread-chat count for the nav |
+| `src/components/admin/admin-nav.tsx` | Chats tab with its unread badge |
+
+The admin actions are `replyToChat`, `setChatStatus`, `setChatRead`, `deleteChat`, `setChatAway`, `saveQuickReply`, `deleteQuickReply`, `moveQuickReply`, `setChatBot` and `createEnquiryFromChat`.
+
+**Alerts and email**
+
+| File | What it does |
+| --- | --- |
+| `settings/actions.ts`, `settings/page.tsx`, `components/admin/notification-panel.tsx` | The "Website chats" push preference (`notify_chats`) |
+| `src/lib/push/server.ts` | `PushKind` "chat", `notifyChat`; stars as words |
+| `src/lib/email/send-chat-reply.ts` | The "You have a reply" email |
+| `src/lib/email/html.ts` | Shared `escapeHtml` (used by `enquiry-notification.ts` and `send-review-notification.ts` too) |
+| `src/lib/admin/alert-sound.ts` | `playChime` skips repeats within 2 s |
+
+**Site and shared UI**
+
+| File | What it does |
+| --- | --- |
+| `src/components/layout/site-header.tsx`, `admin-switch.tsx` | Login/Admin button |
+| `src/components/layout/site-footer.tsx`, `shared/social-icon.tsx` | Brand social icons |
+| `src/components/sections/hero.tsx`, `intro.tsx`, `shared/background-photo.tsx` | Hero heading and email link; ballroom background on the hero and The studio |
+| `src/components/sections/about-founder.tsx` | CC monogram instead of the full logo on blush |
+| `src/data/site.ts`, `src/data/home.ts` | "About us" / "Contact us" |
+| `src/components/ui/search-input.tsx`, `globals.css`, `media/media-library.tsx`, `media/media-picker.tsx` | `SearchInput` with its own clear button; the native × hidden |
+| `src/components/design/design-controls.tsx` | ✓ → Lucide `Check` |
+| `public/sw.js` | No caching on dev hosts |
+
+### Shared clean-ups
+
+- Icons, not emoji, everywhere:
+  - the browser's native search × is hidden, and `components/ui/search-input.tsx` has its own clear button;
+  - ✓ became the Lucide `Check`;
+  - review stars are written as "X out of 5 stars" in emails and push messages.
+- `lib/email/html.ts`: one shared `escapeHtml` for the enquiry, review and chat emails.
+- `playChime` skips repeats within 2 s.
+
+### Tests (dev server + local Supabase, headless Chrome)
+
+- **Visitor:** drag and snap; menu flows; typed questions; handover; Plan my event end to end.
+- **Admin:**
+  - live inbox and replies; reply preview; Seen both ways; Online/Away; toast;
+  - quick replies; bot switch; delete;
+  - Create enquiry (phone only → Baby showers, 2027-03-20, venue, "From: A website chat");
+  - the responsive layouts above.
+- **Database:**
+  - an anonymous website enquiry without an email is still rejected;
+  - the chat migration dry-runs cleanly from scratch.
+- **Build:** the production build compiles, and lint and type-check pass.
+
+### Before this goes live (ask at each step)
+
+1. The owner reviews, then commits.
+2. Apply the chat migration live **before** pushing the code: `bunx supabase db push --linked`. It also changes `enquiries`. If the code goes first, saving push-notification settings fails until the migration runs.
+3. **Per-visitor chat limits:**
+   - add `CHAT_SERVER_KEY` (a long random value, server only, never `NEXT_PUBLIC_`) in Vercel → Settings → Environment Variables;
+   - store its SHA-256 hash in the live database with `insert into private.chat_server_key (key_hash) values ('<sha256 hex>')`;
+   - until both are set, only the site-wide limits apply;
+   - locally, both are already set (`.env.local` and the local database).
+4. Load the FAQ drafts (10 unpublished drafts), then write the real answers.
+5. Push, then check the live site: chat, push alert on a phone, and the "You have a reply" email.
+
+### Still open
+
+- **Content:** the real starting price (now a mock $350); FAQ answers; deposit wording in the quick replies; the owner photo and story; real photos.
+- **Notification email:** switch to the client's address (`ENQUIRY_NOTIFICATION_EMAIL` → ccandevents2242@gmail.com), give the client an admin account, send team invites.
+- **From the owner's 8-item list, set aside to keep this round small:**
+  - "How it started" in About;
+  - the owner's photo;
+  - "How we make your celebration a masterpiece";
+  - an automatic email to the visitor when they send an enquiry.
+- **Phone test by the owner:** the chat push alert and the "You have a reply" email.
+- **Ideas:**
+  - a rate limiter for login, reset codes and forms;
+  - Search Console sitemap and Google Business Profile;
+  - a list of questions the bot couldn't answer.
+
+## Phase 29 — UI improvements (plan, 20 Oct 2026)
+
+A browser review of the website (1440 px desktop, 390 px phone) and the admin (phone) found nothing broken and no sideways scroll, but these improvements. Done one phase at a time, each checked in the browser and logged here.
+
+**29.1 Layout fixes** (the biggest visible win; partly side effects of the full-width change)
+- **Gallery:** about 6 screens tall on desktop. Use 3–4 columns on wide screens, and "Show more" after 8 photos.
+- **Event stories:** about 8 screens tall; one big photo with an empty right half. Put the text beside the photo, with smaller extra photos.
+- **Reading width:** cap text blocks on very wide screens, and balance the Contact section's two columns.
+- **Chat button:** it covers the footer's Privacy link (desktop) and form fields (phone). Keep it clear of the footer, the mobile bar and forms.
+
+**29.2 Website polish**
+- **Gallery filters:** one swipeable row on phones (they wrap to 3 rows now).
+- **Services:** a featured card while there's only one service.
+- **Reviews:** a slimmer section until the first review is approved.
+- **Hero monogram:** smaller on phones.
+- **Footer contact:** compact, without repeating the Contact section.
+- **FAQ:** add "Still have a question? Chat with us" underneath.
+
+**29.3 Admin polish (phone)**
+- **Enquiry status filters:** one swipeable row (they wrap to 3 rows now).
+- **Design page tabs:** no visible scrollbar.
+- **Calendar:** one compact toolbar (Today, month, Month/Agenda, Add reminder).
+
+**29.4 Accessibility and launch content**
+- **Accessibility:** 31 text items smaller than 12 px and about 11 tap targets smaller than 32 px on a phone; fix these.
+- **Owner's content:** real photos (replacing the samples and the sample notice), the real starting price (now $350), more FAQ answers published, and the owner photo in About.
+
+### 29.1 Layout fixes — done (20 Oct 2026), two checks still to re-run
+
+- **Gallery** (`gallery-preview.tsx`, `gallery-lightbox.tsx`):
+  - "All" shows 8 photos, then **Show all N photos**; a category always shows all of its own photos. The editor shows every photo.
+  - Photos after the first five go four across on very wide screens (2xl).
+  - Desktop height 5194 → 2438 px; phone 2894 → 1880 px.
+- **Event stories** (`event-stories.tsx`, new `components/shared/show-more.tsx`):
+  - the main photo is 4:3 on desktop (it was 4:5), so the text sits beside it;
+  - extra photos go four across;
+  - the first 2 stories show, then **Show all N stories**; the editor shows all.
+  - Desktop height 7583 → 3027 px; phone 4754 → 2601 px.
+- **Contact** (`contact.tsx`): on wide screens (xl+), the heading, then Call · Email · Based in · Follow in one row (no empty middle). Text blocks were already width-capped (headings max-w-2xl, paragraphs max-w-xl).
+- **Chat button:**
+  - while a form field on the page is focused, it fades and steps aside (`pageTyping` in `chat-widget.tsx`), and comes back on blur;
+  - the footer's bottom line has right padding (`pr-24 sm:pr-28 lg:pr-28`), so the button doesn't cover Privacy policy.
+- **Tested (browser): 8/10**
+  - gallery: 8 photos plus Show all; a category shows all of its own; Show all reveals all 21;
+  - stories: 2 plus Show all, which reveals all;
+  - contact details in one row; both sections much shorter.
+- **To re-run:** the footer privacy link (padding fixed after the first run, lg override), and the phone chat button while typing (the code is in place; the dev server seemed to serve an older copy). The re-run was stopped because the computer ran low on memory.
+
+### Content: Neha's founder story in About us (3 Nov 2026)
+
+- The client sent her own About text. It's in the **About** section (`about_content`), with her wording kept as sent:
+  - title "Meet Neha – The Creative Mind Behind Canvas Creations and Events";
+  - 4 paragraphs (who she is; how she started; what makes the studio different; "Your vision inspires us. Our creativity brings it to life.");
+  - founder "Neha, Founder" under the text.
+  - Eyebrow, button and the CC monogram (no portrait yet) are unchanged.
+- **Local database:** the `about_content` row updated by a one-off SQL `update`, not a migration (content belongs to the admin, so a migration would overwrite live edits). The dash and curly apostrophes were checked as stored correctly.
+- **Fallback** `src/data/home.ts` (`about`) has the same text, so a database outage shows the same copy.
+- **Tested:**
+  - the homepage HTML has the new title, all 4 paragraphs and "Neha, Founder";
+  - the old title is gone;
+  - type-check passes.
+- **Live site: not done yet.** Paste the text into Admin > Content > About, or run the same `update` on production (with a yes). No deploy needed for either.
+### Content: Terms & Conditions page (3 Nov 2026)
+
+- New page **`/terms`** (`src/app/(site)/terms/page.tsx`): the client's "Revised Terms & Conditions" PDF (revised 23 October 2026), word for word.
+  - Layout: the intro, a Contents list, the unnumbered "Introduction and application", then sections 1–21 with sub-clauses 5.1–5.4 and the section 11 bullet list.
+  - The text is kept as data in the page (`clauses`), styled like `/privacy`.
+  - Each section has an id (`#section-5` is cancellations), so other pages can link to one clause.
+  - Section 21 adds the real email address from site settings: the PDF says "the official email address published on our website".
+  - **Left out on purpose:** the PDF's closing "Legal review note", which is advice to the business (have a South Australian lawyer review it), not something for customers.
+- **Links:**
+  - footer bottom bar: "Terms & Conditions" beside the privacy link;
+  - `sitemap.ts`;
+  - the chat quote's accept step (`chat-quote.tsx`): "Bookings are made under our Terms & Conditions", opening in a new tab so the chat stays.
+- **Tested:**
+  - `/terms` returns 200, with 21 section ids and its title;
+  - the homepage footer links to it, and the sitemap lists it;
+  - type-check and lint pass.
+  - Not yet checked in a browser (screenshots).
+- **To confirm with the client:**
+  - The terms aren't editable in the admin (they're legal text, changed rarely).
+  - The PDF's own note recommends a lawyer's review before relying on them.
+### Content: Neha's portrait in About us (3 Nov 2026)
+
+- `public/images/founder/neha_about_picture.png`: the client's 2048×2048 PNG, already cut to a circle with transparent corners. It's the About photo **by default**:
+  - `data/home.ts`: `about.image` is set to it, with alt "Neha, founder of Canvas Creations and Events";
+  - `getAboutCopy` (`lib/content/public.ts`) and the editor preview (`admin/editor/page.tsx`) fall back to it when no photo is picked in the admin, the same idea as `DEFAULT_BACKGROUND`. A photo picked in Admin replaces it.
+- **Shape** (`about-founder.tsx`): the About photo is now a circle (square frame, `rounded-full`, transparent background), so her round cut-out fits. Any photo picked later is cropped to a circle to match.
+  - Width: 72% of the screen on phones, 52% on tablets, the column on desktop (max 28rem). Previously it was a 4:5 rectangle.
+- **Tested:**
+  - the homepage serves the photo, as WebP for browsers (about 144 KB at the largest size, smaller on phones);
+  - type-check and lint pass.
+  - Not yet checked in a browser by eye.
+### Tidy: founder photo name and size (3 Nov 2026)
+
+- **Renamed** the portrait to the project's lowercase-with-hyphens naming (README: descriptive kebab-case filenames). It stays in `public/images/founder/`, the folder meant for it.
+  - `neha-founder-portrait.webp`: what the site uses. 1200×1200 WebP (quality 90, transparent corners kept), **134 KB**, down from 3.5 MB. It's displayed at about 450 px at most, so 1200 px is still sharp on high-DPI screens. Browsers receive about 71 KB at the largest size.
+  - `neha-founder-portrait-original.png`: the client's untouched 2048 px file, using the same `-original` naming as `logo/`. It isn't used by the site.
+- `founder/.gitkeep` was removed now that the folder has real files. `data/home.ts` points at the WebP (1200×1200).
+- **README:**
+  - the assets line now lists `backgrounds/` and the `-original` naming rule;
+  - the `about_content` note no longer says the founder details are empty.
+- **Folder review:** `public/` and `src/` match the README layout. Two points to decide later:
+  - `logo/canvas-creations-logo.svg` (1.9 MB, a PNG inside an SVG, not used by the site) could be removed;
+  - each `-original` file (logo 1.4 MB, portrait 3.5 MB) could move out of `public/`, because everything in `public/` is downloadable from the live site.
+- **Tested:** the homepage serves the new WebP (71 KB to browsers); type-check passes.
+### Tidy: originals out of public/, unused SVG removed (3 Nov 2026)
+
+- **New folder `assets/originals/`** (project root, in git but not served): the untouched client files. Everything in `public/` can be downloaded from the live site; these files now can't.
+  - `canvas-creations-logo-original.png` (1.4 MB), moved from `public/images/logo/`;
+  - `neha-founder-portrait-original.png` (3.5 MB), moved from `public/images/founder/`.
+- **Deleted** `public/images/logo/canvas-creations-logo.svg` (1.9 MB, a PNG wrapped in an SVG, not a true vector, and used nowhere). It can be restored from git history if ever needed.
+- **README:** the logo and assets lines now describe `assets/originals/` and no longer list the SVG.
+- **Result:** `public/images` went from about 9.8 MB to 3.0 MB. Only files the site uses are left, plus the empty `gallery/`, `services/` and `videos/` placeholders.
+- **Checked:** nothing in the code referenced the moved or deleted files (only the README); the site's images are unchanged.
+### Design pass: spacing system, hero and About (3 Nov 2026)
+
+The user didn't like the hero or About design, and padding and margins had never been tuned per screen size. Screenshots were taken before and after at 390, 768, 1440 and 1920 (headless Chrome, reduced motion so reveals show their final state).
+
+- **Spacing system** (`globals.css`, new tokens; no per-breakpoint padding needed):
+  - `--gutter: clamp(1.25rem, 0.5rem + 3.2vw, 5rem)`: side padding of about 20px on a phone, 33 tablet, 54 at 1440, 69 at 1920. The old padding was fixed at 16/24/32px, so wide screens felt cramped at the edges.
+  - `--section-y: clamp(4.5rem, 3rem + 4.5vw, 8.5rem)`: section spacing of 72px on a phone, 83 tablet, 113 at 1440, 134 at 1920. It was 80/96/128 in steps.
+  - Where they apply: `Container` uses `px-(--gutter)`, and the site header dropped its own px-* so it lines up. `Section` uses `py-(--section-y)`. The admin keeps its own tighter px-* (unchanged).
+- **Hero** (`hero.tsx`):
+  - **Hierarchy:** one lead. The H1 "Turning moments into *masterpieces*" is now the statement (`clamp(2.5rem, 1.4rem + 4.4vw, 5.5rem)`, balanced lines): 40px on phones (it was 22), about 85px on desktop. The studio name is a smaller rose signature line above it (`text-display-sm`); before, the name was larger than the H1.
+  - **The arch:** the photo, or the CC monogram until one is chosen, sits in a ceremony-arch window (`rounded-t-full`, 4:5) with an offset gold hairline arch behind, reusing the existing hero-frame entrance. The monogram sits on a frosted ivory panel (`bg-background/70 backdrop-blur-md`, soft shadow) instead of floating on the blurred photo. Width: 72% on phones (max 19rem), 46% on tablets, the right column on desktop (max 30rem, aligned right).
+  - **Full first screen** on desktop: `lg:min-h-[calc(100svh-var(--header-height))]`, content centred, so the empty middle at 1920 is gone.
+  - The contact line is set apart by a hairline (a quieter secondary way in).
+- **About** (`about-founder.tsx`, rewritten around the same fields):
+  - **Title split:** "Meet Neha" leads (`text-display-lg`), and the text after " – " becomes a softer italic subtitle (`text-display-sm`). It only applies when the title contains " – ".
+  - **Closing line:** with 3+ paragraphs and a final one under 100 characters, the final paragraph becomes a pull-quote (display italic, gold left rule on desktop, centred on phones).
+  - **Signature:** the founder's name in rose display italic, with "FOUNDER, CANVAS CREATIONS AND EVENTS" as an eyebrow under it. It was one small line.
+  - **Portrait:** a circle with an offset gold ring (echoing the hero arch frame). On desktop it stays in view (sticky) while the story scrolls past, aligned towards the text. On phones and tablets it comes first, smaller and centred, with the heading centred and paragraphs left-aligned for reading.
+  - A short gold rule separates the heading from the story.
+- **Checked:**
+  - screenshots at 390, 768, 1440 and 1920 (hero and About);
+  - type-check and lint pass;
+  - `/`, `/terms`, `/privacy` and `/admin/login` all return 200.- **Follow-up (client's wish):** the hero logo stands on its own again, with no frosted panel and no gold arch outline. The arch window and frame now appear only when a real hero photo is chosen. The logo is larger than before the redesign: 82% of the width on phones (max 26rem), 56% on tablets, and the right column on desktop (max 34rem, aligned right). Checked with screenshots at 1440 and 390; type-check and lint pass.
+### Design pass: Services and Why Canvas (3 Nov 2026)
+
+- **Services** (`services.tsx`):
+  - **Before:** a thin numbered list. With one service it was a single row beside a mostly empty column.
+  - **Now:** cards, two across from tablets. Each service card uses the theme's `surface` (white on the ivory section, with the radius, border and shadow from the Design page) and a gold hairline along its top. It shows: optional photo (3:2), number when there are 2+ services, title, summary, and a round arrow when it links somewhere.
+  - **Enquiry card:** "Planning something?" is a blush card with "Enquire Now" and a round arrow; the whole card is the link. It fills the space after an odd number of services, or takes a full row after an even number. With no services it stands alone.
+  - The heading stays sticky on the left on desktop. The editor's add button (`itemSlots.after`) sits under the grid.
+  - The enquiry card's label is the fixed `site.enquiry.label` ("Enquire Now"), not the editable header button text.
+- **Why Canvas** (`why-canvas.tsx`):
+  - **Before:** a "staircase" (each point stepped 25% further right), which left large empty dark areas on desktop.
+  - **Now:** a row of columns under a hairline each, with a large champagne display numeral (01, 02, 03), the title (`text-display-md`) and the description.
+  - Columns follow the count: 3 → three across, 2 → two, 4 → two then four at xl, otherwise three. Stacked on phones.
+- **Checked:**
+  - screenshots at 1440 and 390;
+  - type-check and lint pass.
+### Animated background for the hero and "The studio" (3 Nov 2026)
+
+- **Request:** the user didn't like the blurred ballroom photo and asked for something like Framer or Three.js instead. Three.js was not used: it's a large library and constant GPU work, too costly for the first screen on phones. Instead, a small canvas component with no new dependency.
+- **New `src/components/motion/ambient-glow.tsx`** (`<AmbientGlow variant="hero" | "intro">`):
+  - **Light:** soft pools of blush, champagne and a hint of the button pink and rose drift slowly. They're radial gradients on a canvas at 1/4 resolution, softened with CSS blur. Fine gold sparkles rise and twinkle on a second, full-resolution canvas (14–46 by screen area).
+  - **Pointer:** on desktop (pointer: fine), one champagne glow eases towards the mouse in the hero.
+  - **Layout:** the hero's light pools on the right (behind the logo), so the headline side stays calm. In "The studio" it sits either side of the centred text.
+  - **Colours** are read from the theme variables (`--cc-blush-soft`, `--cc-champagne`, `--cc-button`, `--cc-rose`, `--cc-gold`), so the Design page's palette applies.
+  - **Performance:** about 30fps; paused when scrolled away (IntersectionObserver) or when the tab is hidden; a single still frame with reduced motion; redrawn on resize.
+  - **Server HTML:** a static CSS radial glow, which fades out as the canvas fades in, so there's no flash.
+  - **Seams:** masked edges. The hero fades out at the bottom; the studio fades in at the top and out at the bottom. The two sections and Services below meet with no hard line.
+- **Wired in** (`hero.tsx`, `intro.tsx`): with "show background" on and **no photo chosen** → the glow. A photo chosen in the admin is still shown blurred, as before. Turned off → nothing.
+- **Admin wording updated** (`editor-section.tsx`, `singleton-forms.tsx`): "Background", "Show the background", and "No photo chosen: the animated glow is shown." (it previously said the built-in ballroom photo). Comments updated in `data/home.ts`, `cms/singletons.ts` and `admin/editor-content.ts`.
+- **Checked:**
+  - screenshots at 1440 and 390 (hero and studio);
+  - a normal-motion browser run: the canvas changes over time, stops while scrolled away, and no long tasks;
+  - the join screenshot shows no seam;
+  - type-check and lint pass.
+- **Unused now:** `public/images/backgrounds/blush-ballroom.jpg` and `DEFAULT_BACKGROUND` are no longer shown. They're kept in case the photo is wanted back; they can be removed later.
+### Hanging wooden sign in the hero (3 Nov 2026)
+
+- **Request:** the user sketched a sign hanging from two lines at the top of the hero with "canvas creation and events" on it, and asked for a wooden board with some decoration.
+- **New `src/components/sections/hanging-sign.tsx`** (`<HangingSign>`), all CSS and SVG with no image:
+  - **Board:** honey-toned wood, made of layered gradients for the grain plus a darker base. It has a thin champagne inner border, inset highlights and a soft drop shadow.
+  - **Text:** the name is engraved in the display serif, ivory with a carved shadow, size `clamp(1.25rem, 0.95rem + 1.3vw, 2.125rem)`. It stays on one line from 360px; below that it may wrap onto two, centred.
+  - **Ropes:** two twisted tan ropes (repeating gradient) with brass rings at 16% from each side. They run 16rem up and are clipped by the hero's top edge, so the sign hangs from above.
+  - **Florals:** an SVG cluster on each top corner (mirrored on the left): three blush flowers with gold centres, sage leaves, gold berries and a trailing sprig. Sized 5rem (under 400px), 6rem, 8rem (sm) and 9rem (lg). The board's side padding grows (px-9 → sm:px-14 → lg:px-20) so the sprigs clear the text.
+  - **Motion** (`globals.css` "Hanging sign"): it drops in on load (`cc-sign-drop`, 1.4s), then sways like a pendulum (`cc-sign-swing`, ±0.7°, 8s) about a point 12rem above. It's still with reduced motion. Confirmed in a normal-motion browser: both animations are attached and the sign is rotating.
+- **Hero** (`hero.tsx`):
+  - The sign is a full-width first row (`lg:grid-rows-[auto_1fr]`, so the content still centres in the remaining height). It shows the editable studio name (`settings.heroBrand`, `data-sk="site.heroBrand"`); an empty name hides the sign.
+  - The separate pink brand line above the headline was removed (no duplicate). The H1 margin is now `mt-6`.
+- **Dev note:** the dev server's Tailwind CSS twice missed classes added in a quick second edit; a real content change in the file rebuilt it. Production builds are unaffected.
+- **Checked:**
+  - screenshots at 1440, 390 and 320;
+  - measured the floral positions;
+  - type-check and lint pass.- **Draggable like a spring** (follow-up, same day):
+  - **How it's built:** `HangingSign` is now a client component using `motion/react`. The ropes, board and florals sit in a `motion.div` with `drag`, zero `dragConstraints` and `dragElastic: 0.5`, so it follows the pointer at half the distance (resistance) and always returns home. Release uses `dragTransition: { bounceStiffness: 240, bounceDamping: 7 }` (the wobble). It scales to 1.03 while held.
+  - **Tilt:** `rotate` is derived from x (±180px → ∓12°) about the board's top, so pulled right it tilts anticlockwise, as if swinging on its ropes.
+  - **Cursor and touch:** `cursor-grab` / `active:cursor-grabbing`, `select-none`. `touch-action: pan-y`, so on phones a sideways drag swings it and a vertical swipe still scrolls.
+  - **The CSS** drop-in and idle sway (on the outer wrapper) still run.
+  - **Turned off** with reduced motion (`useReducedMotion`), and in the visual editor: `hero.tsx` passes `draggable={!imageAction}`, and `imageAction` is only set there, so the name can be edited in place.
+  - **Tested** with real mouse events in headless Chrome:
+    - at rest no transform, cursor grab;
+    - pulled 160px right and 64 down → moved 80/32px, tilted about −5°, cursor grabbing;
+    - after release x went 33, −21, −36, −12, 16, 14, 1, −9, −6, 2, 4, 2, −2, −2px (every 70ms) and settled at about 0;
+    - screenshot of the pulled state;
+    - type-check and lint pass.- **Fix: ropes ended in mid-air after a long pull down** (user screenshot). Two causes:
+  - **Fixed rope length:** the ropes had a fixed length (16rem) and moved down with the board. They're now `motion.span`s whose height is `var(--sign-rope)` plus the downward pull (`useTransform(y)`), so their tops always stay past the hero's top edge.
+  - **Too much vertical pull:** `dragElastic` is now per side: `{ left: 0.35, right: 0.35, top: 0.08, bottom: 0.2 }`. It's loose sideways (a swing) and stiff up and down (it's on ropes), so a pull can't drag it over the headline.
+  - **Re-tested** with a pull 300px right and 600px down: the board moved 105/120px, tilted about −7°, and the rope tops stayed 184 and 234px above the hero's top. After release x went 105, 99, 16, −42, −39, −3, 24, 17, −4, −12, −5, 4, 5, 1, and it settled at no transform. Screenshot checked; type-check and lint pass.
+
+### Creative pass #1: The studio (gold ink + ribbon bow)
+- **Theme for the series:** "the website is a celebration being styled", one section at a time. This is #1 of 12.
+- **Gold ink heading** (`intro.tsx`, `globals.css` "Gold ink", utility `ink-write`): the title is wrapped in `<span className="ink-write">`. As it scrolls in (view range `entry 40%` → `cover 45%`) it is written left to right, line by line, with a gold-to-champagne pen edge running ahead of the ink. It uses `background-clip: text` with a `currentColor` gradient, so a style preset's colour still applies, and it reverses when scrolling back. The heading keeps its `data-sk` and id.
+- **Ribbon bow** (new `src/components/shared/ribbon-bow.tsx`, replaces `DecorativeDivider` in the studio only): a rose satin band with a blush highlight and a fine gold edge. On one named view timeline (`--bow`), its halves draw in from the sides (`entry 0%` → `cover 24%`), the loops tie and fill (`cover 22–32%`), the knot pops (`28–34%`) and the tails drop (`30–38%`). Paths use `pathLength=1` and dash offsets. Scrolling back unties it.
+- **Reduced motion / no scroll timelines:** the plain heading and the fully tied bow. Firefox fallback: `scroll-motion.tsx` SPECS has new `ink-write` (`--cc-ink`) and `ribbon-bow` (`--cc-rib`, `--cc-loop`, `--cc-tail`, `--cc-knot`) entries, driving matching `html.js-motion` rules.
+- **Bug fixed along the way:** the studio section had `overflow-hidden`, which made it a scroll container, so every `view()` animation inside it (including its existing heading reveal) never moved. It's now `overflow-clip`, which clips the same without being a scroll container. No other section wraps scroll reveals in `overflow-hidden`.
+- **Checked:**
+  - normal-motion headless Chrome at 1440 and 390: animation progress follows the scroll (ink 0 → 0.20 → 0.57 → 0.93 → 1);
+  - frame-by-frame bow close-ups;
+  - reduced-motion final state at 390 and 1440;
+  - type-check and lint pass.
+
+### Creative pass #2: Services (place cards + wax seal)
+- **Place cards** (new `src/components/motion/tilt-card.tsx`, `globals.css` "Tilt card"):
+  - **The card:** each service card keeps the theme surface; its top gold hairline is replaced by a fine gold printed frame just inside the edge (`inset-2`, `border-highlight/40`).
+  - **Tilt:** with a mouse or pen, `TiltCard` tilts the card towards the pointer, up to 6° (it writes `--tilt-x/y` directly, with no React state), plus a soft white-to-champagne shine under the pointer. It eases back flat on leave (0.7s).
+  - **Phones (hover: none):** the card leans gently from 5° to −5° as it scrolls past (`cc-lean`, view timeline).
+  - **Off** with reduced motion. The enquiry card tilts too.
+- **Wax seal** (new `src/components/shared/wax-seal.tsx`, `globals.css` "Wax seal"):
+  - **The seal:** a rose wax seal (SVG with an irregular edge from a fixed wobble, so it's identical on server and client) with a pressed well, a dotted champagne ring, an embossed italic "CC" and a glint.
+  - **Placement:** it sits over the enquiry card's top-right corner at −10°; the card has extra right padding so the text clears it.
+  - **Stamp:** scroll-linked (`entry 60%` → `cover 30%`). It drops from 1.9× and −28°, presses in, overshoots and settles; it lifts again when scrolling back. On hover it rises 6px with a deeper shadow.
+- **Firefox fallback:** SPECS entries for `seal-stamp` (`--cc-in`) and `tilt-card` (`--cc-cover`), with matching `html.js-motion` rules.
+- **Checked:**
+  - real mouse moves in headless Chrome: about 4.8° tilt, shine on, then back to flat with the shine off;
+  - seal through the scroll: scale 1.9 → 1.65 → 0.95 → 1.00 → 1;
+  - reduced-motion screenshots at 1440 and 390, plus close-ups;
+  - type-check and lint pass.
+
+### Creative pass #3: Categories (balloon garland)
+- **Garland** (`category-strip.tsx` rewritten, new `src/components/sections/balloon.tsx` and `balloon-tones.ts`):
+  - **The balloons:** one per category, as a glossy SVG balloon (radial gradient, tied neck, gloss) with a curling gold string down to a hanging tag carrying the category's name (display serif, italic). Tones rotate blush, champagne, gold, rose, pearl.
+  - **Layout:** large screens set the balloons in an arc (middle highest, via `--arc` = sin of the position); below that it's a 2-column (phone) or 3-column (tablet) grid. Nothing scrolls sideways.
+- **Motion** (`globals.css` "Balloon garland"):
+  - each balloon bobs on its own rhythm (5.5–7.3s, staggered);
+  - it lifts and leans on hover or keyboard focus;
+  - it rises 4.5rem as it scrolls in (`balloon-rise` raises `--motion-rise` for its Reveal);
+  - still with reduced motion.
+- **Link to the gallery:**
+  - each balloon is a link to `/#gallery`. On click it sends `cc:gallery-filter` with the category id, and `gallery-lightbox.tsx` now listens and selects that filter;
+  - an unknown category, or a gallery with too few categories to show filters, falls back to all photos;
+  - screen readers hear "Weddings: see photos";
+  - in the visual editor the balloons are not links, so the label stays editable.
+- **Fix during the build:** the tones and the event name live in `balloon-tones.ts`, not in the `"use client"` file. A server component importing plain values from a client module gets client references, not the values, which crashed the homepage (500) until they were moved.
+- **Checked:**
+  - screenshots at 1440, 768 and 390;
+  - a real click on "Weddings": it scrolled to the gallery, the Weddings filter was pressed, and 4 photos showed;
+  - the homepage and `/design-system` return 200;
+  - type-check and lint pass.
+
+### Creative pass #4: Gallery (polaroids on a fairy-light string)
+- **Polaroids** (`gallery-preview.tsx`): the editorial grid (lead photo, sides, pairs, drift) is replaced by pegged polaroids.
+  - **Layout:** each photo is a square image in a warm-white polaroid frame, with the photo's title written in the wide bottom margin (italic display serif, truncated). They run two across on phones, three on tablets and four on desktop, in a centred flex-wrap so a short last row sits in the middle.
+  - **The string:** each item draws its own swag of the string (an SVG curve stretched to the cell) with four glowing fairy bulbs. The swags join into one continuous festoon in every row, so the category filter and "Show all" (which hide items) need no layout override. A wooden peg with a metal spring clips each polaroid at the swag's low point.
+- **Motion** (`globals.css` "Polaroid string", replacing the obsolete "Portfolio filter (Phase 22)" grid overrides):
+  - bulbs twinkle out of step;
+  - each polaroid hangs at its own angle (`--tilt`, −2.6° to 2.9°) and sways ±0.8° (7s, staggered);
+  - on hover it swings in a damped 1.8s swing about its peg;
+  - still with reduced motion.
+- **Unchanged:** the lightbox (the whole polaroid opens it), the filters, "Show all", sample badges, the Instagram link, the empty state and the editor's item slots.
+- **Checked:**
+  - screenshots at 1440 and 390;
+  - in headless Chrome: 8 shown at first, 4 with Weddings, 21 after Show all;
+  - clicking a polaroid opens the dialog;
+  - hovering runs the swing;
+  - type-check and lint pass.
+
+### Creative pass #5: Event stories (invitation envelope)
+- **Envelope** (new `src/components/shared/envelope.tsx`, used in `event-stories.tsx` on each story's main photo):
+  - **The envelope:** a cream envelope (back, folded pocket panels with a crease line, and a flap hinged on the top edge) sealed with the rose `WaxSeal` from #2. It lies over the main photo.
+  - **Opening**, on the photo's own view timeline (`--env`, `globals.css` "Envelope"):
+    1. the seal breaks: fades and shrinks (`cover 28–34%`);
+    2. the flap swings open over the top edge (`33–42%`);
+    3. the envelope slips down 45% and fades while the photo (`.env-card`) rises from 12% lower at 94% size (`41–52%`).
+  - Scrolling back seals it again. The ranges were tuned so each step happens on screen at 1440×900 and 390×844.
+- **Never hides content:** the envelope is `display: none` unless the motion runs (no reduced motion and scroll timelines, or the JS fallback via new `envelope-story` SPECS `--cc-seal` / `--cc-flap` / `--cc-away`). It's `pointer-events: none`, so the photo's lightbox button still works.
+- **Replaced:** the main photo's mask reveal (the envelope is its entrance now). The story text, supporting photos, testimonial and "Show all" are unchanged.
+- **Known:** for the first story, the opened flap briefly overlaps the section heading above it while the envelope fades.
+- **Checked:**
+  - frame-by-frame at 1440 and 390;
+  - reduced motion shows just the photo;
+  - type-check and lint pass.
+
+### Creative pass #6: Process (ribbon timeline)
+- **Ribbon timeline** (`process.tsx` rewritten, `globals.css` "Process ribbon"):
+  - **The ribbon:** the steps sit on a rose ribbon with a gold edge, running across the top on large screens and down the left side below that. A faint dotted guide shows the path still to come.
+  - **Medallions:** each step's number sits in a round gold-outlined medallion. It replaces the old top border and the big italic numeral.
+- **One progress value:** a registered custom property `--proc` (0–1, `@property`, initial 1) drives everything:
+  - **Scroll:** a view timeline animates it on the list. Desktop runs `cover 15–55%`; the vertical layout runs `cover 25–63%`, measured so the ribbon's tip stays about 60% down a phone screen.
+  - **The band** scales by `--proc` along its path.
+  - **Each medallion** (at `--f` = (i + 0.08)/n along the ribbon) computes `--lit` and fills with gold, turns its number white, grows from 0.86 to 1 and gains a champagne halo as the ribbon reaches it.
+  - **Fallbacks:** the JS fallback writes `--proc` (new `process-ribbon` SPECS entry). With reduced motion it stays 1: fully drawn, all lit.
+- **Checked:**
+  - progress values at 1440 and 390 (for example, steps 1–3 lit at 0.55; the phone tip at 517–534px on an 844px screen);
+  - screenshots at both widths, plus reduced motion at 768;
+  - type-check and lint pass.
+- **Fix: medallions off the line on desktop** (user screenshot at about 1900px wide): the medallions were shifted 80px left, so 01 sat outside the ribbon's start and the rest sat left of their headings.
+  - **Cause:** the desktop reset `lg:left-0` was missing from the browser's dev CSS, the same dev-server Tailwind caching seen with the hanging sign. That left the phone/tablet offset `sm:-left-20` in place.
+  - **Fix:** the medallion's offsets now live in the section's own CSS (`.process-medal`): absolute at `left: -4rem` (from 40rem, `-5rem`) below 64rem, in flow above. They no longer depend on generated utilities.
+  - **Verified:** medallion vs heading offset 1–3px (the unlit 0.86 scale) at 1902, 1440 and 1024; medallion centre on the vertical ribbon (0px) at 768 and 390; screenshot at 1902.
+
+### Creative pass #7: Why Canvas (easels)
+- **Easels** (`why-canvas.tsx`, an `Easel` component; `globals.css` "Easels"):
+  - **The easel:** each reason is an ivory canvas board with a fine gold inner frame, standing on a wooden easel. Its rear leg and two splayed front legs are SVG behind the board, with the mast tip showing above, and a wooden ledge sits under the board.
+  - **Text:** the numeral is gold italic, with the title and description in fixed dark ink, since the board is light on the dark section.
+  - **Layout:** boards stretch to equal height, so the ledges line up across a row. Three across from `md`; stacked (max 24rem) on phones.
+- **Motion** (view timeline `--easel` per easel):
+  1. the legs draw down from the mast (`entry 5–70%`);
+  2. the ledge widens into place (`entry 45–85%`);
+  3. the board is set down: it fades in from 2.5rem higher at −3°, dips 4px past, then settles (`entry 70%` → `cover 40%`).
+- **Hover:** the board tips forward on its ledge (`rotateX(-7deg)`, about its bottom edge).
+- **Fallbacks:** reduced motion shows it complete and still. The JS fallback uses a new `easel` SPECS entry (`--cc-legs`, `--cc-ledge`, `--cc-board`).
+- **Replaced:** the hairline-plus-numeral list and its Reveal.
+- **Checked:**
+  - screenshots at 1440 and 390;
+  - the scroll sequence (legs 0.99 → 0, ledge 0 → 1, board 0 → settled);
+  - type-check and lint pass.
+
+### Creative pass #8: About (gilded frame + handwritten note card)
+- **Gilded frame** (new `src/components/shared/gilded-frame.tsx`): an SVG round frame laid 7% past Neha's portrait on every side. It replaces the offset gold ring.
+  - **The frame:** two gilt rings (a gold gradient), a row of round gold beads between them, and a small floral spray (blush flower, sage leaves, gold berries) at the top and bottom.
+  - **Motion** (`globals.css` "Gilded frame"):
+    - the rings draw round clockwise from the top (`entry 10%` → `cover 30%`);
+    - the beads fade in (`20–34%`);
+    - the sprays bloom with a small overshoot (`28–40%`).
+  - **Sticky portrait:** the sequence finishes before the portrait turns sticky on desktop, at about cover 50%, because a sticky element stops moving through its view timeline.
+  - **Wrapper:** the portrait's wrapper went from a mask reveal to `reveal-in`, since a clip-path would cut off the frame outside the photo. On phones there is extra space below so the bottom spray clears the eyebrow.
+  - **Bug fixed during the build:** the bottom spray's SVG `rotate(180)` was pivoting on the CSS `transform-origin` meant for the bloom. Placement and bloom are now separate groups.
+- **Note card:** when the About text ends on a short closing line, that line becomes Neha's handwritten note card.
+  - **The card:** warm notepaper with faint rose ruled lines and blush washi tape, the line in a handwriting font, and her name signed in rose at the bottom right. Her role and studio name sit beneath the card.
+  - **Motion:** it rests at −1.5° and is laid on with a turn and a settle as it scrolls in (`cc-note-in`; JS fallback via a new `note-card` SPECS entry).
+  - **Without a closing line:** the name shows as before.
+  - **Admin:** the `data-sk` keys for the name and role are kept.
+- **New font:** Dancing Script through `next/font/google` (self-hosted at build, like the other two fonts), variable `--font-dancing`, Tailwind `font-script`. It's only used for the note card and signature.
+- **Checked:**
+  - screenshots at 1440 and 390, plus close-ups of the frame;
+  - scroll values for the rings, beads, sprays and card;
+  - type-check and lint pass.
+
+### Creative pass #9: Reviews (guestbook)
+- **Guestbook** (new client `src/components/sections/guestbook.tsx`; `reviews.tsx` uses it in place of the card grid; `globals.css` "Guestbook"):
+  - **The book:** a rose cloth cover with a gold-tooled edge holding cream pages, each shaded towards the spine. It shows a two-page spread from `lg` and one page below.
+  - **Each approved review is a signed page:** stars, the message in italic display serif, the reviewer's name signed in the script font (with the event type), and a page number.
+  - **Empty pages:** the blank page after the last review reads "This page is waiting for your celebration." With no reviews at all, the book lies open on a single page with the existing empty text.
+- **Turning pages:** arrow buttons (disabled at the ends and during a turn), a sideways swipe or drag over 50px (`touch-action: pan-y`, so vertical scrolling still works), and a live status ("Reviews 1–2 of 5" / "Review 1 of 5").
+  - **The turn:** a leaf rotates 180° about the spine in 0.9s. Its front carries the old page and its back (pre-rotated, `backface-visibility: hidden`) the new one. A shadow-and-highlight sweep plays across it like a curling page, and the pages beneath swap so each half shows the right page before and after.
+  - **Reduced motion:** the page changes instantly.
+- **Overflow:** the Reviews section uses `overflow-x-clip`, so a phone turn swinging past the book's edge can't cause a sideways scroll.
+- **Unchanged:** the "Leave a review" form and button, and the "nothing invented" rule (only approved reviews show).
+- **Testing:** four temporary approved reviews were added to the **local** database to test turning, then deleted (local back to its 1 approved review).
+  - **Desktop:** next went 1–2 → 3–4, with the leaf mid-turn at about 115° and gone afterwards, and previous went back.
+  - **Phone:** a drag swipe went 1 → 2.
+  - **Screenshots:** before, mid-turn and after, plus the single-review spread.
+  - Type-check and lint pass.
+- **Grab to turn + test data** (follow-up, same day; user: "have a test data and also can we have a grab pointer on the review book so easy to next and back"):
+  - **Grab cursor:** the book shows `cursor: grab` (`grabbing` while held) whenever there's more than one spread.
+  - **Drag:** the page follows the pointer as it's pulled. Left turns forward, right turns back; a full turn is half the book's width on a spread, 80% on a phone. Let go past about a quarter turn (0.22) and it finishes from where it is (0.9s); otherwise it falls back (0.35s). The curl shading follows the angle while dragging.
+  - **Click a page:** the right half goes forward, the left half goes back (nothing happens at either end).
+  - **Arrow keys:** once the book has focus (it's a focusable labelled group).
+  - **One engine for all turns:** the leaf is now driven by its angle and a CSS transition (`.guestbook-leaf-moving`, `--leaf-ms`) instead of fixed keyframes, so drags, clicks, keys and buttons all run through it. On a single page, a back turn brings the earlier page back over from the left (−180° → 0).
+  - **Pivot:** set in the book's own CSS (`.guestbook-leaf-next` / `-prev`), not new utilities, given the dev-server CSS caching.
+  - **Reduced motion:** no dragging animation; a drag over 40px or a click changes the page instantly.
+  - **Test data (LOCAL ONLY):** six approved reviews named "Test – Priya / Sam / Aisha / Daniel / Meera / Jordan" (mixed lengths and ratings, including a long one) were inserted into the local database and kept for testing. They are not in any migration, so they never reach production. Remove with `delete from reviews where name like 'Test – %';`.
+  - **Note:** the homepage shows the 6 newest approved reviews (`REVIEWS_LIMIT` in `src/lib/content/public.ts`, unchanged).
+  - **Tested** in headless Chrome at 1440 and 390, with "start" showing "Reviews 1–2 of 6", or "Review 1 of 6" on the phone:
+    - a 216px drag (leaf at −76° on desktop, −139° on phone) went forward;
+    - a 36px drag fell back;
+    - a drag right went back;
+    - clicking the right page then the left went forward then back;
+    - ArrowRight then ArrowLeft went forward then back;
+    - clicking left at the start did nothing;
+    - mid-drag screenshots were checked;
+    - type-check and lint pass.
+- **Closed book that opens with the scroll** (follow-up, same day; user: "at the first can we have it like a closed book and as the scroll that open and review visible"):
+  - **The cover:** a front cover (`.book-cover` in `guestbook.tsx`) in rose cloth with a double gold-tooled border, "Guestbook" in gold script and "Canvas Creations and Events" in small caps.
+  - **Scroll progress:** a registered `--open` (0 → 1, initial 1) is animated on `.guestbook` by its view timeline (`entry 50%` → `cover 45%`). The JS fallback writes it via a new `guestbook` SPECS entry.
+  - **Spread (desktop):** closed, the cover lies over the right half and the book is shifted −25% so it sits centred, with the left half (its cloth, now a `::before`, and its page) hidden. Opening, the cover rotates 0 → −180° about the spine and the book slides back to centre. The cover's inside is a copy of the left half (cloth plus the first left page), so it lands matching. The real left half fades in once the cover passes upright (`--open` 0.5–0.625), and the cover leaf vanishes at fully open.
+  - **Phone:** the cover lies over the single page and swings away to the left.
+  - **Fallbacks:** reduced motion, or no scroll timelines and no JS fallback, show the book open from the start. Dragging, clicking and the arrows work as before once it's open.
+  - **Dev-cache guard:** the left-page-on-the-cover's-inside visibility is in the book's own CSS (`.book-cover-page`), not a new utility.
+  - **Checked:**
+    - scroll frames at 1440 (`--open` 0 → 0.10 → 0.36 → 0.63 → 0.89: closed, cover lifting, past upright, nearly flat);
+    - scroll frames at 390 (0 → 0.31 → 0.71 → 1);
+    - reduced motion shows it open;
+    - type-check and lint pass.
+- **Book opens by itself** (follow-up, same day). The user asked to improve the book's opening time and chose "Open by itself": the cover no longer follows the scroll, where it could be left half open.
+  - **Trigger:** `guestbook.tsx` reads the book's position on scroll and resize, throttled to one check per frame.
+    - Once the book's top reaches the middle of the screen, it sets `data-book="open"`.
+    - Only once the whole book is back below the screen does it set `data-book="closed"`, so it never flaps open and shut near the middle, and it opens afresh next time.
+    - The first state is set without animating. `data-book-ready` then enables the transition.
+  - **Motion:** `globals.css` replaces the scroll-timeline keyframes with `transition: --open 1.2s cubic-bezier(0.45, 0.05, 0.25, 1)`, plus `.guestbook[data-book="closed"] { --open: 0 }`. The `guestbook` SPECS entry was removed from `scroll-motion.tsx`.
+  - **While closed:** page turns (drag, click, arrows and buttons) are ignored.
+  - **Fallbacks:** reduced motion leaves the attributes unset, so the book is simply open. Without JS the book is also open.
+  - **Checked** in headless Chrome at 1440 and 390:
+    - closed below the screen, in the lower half and just above the middle;
+    - past the middle, `--open` went 0.13 at 250ms, about 0.9 at 650ms and 1.00 at 1550ms;
+    - scrolling back to the lower half kept it open;
+    - fully below the screen it closed (0.62 at 400ms, 0 at 1600ms);
+    - scrolling up opened it again;
+    - reduced motion stays at 1.00 throughout;
+    - type-check and lint pass.
+- **#10 FAQ, ribbon tags** (user: "go ahead"):
+  - **The tags:** each question is a paper gift tag on a satin ribbon. Each tag has:
+    - clipped left corners, a gold-stitched dashed line and a soft drop shadow;
+    - a gold-rimmed eyelet with a ribbon looped through it, knotted, with two V-cut tails. The ribbon colours cycle blush, gold, rose and champagne, from `TONES` in `balloon-tones.ts`.
+  - **Tilt:** each tag rests slightly askew (`--tag-tilt`, ±0.6–1.2°) and pivots on its eyelet.
+  - **Motion:**
+    - each tag swings into place on its own view timeline (`--tag`, entry 10% to cover 30%), with a damped overshoot;
+    - on hover it eases straighter;
+    - once opened it hangs straight, with a springy transition, and the answer unfolds down from a dashed crease (`rotateX` −80° to 0, 0.7s).
+  - **Accessibility:** it is still the Radix accordion, so keyboard use, ARIA and one-open-at-a-time are unchanged.
+  - **Code:**
+    - `faq.tsx`: new `TagRibbon` SVG. The `Reveal` wrapper and the list's top border were removed, since each tag has its own entrance.
+    - `globals.css`: new "Ribbon tags" block, with positions in custom classes so they don't depend on new utilities being generated. The ribbon is larger from 40rem.
+    - Firefox fallback: a `faq-tag` SPECS entry in `scroll-motion.tsx` plus a `html.js-motion .faq-tag` rule.
+    - With reduced motion, tags rest still and answers simply appear.
+  - **Checked** in headless Chrome at 1440 and 390:
+    - scroll frames show the swing (−7° and transparent, to a slight overshoot, to settled);
+    - clicking the first tag opens it, with `data-state=open`, the tag straight and the answer under the crease;
+    - close-up of the ribbon and eyelet;
+    - type-check and lint pass.
+- **#11 Enquiry, invitation card and sealed envelope** (user: "go"):
+  - **Invitation card** (`shared/invite-card.tsx`, new): wraps the enquiry form and its thank-you inside `EnquiryForm`, so the design-system preview shows it too. It has:
+    - ivory stock, a soft shadow and a double gold border;
+    - a gold flourish in each corner (a rounded bracket, an inner curve, a curl and a dot), drawn once for the top-left corner and mirrored by CSS.
+  - **Corner motion:** each corner has its own view timeline (`--corner`, entry 100% to cover 35%) and draws itself in, so on a long form the bottom corners draw as the bottom arrives. The Firefox fallback is an `invite-corner` SPECS entry plus a `html.js-motion .invite-flourish` rule.
+  - **Sent envelope** (`shared/sent-envelope.tsx`, new): replaces the thank-you's plain surface. It is a timed sequence of about 2.8s:
+    - a mini invitation card slides down into an envelope (0.15–1.25s);
+    - the flap folds shut over it (1.25–1.85s). The flap is behind the card while open and in front once past upright, done by switching `z-index` in the keyframes;
+    - the studio's wax seal (`WaxSeal`) is pressed on (1.85–2.2s);
+    - the envelope gives a small lift, then the thank-you text fades in (2.25s).
+  - **Unchanged:** the form fields, validation, honeypot, status messages, and focus moving to the thank-you heading.
+  - **Reduced motion:** the resting styles are the sealed envelope, so it shows sealed with the text at once.
+  - **Fix during testing:** the pocket needed its own `z-index` (2) above the card (1), or the card showed in front of the envelope.
+  - **Checked** in headless Chrome at 1440 and 390:
+    - the corners draw in as the section scrolls up;
+    - the design-system preview form was filled in and sent, and frames at 0, 0.45, 1.0, 1.55, 2.05 and 3.2s show the card going in, the flap closing, the seal stamped, then the final thank-you card;
+    - type-check and lint pass.
+- **#12 Footer, garland and confetti** (user: "go"; the last of the creative series):
+  - **Garland** (`shared/footer-garland.tsx`, new): a floral garland along the top of the site footer, on every public page.
+    - A sage vine in three swags, quadratic curves in a 1440-wide viewBox with `xMidYMin slice`, so phones show the centre swag.
+    - Nine five-petal blooms in blush, champagne, rose and gold, with gold centres and the middle bloom of each swag larger.
+    - Pairs of sage leaves angled along the vine.
+  - **Confetti:** 28 small rectangles, dots and strips in brand colours, settled over the footer behind its content at 55% opacity. They are placed with an R2 low-discrepancy sequence, because a modulo scatter formed a visible diagonal line. Most sit in the upper part, under the garland.
+  - **Motion:** a registered `--party` (0–1, initial 1) is animated on the footer by its view timeline, over entry 0% to 85%. The range ends by the time the footer is fully in, so it always completes at the bottom of the page.
+    - the vine draws;
+    - each bloom and leaf opens, scaling and turning, from the middle outwards (`--d` delay);
+    - each piece of confetti drifts down about 14rem, turning, and settles.
+  - **Fallbacks:** the Firefox fallback writes `--party` through a new `footer-party` SPECS entry. Reduced motion leaves it at 1, so everything is in place.
+  - **Footer changes:** the footer is `relative isolate`, and the main grid gets extra top padding (`.footer-main`: 7rem, 8rem from 64rem) to clear the garland.
+  - **Checked** in headless Chrome at 1440 and 390, with frames at 15%, 40%, 70% and all of the footer in view (`--party` 0.18 → 0.47 → 0.82 → 1). Type-check and lint pass.
+- **Contact us, calling cards** (user: "Contact us section and header also" then "yes"):
+  - **The cards:** the four details are now printed calling cards in a grid (`contact.tsx`, new `CallingCard`): 1 column on phones, 2 from `sm` (beside the heading on `lg`), 4 across on `xl`. Each has:
+    - ivory stock, a fine gold inner border and a soft shadow;
+    - a gold line icon in a ring (lucide `Phone`, `Mail`, `MapPin`, `Heart`);
+    - a resting tilt (`--tilt`, ±0.8–1.6°).
+  - **Unchanged:** the `<address>` / `<dl>` / `<dt>` / `<dd>` structure and all links. The `Reveal` wrapper was removed.
+  - **Motion:** each card is dealt in from the upper left, spinning flat as it lands, on its own view timeline (`--card`). Side by side, they land one after another, because `--i` shifts the range. Hover lifts and straightens a card.
+  - **Fallbacks:** the Firefox fallback is a `calling-card` SPECS entry plus a `html.js-motion` rule. Reduced motion leaves the cards still and at rest.
+- **Header, scroll ribbon, "you are here" bow and logo sparkle:**
+  - **Scroll ribbon** (`header-shell.tsx`): a 3px gold ribbon along the header's bottom edge fills with page progress, with a tiny bow (`shared/mini-bow.tsx`, new) riding at its tip.
+    - `--page` (registered, 0–1) comes from `animation-timeline: scroll(root block)`.
+    - Where scroll timelines aren't supported, `HeaderShell` writes it on scroll, throttled to one update per frame.
+  - **Menu bow** (`layout/header-nav.tsx`, new client component that replaces the inline nav in `site-header.tsx`): on the homepage a gold bow sits under the menu item for the section on screen. That is the last linked section whose top has passed 40% of the way down the screen, or Home above them all.
+    - It slides along with a springy transition.
+    - The item gets `aria-current="location"`.
+    - It is hidden on other pages.
+  - **Logo:** three gold four-point sparkles twinkle round it on hover or keyboard focus, staggered by 0.12s.
+  - **Reduced motion:** no ribbon or sparkles, and the menu bow moves without sliding.
+- **Checked** in headless Chrome at 1440 and 390:
+  - the menu marker followed Services → About us → FAQ → Contact us, with `--page` 0.10 → 0.65 → 0.83 → 0.95;
+  - screenshots of the ribbon and bow, the cards mid-deal and landed, the logo sparkle on hover, and the phone header ribbon;
+  - type-check and lint pass.
+- **Fix: horizontal scrollbar and blank area to the right** (user's screenshot; caused by this pass):
+  - **Cause:** the header ribbon's `.header-bow-track` was full width and moved with `translate: calc(var(--page) * 100%)`, so the page grew wider as you scrolled, up to 1869px at the bottom on a 1902px screen. The earlier tests ran with hidden scrollbars and never measured page width, so they missed it.
+  - **Fix:** the bow is now placed with `left` inside a track that doesn't move.
+  - **Also found by a sweep of the whole page:**
+    - the Event stories envelope flap added up to 101px while swinging open;
+    - the wax seal added 16px on tablets and phones during its scale-in;
+    - at 1024px the email address ran 6px past its calling card.
+  - **Fixes for those:**
+    - `overflow-x-clip` on the homepage `<main>` and the visual editor's `<main>`, which doesn't stop sticky or view timelines;
+    - `overflow-x: clip` on `.footer-garland`;
+    - `.calling-card-email` (1.3rem, 1.125rem from 40rem, `overflow-wrap: anywhere`), `min-width: 0` on `.calling-card`, and the contact columns at `lg` are now 5 + 7.
+  - **Checked** in headless Chrome: 41 scroll positions at each of 1902, 1440, 1280, 1024, 768, 640 and 390 show 0px overflow, and the email fits on one line in its card at all of them. Type-check and lint pass.
+- **Side section bar** (user's sketch: "add another side sectionbar ... all the sections like the studio, Services, What we style, Our work, etc all and it will be like a progressbar and clickable as well"):
+  - **What it is** (`layout/section-rail.tsx`, new client component, on the public homepage only): a small ivory card fixed to the right, between the header and the chat button, listing every section on a gold line with a bead for each.
+  - **Sections:** read from the page itself (`#main section[aria-labelledby]`, using each section's eyebrow text through a new `data-eyebrow` attribute on `Eyebrow`), so edited names and unpublished sections stay correct with no list to maintain. The first section shows as "Home". Today that gives 13: Home, The studio, Services, What we style, Our work, Event stories, The process, Why Canvas, About us, Reviews, FAQ, Enquire, Contact us. Pricing and Films join automatically once published.
+  - **New ids** so every section can be linked: `what-we-style`, `process` and `why-canvas`.
+  - **Progress:** the line fills continuously between beads as you scroll, from the section at 40% of the way down the screen and how far the page has moved towards the next one. It is written to `--rail` directly, so scrolling only re-renders when the section changes. Passed beads fill with gold; the current one has a halo, and its name is rose and bold with `aria-current="location"`.
+  - **Clicking:** each name is a normal `#id` link, so the existing SmoothScroll glide applies.
+  - **Showing the names:** on by default from 96rem (1536px). Below that it starts as just the line and beads, and hovering or tabbing shows the names. The arrow at the top hides or shows them, remembered on the device in `localStorage` (`cc-section-rail`, wrapped in try/catch).
+  - **Not shown** below 64rem (phones and tablets) or in print.
+  - **Known trade-off:** the page runs full width, so the open card sits over the right edge of full-width sections. At 1902 it covers part of "See more on Instagram" and the edge of the last polaroid.
+  - **Checked** in headless Chrome:
+    - at 1902 and 1440, real clicks on all 13 names landed on the right section (13/13 each), with the fill rising steadily from 0.03 to 1;
+    - the arrow changed the width (128 ↔ 38px) and survived a reload;
+    - at 390 the bar is hidden;
+    - screenshots over light and dark sections;
+    - sideways overflow is still 0 at 1902 and 1024;
+    - type-check and lint pass.
+- **Side section bar redesigned** (user: "i don't like this design so can u improve?"):
+  - **Dropped:** the boxed card with small text, the always-open names over the content, and the hide arrow with its `localStorage` setting. Nothing needs hiding now, so the code is simpler.
+  - **At rest:** a slim gold arc curving along the right edge of the screen, strung with a pearl bead per section. Passed beads turn gold. A small bow rides the tip of the fill, with a rose swallowtail ribbon flag naming the current section. The bar takes 66px at the edge and leaves "See more on Instagram" and the gallery clear at 1902.
+  - **On hover or keyboard focus:** an ivory drawer grows out of the edge, with every section by name in the site's serif, each name following the curve. The current section is rose italic. The drawer grows with `scale`, so it can't widen the page.
+  - **The curve:** a quadratic `M100 0 Q 0 50 100 100`, so a bead at position `s` sits `2s(1-s)` of `--arc` in from the edge (`--o` per row). The bow's position uses the same formula from `--rail`. The fill is a second copy of the curve revealed with `clip-path`, because `pathLength` dashes aren't reliable with `non-scaling-stroke`.
+  - **Unchanged:** the section list from the page, the progress maths, `#id` links through SmoothScroll, `aria-current`, and hidden below 64rem and in print.
+  - **Checked** in headless Chrome at 1902×945 and 1280×720:
+    - all 13 beads sit exactly on the curve (0px off);
+    - real hover then click landed on the right section 13/13 at each size, with 0px sideways overflow on every click;
+    - the drawer shuts when the pointer leaves;
+    - screenshots at rest on light and dark sections, and with the drawer open;
+    - type-check and lint pass.
+- **Fix: guestbook duplicate page and flicker** (user: "fix the review book flicker issue and while open a page it duplicate the page also"):
+  - **Duplicate page (reproduced):** while the cover swung open, the real left page and cloth appeared at `--open` 0.5–0.625, as the cover still carried its copy across, so two left pages were on screen from about 0.55 to 0.95. The real left half now stays hidden until 0.99, when the cover has landed exactly over it.
+  - **Pop at the swap:** the page inside the cover was narrower than the real one (padding at the spine) and its cloth differed. `.book-cover-back` now has no spine padding on spreads and the same cloth and shadows as the real half. The two now match, apart from slight text smoothing.
+  - **Flash on letting go of a drag (reproduced):** the shading restarted from 0, dropping from 0.59 to 0.02 (1.00 to 0.01 on phones). `Leaf` now keeps `shadeFrom`, and the keyframes start from `--shade`. A turn let go past upright, or falling back, only fades (`cc-leaf-fade`, `.guestbook-leaf-fading`).
+  - **Book height (not happening with today's reviews; prevented):** the height came from the pages showing, so a long review would have made the book jump during a turn. A hidden `.guestbook-sizer` stack of all reviews now holds it at the tallest page. A very long review will make every page that tall.
+  - **Checked** in headless Chrome at 1440 and 390:
+    - copies of the left page: 1 at every point of the opening (was 2 from 0.55 to 0.95);
+    - shading after letting go: 0.59 → 0.58, and 1.00 → 0.99 on phones;
+    - recorded frames of opening, turning forward, turning back and dragging show no flicker frames;
+    - with a simulated very long review the book took one height (408 → 1096px) and held it through every turn;
+    - type-check and lint pass.
+- **About us, founder portrait redone as a mood board** (user: "this looks like deatch person so remove that decoration and try something better"):
+  - **Removed:** the round gold frame with flowers top and bottom, which read as a memorial wreath. `shared/gilded-frame.tsx` is deleted, along with its CSS block and animations.
+  - **New design** (`about-founder.tsx`, globals.css "Mood board"): a stylist's working board. An upright 4:5 photo with a thin white border, tilted −2° and taped at the top corners onto a blush panel, with a fan of four colour sample cards (sage, champagne, rose, pink) at the bottom corner.
+  - **Motion:** as it scrolls in, the panel settles, the photo is laid on and the cards fan out, finishing before the portrait turns sticky on desktop. Hovering spreads the cards a little. Firefox fallback: a `moodboard` SPECS entry plus `html.js-motion` rules. With reduced motion it rests still.
+  - **The photo file:** the supplied portrait, including the 2048px original, is a transparent circle cut-out. To show it upright, the frame is filled with its exact background colour (`#d8e1eb`) and the photo is zoomed 1.17× from the top, the least zoom that keeps the circle's bottom edge out of the frame. `sizes` was raised so it stays sharp. A true rectangular photo from Neha would allow a wider crop. A newly uploaded photo gets the same zoom.
+  - **Checked** in headless Chrome at 1440 and 390: screenshots at rest; the fill matches the photo to within 2/255 at the top corners, so no seam shows; 0px sideways overflow; type-check and lint pass. The hover spread and the Firefox fallback were not exercised.
+- **Side section bar switched off for now** (user: "for now comment this section"): the `SectionRail` import and `<SectionRail />` are commented out in `src/app/(site)/page.tsx`. `section-rail.tsx`, its CSS and the new section ids stay in place, so restoring those two lines brings it back.
+- **Event stories envelope made smaller so the opening fits on screen** (user: "make a image bit small and card also so when user scroll it visible properly"):
+  - **Size** (globals.css "Envelope", `.envelope-story`): the width now follows the screen height, up to 640px, so the envelope and its open flap fit under the header together. 1002×752 became 640×480 at 1902×945, 605×454 at 1440×900 and 464×348 at 1280×720. Phones stay about the same (348×435). It sits centred in its column.
+  - **Timing:** seal cover 32–36%, flap 36–44%, envelope drop and photo 43–55%. These count from under the header, because the page's `scroll-padding-top` shortens the view timeline. The Firefox fallback in `scroll-motion.tsx` counts the full window, so it has its own lower numbers (.30–.335, .335–.405, .40–.51).
+  - **Fix:** the photo started 12% lower than the envelope, so a strip of it showed below the sealed envelope once the whole envelope fitted on screen. That offset is removed from `cc-env-card` and the fallback.
+  - **Known:** the open flap passes over the section heading on the first story. On phones the bottom Call/Enquire bar covers about 30px of the envelope as the flap starts.
+  - **Checked** in headless Chrome at 1902×945, 1440×900, 1280×720 and 390×844: the open flap stays below the header, the flap starts with the envelope's bottom on screen (behind the Call/Enquire bar on phones), 0px sideways overflow, type-check and lint pass. Firefox fallback timing was worked out, not run.
+- **Event stories envelope rebuilt so the photo is really inside it** (user sent a screenshot: "we need more improvement on here"; the photo and SAMPLE badge still showed below the envelope, and the open envelope looked plain):
+  - **Layers:** `Envelope` is split into `EnvelopeBack` and `EnvelopeFront` (`shared/envelope.tsx`), with the photo between them, so it shows through the opening instead of sitting under a solid block.
+  - **Motion:** seal cover 32–36%, flap 36–44% (outer face to edge-on, then the lined inner face in the back layer so the photo passes in front of it), photo rises 32% out of the pocket and settles back 43–58%, envelope drops and fades 47–58%. Firefox fallback: new `--cc-rise` and `--cc-settle` in SPECS, plus `.env-flap-in`.
+  - **Shape:** the flap is 48% of the height (was 54%) and overlaps the pocket's edges, so no photo shows at the join and the open flap rises less.
+  - **Look:** the inside of the flap has a blush lining.
+  - **Lightbox:** `.envelope-story > button` is lifted above the photo so the photo stays clickable.
+  - **Checked** in headless Chrome at 1902×945, 1280×720 and 390×844: the photo stays inside the sealed envelope on the two stories shown (the other two sit behind "Show all" and were not opened), the open flap stays below the header, no photo shows at the flap's join, the photo still opens the lightbox, 0px sideways overflow at the positions tested. Type-check and lint pass. The strip in the user's screenshot measured about 42px, what the removed 12% offset would leave, so it was probably older CSS, not confirmed. Firefox fallback not run.
+- **Public header tidied to match the admin header** (user: "i like the admin side header but public page header is not looking that much good"):
+  - **Size:** desktop height 96px to 80px (`--header-height` 5rem); logo 72px to 56px (48px on phones).
+  - **Name:** "Canvas Creations / and Events" beside the logo from 640px up (`.logo-sub`).
+  - **Surface:** frosted background (95%, as lower turned grey over the dark Gallery) with a permanent hairline, as in admin; the soft shadow still comes on scroll.
+  - **Menu** (`header-nav.tsx`): semibold muted text, darker on hover and for the current item, with hover and current lines on the bottom edge. The bow under the current item is replaced by a sliding underline in the primary colour (`.nav-line`, `--x`, `--w`).
+  - **Scroll ribbon:** thinner (2px) and its riding bow is gone, so one edge no longer carries two bows. `MiniBow` stays for the switched-off section rail.
+  - **Checked** in headless Chrome at 1902×945, 1024×768 and 390×844: header 81px (73px on phones), underline matches the current item, name fits at 1024, 0px sideways overflow. The name is hidden on phones. Type-check and lint pass. Mobile menu not opened.

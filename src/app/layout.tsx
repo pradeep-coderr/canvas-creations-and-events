@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, Manrope } from "next/font/google";
+import { Cormorant_Garamond, Dancing_Script, Manrope } from "next/font/google";
 import { MotionProvider } from "@/components/motion/motion-provider";
 import { site } from "@/data/site";
 import { getSiteUrl } from "@/lib/site-url";
@@ -15,6 +15,13 @@ const cormorant = Cormorant_Garamond({
   variable: "--font-cormorant",
   subsets: ["latin"],
   style: ["normal", "italic"],
+  display: "swap",
+});
+
+// Handwriting: only the About section's note card and signature.
+const dancing = Dancing_Script({
+  variable: "--font-dancing",
+  subsets: ["latin"],
   display: "swap",
 });
 
@@ -37,7 +44,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en-AU"
-      className={`${manrope.variable} ${cormorant.variable} h-full antialiased`}
+      className={`${manrope.variable} ${cormorant.variable} ${dancing.variable} h-full antialiased`}
     >
       {/* suppressHydrationWarning: browser extensions (e.g. Grammarly) add
           attributes to <body> before React loads; only this element's own

@@ -56,6 +56,8 @@ export interface EditorPageData {
   data: EditorData;
   collections: EditorCollections;
   heroImage: EditorialImage | null;
+  /** The background photo behind the hero and "The studio" (null: the animated glow). */
+  backgroundImage: EditorialImage | null;
   aboutImage: EditorialImage | null;
   /** Categories that have photos in the portfolio (drafts included). */
   galleryCategories: { id: string; label: string }[];
@@ -234,7 +236,13 @@ function toDomain(key: CollectionKey, row: Row, urls: Urls) {
 export async function loadEditorPage(): Promise<EditorPageData | null> {
   const supabase = await createClient();
   const [homeRes, aboutRes, videoRes, siteRes, stylesRes, imageOptions, videoOptions, categoryOptions, ...lists] = await Promise.all([
-    supabase.from("home_content").select(`*, hero_image:media_assets!home_content_hero_image_fkey(${MEDIA})`).eq("id", true).single(),
+    supabase
+      .from("home_content")
+      .select(
+        `*, hero_image:media_assets!home_content_hero_image_fkey(${MEDIA}), background_image:media_assets!home_content_background_image_fkey(${MEDIA})`,
+      )
+      .eq("id", true)
+      .single(),
     supabase.from("about_content").select(`*, image:media_assets!about_content_image_fkey(${MEDIA})`).eq("id", true).single(),
     supabase.from("video_story").select(VIDEO_STORY_SELECT).eq("id", true).single(),
     supabase.from("site_settings").select(SITE_SETTINGS_SELECT).eq("id", true).single(),
@@ -283,6 +291,7 @@ export async function loadEditorPage(): Promise<EditorPageData | null> {
     supabase,
     [
       (home.hero_image as Media)?.storage_path,
+      (home.background_image as Media)?.storage_path,
       (about.image as Media)?.storage_path,
       ...collectionKeys.flatMap((key, i) =>
         rowsOf(i).flatMap((row) => [
@@ -360,6 +369,7 @@ export async function loadEditorPage(): Promise<EditorPageData | null> {
     },
     collections: domain as unknown as EditorCollections,
     heroImage: image(home.hero_image as Media, urls),
+    backgroundImage: image(home.background_image as Media, urls),
     aboutImage: image(about.image as Media, urls),
     galleryCategories: [...categoryMap.entries()]
       .sort((a, b) => a[1].order - b[1].order)

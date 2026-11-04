@@ -97,6 +97,9 @@ export const homeSchema = z.object({
   pricingDescription: optionalText(),
   galleryIntro: optionalText(),
   heroImageId: optionalId(),
+  // The blurred photo behind the hero and "The studio" (none: the animated glow), and whether it's shown.
+  backgroundImageId: optionalId(),
+  showBackground: z.boolean(),
   // Up to three lines (why_title_lines: 1–3, no blanks). Empty lines are dropped.
   whyTitleLines: z
     .tuple([titleLine, titleLine, titleLine])
@@ -109,7 +112,12 @@ export const homeSchema = z.object({
 export type HomeValues = z.input<typeof homeSchema>;
 
 export function homeToRow(v: z.output<typeof homeSchema>): Row {
-  const row: Row = { hero_image_id: v.heroImageId, why_title_lines: v.whyTitleLines };
+  const row: Row = {
+    hero_image_id: v.heroImageId,
+    background_image_id: v.backgroundImageId,
+    show_background: v.showBackground,
+    why_title_lines: v.whyTitleLines,
+  };
   for (const [field, column] of Object.entries(homeColumns)) row[column] = v[field as HomeField];
   for (const [field, column] of Object.entries(homeOptionalColumns)) row[column] = v[field as HomeOptionalField];
   return row;
@@ -119,6 +127,8 @@ export function homeToValues(row: Row): HomeValues {
   const lines = Array.isArray(row.why_title_lines) ? row.why_title_lines.map(str) : [];
   const values = {
     heroImageId: str(row.hero_image_id),
+    backgroundImageId: str(row.background_image_id),
+    showBackground: row.show_background !== false,
     whyTitleLines: [lines[0] ?? "", lines[1] ?? "", lines[2] ?? ""] as [string, string, string],
   } as HomeValues;
   for (const [field, column] of Object.entries(homeColumns)) values[field as HomeField] = str(row[column]);

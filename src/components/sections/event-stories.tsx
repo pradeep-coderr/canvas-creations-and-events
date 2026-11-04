@@ -1,18 +1,21 @@
 import { Container } from "@/components/layout/container";
 import { Section } from "@/components/layout/section";
 import { Reveal, RevealRule } from "@/components/motion/reveal";
+import { EnvelopeBack, EnvelopeFront } from "@/components/shared/envelope";
 import { ImageFrame } from "@/components/shared/image-frame";
 import { SampleBadge, SampleNotice } from "@/components/shared/sample-badge";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { storiesSection, type StoriesCopy } from "@/data/home";
 import type { EventStory } from "@/data/stories";
+import { ShowMore } from "@/components/shared/show-more";
 import { cn } from "@/lib/utils";
 import { GalleryLightbox, LightboxTrigger } from "./gallery-lightbox";
 import { SlotItem, type ItemSlots } from "./item-slots";
 
 /*
  * Event stories: celebrations told like a magazine feature. Each story has a
- * large main photo (opening through a soft mask as it scrolls in), its text
+ * large main photo (delivered in an invitation envelope that opens as it
+ * scrolls in: shared/envelope), its text
  * settling beside it, supporting photos that drift at slightly different
  * rates on large screens, and — only when the client has agreed to one — their
  * testimonial. All motion is scroll-linked CSS (globals.css), reversing on
@@ -71,26 +74,33 @@ function Story({ story, flip }: { story: EventStory; flip: boolean }) {
     >
       <article aria-labelledby={`story-${story.id}`} className="grid gap-8 lg:grid-cols-12 lg:gap-16">
         {/* Flipped stories swap photo and text on large screens only (the extra photos stay below). */}
-        <Reveal variant="mask" className={cn("lg:col-span-7", flip && "lg:col-start-6 lg:row-start-1")}>
-          <figure className="relative">
-            <ImageFrame
-              src={story.image.src}
-              alt={story.image.alt}
-              ratio="portrait"
-              sizes="(min-width: 1280px) 700px, (min-width: 1024px) 58vw, 100vw"
-              className="aspect-4/5 sm:aspect-3/2 lg:aspect-4/5"
-            />
-            {story.isDemo && <SampleBadge />}
+        {/* The main photo arrives like an invitation: it sits inside a sealed
+            envelope that opens with the scroll, rises out of the pocket, and
+            the envelope drops away. */}
+        <div className={cn("lg:col-span-7", flip && "lg:col-start-6 lg:row-start-1")}>
+          <figure className="envelope-story relative">
+            <EnvelopeBack />
+            <div className="env-card relative">
+              <ImageFrame
+                src={story.image.src}
+                alt={story.image.alt}
+                ratio="portrait"
+                sizes="(min-width: 1280px) 700px, (min-width: 1024px) 58vw, 100vw"
+                className="aspect-4/5 sm:aspect-3/2 lg:aspect-4/3"
+              />
+              {story.isDemo && <SampleBadge />}
+            </div>
+            <EnvelopeFront />
             <LightboxTrigger index={0} label={story.image.alt} />
           </figure>
-        </Reveal>
+        </div>
         <div className={cn("flex flex-col justify-center lg:col-span-5", flip && "lg:col-start-1 lg:row-start-1")}>
           <Reveal>
             <StoryText story={story} headingId={`story-${story.id}`} />
           </Reveal>
         </div>
         {story.gallery.length > 0 && (
-          <ul className={cn("grid grid-cols-2 gap-3 sm:gap-4 lg:col-span-12 lg:gap-6", story.gallery.length >= 3 && "lg:grid-cols-3")}>
+          <ul className={cn("grid grid-cols-2 gap-3 sm:gap-4 lg:col-span-12 lg:gap-6", story.gallery.length >= 3 && "lg:grid-cols-4")}>
             {story.gallery.map((img, i) => (
               <li key={i} className="min-w-0">
                 <Reveal>
@@ -100,7 +110,7 @@ function Story({ story, flip }: { story: EventStory; flip: boolean }) {
                       alt={img.alt}
                       ratio="square"
                       zoomOnHover
-                      sizes="(min-width: 1280px) 400px, (min-width: 1024px) 33vw, 50vw"
+                      sizes="(min-width: 1024px) 25vw, 50vw"
                       className={i % 3 === 1 ? "aspect-4/5 sm:aspect-square" : "aspect-square"}
                     />
                     {story.isDemo && <SampleBadge />}
@@ -142,16 +152,19 @@ export function EventStories({
         {anySample && <SampleNotice className="mt-4">{copy.sampleNotice}</SampleNotice>}
 
         {stories.length > 0 && (
-          <ol className="mt-14 grid gap-16 sm:mt-16 lg:mt-20 lg:gap-24">
-            {stories.map((story, i) => (
-              <li key={story.id} className="grid gap-16 lg:gap-24">
-                {i > 0 && <RevealRule />}
-                <SlotItem slots={itemSlots} item={story}>
-                  <Story story={story} flip={i % 2 === 1} />
-                </SlotItem>
-              </li>
-            ))}
-          </ol>
+          // The website shows two stories, then "Show all"; the editor shows every story.
+          <ShowMore limit={itemSlots ? stories.length : 2} count={stories.length} label={`Show all ${stories.length} stories`} listSelector="ol">
+            <ol className="mt-14 grid gap-16 sm:mt-16 lg:mt-20 lg:gap-24">
+              {stories.map((story, i) => (
+                <li key={story.id} className="grid gap-16 lg:gap-24">
+                  {i > 0 && <RevealRule />}
+                  <SlotItem slots={itemSlots} item={story}>
+                    <Story story={story} flip={i % 2 === 1} />
+                  </SlotItem>
+                </li>
+              ))}
+            </ol>
+          </ShowMore>
         )}
         {itemSlots?.after}
       </Container>

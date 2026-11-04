@@ -68,6 +68,7 @@ export function ForgotPasswordForm() {
 
       {step === "password" ? (
         <PasswordStep
+          email={state.email ?? ""}
           onRestart={() => {
             setVerified(false);
             setChangingEmail(true);

@@ -594,6 +594,8 @@ interface HomeRow {
   hero_description: string;
   hero_secondary_cta_label: string;
   hero_image: MediaRow | null;
+  background_image: MediaRow | null;
+  show_background: boolean;
   intro_eyebrow: string;
   intro_title: string;
   intro_body: string;
@@ -645,18 +647,21 @@ export function getHomeCopy(): Promise<HomeCopy> {
     async (db) => {
       const { data, error } = await db
         .from("home_content")
-        .select(`*, hero_image:media_assets!home_content_hero_image_fkey(${MEDIA})`)
+        .select(
+          `*, hero_image:media_assets!home_content_hero_image_fkey(${MEDIA}), background_image:media_assets!home_content_background_image_fkey(${MEDIA})`,
+        )
         .eq("id", true)
         .single();
       if (error) throw error;
       const r = data as unknown as HomeRow;
-      const urls = await signed(db, [r.hero_image]);
+      const urls = await signed(db, [r.hero_image, r.background_image]);
       return {
         hero: {
           eyebrow: r.hero_eyebrow,
           description: r.hero_description,
           secondaryCta: { label: r.hero_secondary_cta_label, href: hero.secondaryCta.href },
           image: toImage(r.hero_image, urls),
+          background: { image: toImage(r.background_image, urls), show: r.show_background !== false },
         },
         intro: { eyebrow: r.intro_eyebrow, title: r.intro_title, body: r.intro_body },
         services: {
@@ -726,7 +731,8 @@ export function getAboutCopy(): Promise<AboutCopy> {
         eyebrow: r.eyebrow,
         title: r.title,
         body: r.body,
-        image: toImage(r.image, await signed(db, [r.image])),
+        // No photo picked in the admin: Neha's built-in portrait.
+        image: toImage(r.image, await signed(db, [r.image])) ?? about.image,
         cta: { label: r.cta_label, href: about.cta.href },
         founder: r.founder_name ? { name: r.founder_name, role: r.founder_role ?? undefined } : null,
       };

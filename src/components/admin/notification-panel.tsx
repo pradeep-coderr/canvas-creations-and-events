@@ -79,7 +79,7 @@ export function NotificationPanel({
 }: {
   publicKey: string | null;
   /** This admin's saved subscriptions (endpoint → preferences). */
-  prefs: Record<string, { enquiries: boolean; reminders: boolean; reviews: boolean }>;
+  prefs: Record<string, { enquiries: boolean; reminders: boolean; reviews: boolean; chats: boolean }>;
 }) {
   const [support, setSupport] = useState<Support>("checking");
   const [permission, setPermission] = useState<NotificationPermission>("default");
@@ -87,6 +87,7 @@ export function NotificationPanel({
   const [enquiries, setEnquiries] = useState(true);
   const [reminders, setReminders] = useState(true);
   const [reviews, setReviews] = useState(true);
+  const [chats, setChats] = useState(true);
   const [busy, setBusy] = useState<Busy>(null);
   const [status, setStatus] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [diag, setDiag] = useState<Diagnostics>({
@@ -145,6 +146,7 @@ export function NotificationPanel({
         setEnquiries(saved.enquiries);
         setReminders(saved.reminders);
         setReviews(saved.reviews);
+        setChats(saved.chats ?? true);
       }
       setSupport("supported");
     };
@@ -256,12 +258,13 @@ export function NotificationPanel({
       return { ok: true, message: "Delivered: the test notification was shown on this device." };
     });
 
-  const savePrefs = (next: { enquiries: boolean; reminders: boolean; reviews: boolean }) =>
+  const savePrefs = (next: { enquiries: boolean; reminders: boolean; reviews: boolean; chats: boolean }) =>
     run("prefs", async () => {
       if (!subscription) return;
       setEnquiries(next.enquiries);
       setReminders(next.reminders);
       setReviews(next.reviews);
+      setChats(next.chats);
       return setPushPreferences({ endpoint: subscription.endpoint, ...next });
     });
 
@@ -320,7 +323,7 @@ export function NotificationPanel({
                   id="notify-enquiries"
                   checked={enquiries}
                   aria-disabled={busy !== null || undefined}
-                  onCheckedChange={(v) => busy === null && void savePrefs({ enquiries: v === true, reminders, reviews })}
+                  onCheckedChange={(v) => busy === null && void savePrefs({ enquiries: v === true, reminders, reviews, chats })}
                 />
                 <Label htmlFor="notify-enquiries">New enquiries</Label>
               </div>
@@ -329,7 +332,7 @@ export function NotificationPanel({
                   id="notify-reminders"
                   checked={reminders}
                   aria-disabled={busy !== null || undefined}
-                  onCheckedChange={(v) => busy === null && void savePrefs({ enquiries, reminders: v === true, reviews })}
+                  onCheckedChange={(v) => busy === null && void savePrefs({ enquiries, reminders: v === true, reviews, chats })}
                 />
                 <Label htmlFor="notify-reminders">Calendar reminders</Label>
               </div>
@@ -338,9 +341,18 @@ export function NotificationPanel({
                   id="notify-reviews"
                   checked={reviews}
                   aria-disabled={busy !== null || undefined}
-                  onCheckedChange={(v) => busy === null && void savePrefs({ enquiries, reminders, reviews: v === true })}
+                  onCheckedChange={(v) => busy === null && void savePrefs({ enquiries, reminders, reviews: v === true, chats })}
                 />
                 <Label htmlFor="notify-reviews">New reviews and feedback</Label>
+              </div>
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="notify-chats"
+                  checked={chats}
+                  aria-disabled={busy !== null || undefined}
+                  onCheckedChange={(v) => busy === null && void savePrefs({ enquiries, reminders, reviews, chats: v === true })}
+                />
+                <Label htmlFor="notify-chats">Website chats</Label>
               </div>
             </fieldset>
           )}

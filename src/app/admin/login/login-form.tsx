@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useEffect } from "react";
+import { startTransition, useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { signInSchema, type SignInValues } from "@/lib/admin/auth-schemas";
 import { signIn, type SignInState } from "../actions";
+import { useRouter } from "next/navigation";
+import { createSentCredentials } from "@/lib/admin/save-password";
 
 /**
  * Sign-in (React Hook Form + Zod in the browser; the server action checks
@@ -32,13 +34,25 @@ export function LoginForm({ next = "/admin" }: { next?: string }) {
     shouldFocusError: true,
   });
 
+  /** What was just sent, for "Save password?" once the server accepts it. */
+  const [sent] = useState(createSentCredentials);
+  const router = useRouter();
+
   useEffect(() => {
+    if (state.next) {
+      // Signed in: offer to save the password (Chrome / Google Password
+      // Manager), then open the admin.
+      const next = state.next;
+      void sent.offer().then(() => router.replace(next));
+      return;
+    }
     if (!state.error) return;
     resetField("password");
     setFocus("password");
-  }, [state, resetField, setFocus]);
+  }, [state, resetField, setFocus, sent, router]);
 
   const onSubmit = handleSubmit((values) => {
+    sent.set(values.email, values.password);
     const data = new FormData();
     data.set("email", values.email);
     data.set("password", values.password);
@@ -100,7 +114,7 @@ export function LoginForm({ next = "/admin" }: { next?: string }) {
           {state.error}
         </p>
       )}
-      <Button type="submit" size="lg" className="w-full" pending={pending} pendingLabel="Signing in…">
+      <Button type="submit" size="lg" className="w-full" pending={pending || Boolean(state.next)} pendingLabel="Signing in…">
         Sign in
       </Button>
     </form>

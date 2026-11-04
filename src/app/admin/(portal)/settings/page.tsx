@@ -14,18 +14,21 @@ export const metadata: Metadata = { title: "Settings" };
 export default async function SettingsPage() {
   const admin = await requireSuperAdmin();
   const supabase = await createClient();
-  const [{ data }, { data: emailCheck }] = await Promise.all([
+  const [{ data, error: prefsError }, { data: emailCheck }] = await Promise.all([
     supabase
       .from("push_subscriptions")
-      .select("endpoint, notify_enquiries, notify_reminders, notify_reviews")
+      .select("endpoint, notify_enquiries, notify_reminders, notify_reviews, notify_chats")
       .eq("admin_user_id", admin.userId)
       .is("revoked_at", null),
     supabase.from("notification_checks").select("ok, detail, checked_at").eq("kind", "email").maybeSingle(),
   ]);
+  // Not quiet: an error here usually means the database is behind the code
+  // (e.g. the chat migration hasn't run), and every device would show defaults.
+  if (prefsError) console.error("[settings] notification preferences failed to load", { code: prefsError.code });
   const prefs = Object.fromEntries(
     (data ?? []).map((s) => [
       s.endpoint,
-      { enquiries: s.notify_enquiries, reminders: s.notify_reminders, reviews: s.notify_reviews },
+      { enquiries: s.notify_enquiries, reminders: s.notify_reminders, reviews: s.notify_reviews, chats: s.notify_chats },
     ]),
   );
 

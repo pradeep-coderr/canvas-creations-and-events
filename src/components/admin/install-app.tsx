@@ -62,6 +62,10 @@ export function InstallApp({ compact = false }: { compact?: boolean }) {
       <Button
         type="button"
         variant={compact ? "outline" : "default"}
+        // The header: a round icon button (named for screen readers, with a tooltip).
+        size={compact ? "icon" : undefined}
+        title={compact ? "Install app" : undefined}
+        className={compact ? "rounded-full" : undefined}
         pending={busy}
         pendingLabel="Installing…"
         onClick={async () => {
@@ -78,8 +82,7 @@ export function InstallApp({ compact = false }: { compact?: boolean }) {
         }}
       >
         <Download data-icon="inline-start" aria-hidden="true" />
-        {/* Icon-only in the phone header, where space is tight. */}
-        <span className={compact ? "sr-only sm:not-sr-only" : undefined}>Install app</span>
+        <span className={compact ? "sr-only" : undefined}>Install app</span>
       </Button>
     );
   }

@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Textarea } from "@/components/ui/textarea";
 import { ALT_MAX, TITLE_MAX, videoProviderLabels, type MediaImage, type MediaVideo } from "@/lib/media/types";
 import { cn } from "@/lib/utils";
@@ -140,13 +141,12 @@ export function MediaLibrary({
       {tab === "photos" ? (
         <>
           {images.length > 0 && (
-            <Input
-              type="search"
+            <SearchInput
               className="mt-4 max-w-md"
               aria-label="Search photos by description or file name"
               placeholder="Search by description or file name"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onValueChange={setQuery}
             />
           )}
           {images.length === 0 ? (

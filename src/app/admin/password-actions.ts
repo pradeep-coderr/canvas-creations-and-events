@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { newPasswordSchema, resetCodeSchema } from "@/lib/admin/auth-schemas";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -81,6 +80,8 @@ export interface NewPasswordState {
   fieldErrors?: { password?: string; confirm?: string };
   /** The reset session is gone (expired, or the page was opened directly). */
   restart?: boolean;
+  /** Saved: the page offers to update the browser's saved password, then goes to sign-in. */
+  done?: boolean;
 }
 
 export async function setNewPassword(_prev: NewPasswordState, formData: FormData): Promise<NewPasswordState> {
@@ -113,5 +114,5 @@ export async function setNewPassword(_prev: NewPasswordState, formData: FormData
   // End the short reset session: the admin signs in again with the new password.
   await supabase.auth.signOut();
   console.info("[admin] password updated with a reset code", { userId: data.claims.sub });
-  redirect("/admin/login?reset=done");
+  return { done: true };
 }

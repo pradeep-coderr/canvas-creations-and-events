@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { HomeSections } from "@/components/home/home-sections";
+// Side section bar: switched off for now. To bring it back, restore this import and <SectionRail /> below.
+// import { SectionRail } from "@/components/layout/section-rail";
 import { getHomepageContent } from "@/lib/content/public";
 import { localBusinessJsonLd, serializeJsonLd, websiteJsonLd } from "@/lib/structured-data";
 
@@ -16,16 +18,19 @@ export default async function Home() {
   const content = await getHomepageContent();
 
   return (
-    <main id="main">
-      {/* Business structured data: verified facts only (see lib/structured-data.ts). */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: serializeJsonLd(localBusinessJsonLd(content.settings)) }}
-      />
-      {/* The site's name for search results (with the names people search for). */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteJsonLd()) }} />
-      {/* Same composition as the admin visual editor (/admin/editor). */}
-      <HomeSections content={content} />
-    </main>
+    <>
+      <main id="main" className="overflow-x-clip">
+        {/* Business structured data: verified facts only (see lib/structured-data.ts). */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(localBusinessJsonLd(content.settings)) }}
+        />
+        {/* The site's name for search results (with the names people search for). */}
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteJsonLd()) }} />
+        {/* Same composition as the admin visual editor (/admin/editor). */}
+        <HomeSections content={content} />
+      </main>
+      {/* The side bar of sections, switched off for now: <SectionRail /> */}
+    </>
   );
 }

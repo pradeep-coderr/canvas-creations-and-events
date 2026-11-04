@@ -130,7 +130,7 @@ export function HomeSections({ content, slots }: { content: HomeContent; slots?:
         <Hero copy={copy.hero} settings={settings} imageAction={slots?.heroImage} />
       </S>
       <S section="intro" styles={ss}>
-        <Intro copy={copy.intro} />
+        <Intro copy={copy.intro} background={copy.hero.background} />
       </S>
       <S section="services" styles={ss}>
         <Services services={content.services} copy={copy.services} itemSlots={slots?.services} />

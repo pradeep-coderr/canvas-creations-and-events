@@ -6,6 +6,7 @@ import { notifyNewEnquiry } from "@/lib/push/server";
 import { enquirySchema, type Enquiry, type EnquiryResult } from "@/lib/enquiry";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { buildVisitorMeta } from "@/lib/visitor/server";
 
 const FAILED: EnquiryResult = {
   status: "error",
@@ -45,6 +46,8 @@ function toRow(id: string, enquiry: Enquiry) {
 export async function submitEnquiry(
   input: unknown,
   honeypot?: unknown,
+  /** Visitor info from the browser (lib/visitor); the server adds location and device. */
+  signals?: unknown,
 ): Promise<EnquiryResult> {
   if (typeof honeypot === "string" && honeypot.trim() !== "") {
     // Looks sent to the sender (bots learn nothing); logged so a real person
@@ -71,7 +74,8 @@ export async function submitEnquiry(
   const id = crypto.randomUUID();
   try {
     const supabase = await createClient();
-    const { error } = await supabase.from("enquiries").insert(toRow(id, parsed.data));
+    const meta = await buildVisitorMeta(signals);
+    const { error } = await supabase.from("enquiries").insert({ ...toRow(id, parsed.data), meta });
     if (error) {
       // Log the database error for diagnosis, never the visitor's details.
       console.error("[enquiry] insert failed", { code: error.code, message: error.message });

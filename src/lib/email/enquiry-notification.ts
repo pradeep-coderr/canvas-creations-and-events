@@ -2,6 +2,7 @@ import "server-only";
 import { site } from "@/data/site";
 import { formatDateTime, formatEventDate } from "@/lib/datetime";
 import type { Enquiry } from "@/lib/enquiry";
+import { escapeHtml } from "./html";
 
 /*
  * Internal "new enquiry" notification for the business. Operational, not
@@ -20,15 +21,6 @@ const colour = {
 };
 const fontSerif = "Georgia, 'Times New Roman', serif";
 const fontSans = "Arial, Helvetica, sans-serif";
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
 
 /** Collapse newlines and control characters (for the subject line). */
 function singleLine(value: string) {

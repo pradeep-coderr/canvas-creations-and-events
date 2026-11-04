@@ -1,11 +1,12 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const containerVariants = cva("mx-auto w-full px-5 sm:px-8 lg:px-10", {
+// The fluid side padding (--gutter, globals.css), shared with the site header so everything lines up.
+const containerVariants = cva("mx-auto w-full px-(--gutter)", {
   variants: {
     size: {
-      // 1280px box → 1200px of content at desktop
-      default: "max-w-7xl",
+      // Full width: the page uses the whole window (edge padding only)
+      default: "max-w-none",
       // Reading width: editorial copy, headings, forms
       narrow: "max-w-3xl",
     },

@@ -11,6 +11,8 @@ import { createClient } from "@/lib/supabase/server";
 
 export interface SignInState {
   error?: string;
+  /** Signed in: where to go next (the page offers to save the password, then goes there). */
+  next?: string;
 }
 
 const credentialsSchema = z.object({
@@ -47,7 +49,8 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
 
   console.info("[admin] signed in", { userId: data.user.id });
   // Back to the admin page they were asked to sign in for (admin pages only).
-  redirect(safeAdminNext(formData.get("next")));
+  // The page goes there itself, after offering to save the password.
+  return { next: safeAdminNext(formData.get("next")) };
 }
 
 export async function signOut() {

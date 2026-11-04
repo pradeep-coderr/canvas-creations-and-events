@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ImageUse, MediaImage } from "@/lib/media/types";
 import { cn } from "@/lib/utils";
@@ -110,12 +110,13 @@ export function MediaPicker({
         ) : (
           <>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Input
-                type="search"
+              <SearchInput
+                className="flex-1"
+                inputClassName="h-11"
                 aria-label="Search photos by description"
                 placeholder="Search by description"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onValueChange={setQuery}
               />
               <Button ref={uploadRef} type="button" variant="secondary" onClick={() => setUploading(true)}>
                 Upload new photo

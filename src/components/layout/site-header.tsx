@@ -3,42 +3,46 @@ import { Button } from "@/components/ui/button";
 import { SiteLink } from "@/components/shared/site-link";
 import { site } from "@/data/site";
 import type { SiteCopy } from "@/lib/cms/site-settings";
+import { AdminSwitch } from "./admin-switch";
 import { Container } from "./container";
+import { HeaderNav } from "./header-nav";
 import { HeaderShell } from "./header-shell";
 import { MobileMenu } from "./mobile-menu";
 
 export function SiteHeader({ settings }: { settings: SiteCopy }) {
   return (
     <HeaderShell>
-      <Container className="flex h-(--header-height) items-center justify-between gap-8">
-        <SiteLink href="/" className="shrink-0 rounded-full">
-          <Image
-            src="/images/logo/canvas-creations-logo-512.png"
-            alt={site.name}
-            width={512}
-            height={512}
-            loading="eager"
-            sizes="(min-width: 1024px) 72px, 52px"
-            className="size-13 lg:size-18"
-          />
+      {/* Full width with edge padding (the sections below keep their reading width). */}
+      <Container className="flex h-(--header-height) max-w-none items-center justify-between gap-6">
+        {/* The logo and name; a quick gold sparkle round the logo on hover (globals.css "Header ribbon"). */}
+        <SiteLink href="/" className="logo-sparkle flex shrink-0 items-center gap-3 rounded-sm">
+          <span className="relative shrink-0">
+            <Image
+              src="/images/logo/canvas-creations-logo-512.png"
+              alt={site.name}
+              width={512}
+              height={512}
+              loading="eager"
+              sizes="(min-width: 1024px) 56px, 48px"
+              className="size-12 lg:size-14"
+            />
+            {[1, 2, 3].map((n) => (
+              <svg key={n} aria-hidden="true" viewBox="0 0 10 10" className={`sparkle sparkle-${n} pointer-events-none absolute`}>
+                <path d="M5 0 C 5.4 3.6, 6.4 4.6, 10 5 C 6.4 5.4, 5.4 6.4, 5 10 C 4.6 6.4, 3.6 5.4, 0 5 C 3.6 4.6, 4.6 3.6, 5 0 Z" fill="#d29a49" />
+              </svg>
+            ))}
+          </span>
+          {/* Repeats the logo's alt text, so hidden from screen readers. */}
+          <span aria-hidden="true" className="logo-name">
+            <span className="font-display text-xl font-title">{site.shortName}</span>
+            <span className="logo-sub text-muted-foreground">and Events</span>
+          </span>
         </SiteLink>
 
-        <nav aria-label="Main" className="hidden lg:block">
-          <ul className="flex items-center gap-9 xl:gap-11">
-            {settings.navigation.map((item) => (
-              <li key={item.href}>
-                <SiteLink
-                  href={item.href}
-                  className="relative py-2 text-sm font-medium tracking-[0.04em] text-foreground/80 transition-colors duration-300 after:absolute after:inset-x-0 after:bottom-0.5 after:h-px after:origin-left after:scale-x-0 after:bg-highlight after:transition-transform after:duration-500 after:ease-elegant hover:text-foreground hover:after:scale-x-100"
-                >
-                  {item.label}
-                </SiteLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <HeaderNav items={settings.navigation} />
 
-        <div className="flex items-center">
+        <div className="flex shrink-0 items-center gap-2">
+          <AdminSwitch />
           <Button asChild className="hidden lg:inline-flex">
             <SiteLink href={settings.enquiry.href}>{settings.enquiry.label}</SiteLink>
           </Button>

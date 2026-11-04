@@ -41,7 +41,7 @@ export async function getMediaUsage(client: Client): Promise<Map<string, string[
   const [services, gallery, home, about, video, films, stories, posters] = await Promise.all([
     client.from("services").select("title, image_id, is_published").not("image_id", "is", null),
     client.from("gallery_items").select("title, media_id, is_published"),
-    client.from("home_content").select("hero_image_id").eq("id", true).maybeSingle(),
+    client.from("home_content").select("hero_image_id, background_image_id").eq("id", true).maybeSingle(),
     client.from("about_content").select("image_id").eq("id", true).maybeSingle(),
     client.from("video_story").select("video_media_id, poster_id").eq("id", true).maybeSingle(),
     client.from("films").select("title, video_media_id, is_published"),
@@ -57,6 +57,7 @@ export async function getMediaUsage(client: Client): Promise<Map<string, string[
   for (const s of services.data ?? []) add(s.image_id, `Service: ${s.title}${draft(s.is_published)}`);
   for (const g of gallery.data ?? []) add(g.media_id, `Gallery: ${g.title || "untitled photo"}${draft(g.is_published)}`);
   add(home.data?.hero_image_id, "Hero");
+  add(home.data?.background_image_id, "Background (hero and The studio)");
   add(about.data?.image_id, "About (founder photo)");
   add(video.data?.video_media_id, "Video section");
   add(video.data?.poster_id, "Video poster");

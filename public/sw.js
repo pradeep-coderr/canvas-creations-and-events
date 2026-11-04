@@ -22,18 +22,33 @@
  * filling in the enquiry form; on activation old "cc-" caches are deleted.
  */
 
-const VERSION = "v2";
+const VERSION = "v3";
 const PAGES = `cc-pages-${VERSION}`;
 const STATIC = `cc-static-${VERSION}`;
 const MEDIA = `cc-media-${VERSION}`;
 const CURRENT = [PAGES, STATIC, MEDIA];
 const MEDIA_LIMIT = 60;
 
+// Local development (localhost, the LAN address, a Cloudflare test tunnel):
+// no caching at all. `next dev` serves changing code under the same
+// /_next/static URLs, so cached copies would run stale code (hydration
+// errors, "module factory is not available"). Push notifications still work.
+const DEV_HOST =
+  /^(localhost|127\.0\.0\.1|\[::1\]|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)$/.test(
+    self.location.hostname,
+  ) || self.location.hostname.endsWith(".trycloudflare.com");
+
 // Install: cache the homepage and the static assets it references (JS, CSS,
 // preloaded fonts), so it works offline right after the first visit.
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
+      // Dev hosts: take over at once, so an older worker's cached dev code
+      // stops being served (this one caches nothing there).
+      if (DEV_HOST) {
+        await self.skipWaiting();
+        return;
+      }
       try {
         const response = await fetch("/", { cache: "reload" });
         if (!response.ok) return;
@@ -65,6 +80,7 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  if (DEV_HOST) return;
   const request = event.request;
   if (request.method !== "GET") return;
 

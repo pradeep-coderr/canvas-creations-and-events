@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useEffect, useRef } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Circle, CircleAlert, ShieldCheck } from "lucide-react";
@@ -9,6 +9,8 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { PasswordInput } from "@/components/ui/password-input";
 import { PASSWORD_MIN, newPasswordSchema, type NewPasswordValues } from "@/lib/admin/auth-schemas";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { createSentCredentials } from "@/lib/admin/save-password";
 import { setNewPassword, type NewPasswordState } from "../password-actions";
 
 const rules = [
@@ -28,7 +30,7 @@ function strength(v: string) {
 }
 
 /** Step 3: the new password, only after the code was accepted. */
-export function PasswordStep({ onRestart }: { onRestart: () => void }) {
+export function PasswordStep({ email, onRestart }: { email: string; onRestart: () => void }) {
   const [state, action, pending] = useActionState<NewPasswordState, FormData>(setNewPassword, {});
   const headingRef = useRef<HTMLHeadingElement>(null);
   const {
@@ -47,12 +49,20 @@ export function PasswordStep({ onRestart }: { onRestart: () => void }) {
   const meter = strength(password ?? "");
 
   useEffect(() => headingRef.current?.focus(), []);
+  /** The new password, for updating the browser's saved one once it's accepted. */
+  const [sent] = useState(createSentCredentials);
+  const router = useRouter();
+  useEffect(() => {
+    if (!state.done) return;
+    void sent.offer(email).then(() => router.replace("/admin/login?reset=done"));
+  }, [state.done, email, sent, router]);
   useEffect(() => {
     if (state.fieldErrors?.password) setError("password", { message: state.fieldErrors.password });
     if (state.fieldErrors?.confirm) setError("confirm", { message: state.fieldErrors.confirm });
   }, [state, setError]);
 
   const onSubmit = handleSubmit((values) => {
+    sent.set(email, values.password);
     const data = new FormData();
     data.set("password", values.password);
     data.set("confirm", values.confirm);
@@ -61,6 +71,8 @@ export function PasswordStep({ onRestart }: { onRestart: () => void }) {
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-6">
+      {/* Which account this is for, so password managers update the right saved login. */}
+      <input type="email" name="username" autoComplete="username" value={email} readOnly hidden />
       <div className="space-y-3 text-center">
         <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-surface-blush">
           <ShieldCheck aria-hidden="true" className="size-5 text-primary" />

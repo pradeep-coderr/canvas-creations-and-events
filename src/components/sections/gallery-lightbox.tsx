@@ -2,10 +2,11 @@
 
 import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { GALLERY_FILTER_EVENT } from "./balloon-tones";
 
 /*
  * Portfolio interactivity. The photo grid stays server-rendered; this adds:
@@ -45,16 +46,24 @@ export function GalleryLightbox({
   photos,
   categories = [],
   allLabel = "All",
+  limit,
   children,
 }: {
   photos: LightboxPhoto[];
   categories?: FilterCategory[];
   /** The first filter button (editable wording). */
   allLabel?: React.ReactNode;
+  /**
+   * The portfolio: show this many photos under "All", then "Show all N
+   * photos" (a category always shows all of its own). None: show everything.
+   */
+  limit?: number;
   children: React.ReactNode;
 }) {
   const [index, setIndex] = useState<number | null>(null);
   const [filter, setFilter] = useState("all");
+  const [expanded, setExpanded] = useState(false);
+  const collapsed = Boolean(limit && filter === "all" && !expanded && photos.length > limit);
   const trigger = useRef<HTMLElement | null>(null);
   const grid = useRef<HTMLDivElement>(null);
   const touch = useRef<{ x: number; y: number } | null>(null);
@@ -70,6 +79,17 @@ export function GalleryLightbox({
     if (position < 0 || count < 2) return;
     setIndex(visible[(position + step + count) % count].i);
   };
+
+  // A Categories balloon asks for its category (it also scrolls here); an
+  // unknown or hidden category falls back to all photos.
+  useEffect(() => {
+    const onFilter = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      setFilter(showFilter && categories.some((c) => c.id === id) ? id : "all");
+    };
+    window.addEventListener(GALLERY_FILTER_EVENT, onFilter);
+    return () => window.removeEventListener(GALLERY_FILTER_EVENT, onFilter);
+  }, [categories, showFilter]);
 
   // Photos that stay after a filter change fade in (motion allowed only).
   useEffect(() => {
@@ -119,7 +139,11 @@ export function GalleryLightbox({
             ))}
           </div>
           <p role="status" className="sr-only">
-            {filter === "all" ? `Showing all ${photos.length} photos` : `Showing ${count} ${count === 1 ? "photo" : "photos"}: ${activeLabel ?? ""}`}
+            {filter === "all"
+              ? collapsed
+                ? `Showing ${limit} of ${photos.length} photos`
+                : `Showing all ${photos.length} photos`
+              : `Showing ${count} ${count === 1 ? "photo" : "photos"}: ${activeLabel ?? ""}`}
           </p>
         </div>
       )}
@@ -128,9 +152,23 @@ export function GalleryLightbox({
       {filter !== "all" && /^[a-z0-9-]+$/.test(filter) && (
         <style>{`[data-portfolio-filter="${filter}"] .cc-portfolio > li:not([data-category="${filter}"]){display:none}`}</style>
       )}
+      {/* "All" shows the first few photos until "Show all" is pressed. */}
+      {collapsed && <style>{`[data-portfolio-filter="all"] .cc-portfolio > li:nth-child(n+${(limit ?? 0) + 1}){display:none}`}</style>}
       <div ref={grid} className="contents" data-portfolio-filter={filter}>
         {children}
       </div>
+      {collapsed && (
+        <div className="mt-12 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="inline-flex min-h-12 items-center gap-2 rounded-full border border-foreground/40 px-7 text-sm font-semibold text-foreground transition-colors hover:border-foreground hover:bg-foreground hover:text-background focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            Show all {photos.length} photos
+            <ChevronDown className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+      )}
 
       <DialogPrimitive.Root open={photo !== null} onOpenChange={(open) => !open && setIndex(null)}>
         <DialogPrimitive.Portal>

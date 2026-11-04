@@ -1,7 +1,8 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const sectionVariants = cva("py-20 sm:py-24 lg:py-32", {
+// Fluid vertical rhythm (--section-y, globals.css).
+const sectionVariants = cva("py-(--section-y)", {
   variants: {
     tone: {
       default: "bg-background",

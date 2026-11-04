@@ -14,6 +14,7 @@ export function SiteSettingsForm({ defaultValues }: { defaultValues: SiteValues 
       {(form) => (
         <>
           <FormSection title="Headline" description="The big headline at the top of the homepage. Also used in the page title for Google and social media.">
+            <TextField form={form} name="heroBrand" label="Name above the headline" optional hint="The studio's name in large rose letters. Leave empty to hide it." />
             <TextField form={form} name="headlineLead" label="Headline" />
             <TextField
               form={form}
@@ -49,7 +50,9 @@ export function SiteSettingsForm({ defaultValues }: { defaultValues: SiteValues 
             <TextField form={form} name="menuLabel" label="Mobile menu button" />
             <TextField form={form} name="mobileEnquireLabel" label="Mobile bar: enquire button" />
             <TextField form={form} name="mobileCallLabel" label="Call link text" hint="Before the number, e.g. “Call”. Also on the mobile bar and in Contact." />
-            <TextField form={form} name="callPrompt" label="Call prompt" hint="Before the phone link, e.g. “Prefer to talk?”." />
+            <TextField form={form} name="callPrompt" label="Contact prompt" hint="In the hero, before the email link (or the phone link when there's no email), e.g. “Prefer to talk?”." />
+            <TextField form={form} name="emailLinkLabel" label="Hero email link text" hint="Before the email address, e.g. “Email”." />
+            <TextField form={form} name="emailSubject" label="Email subject" hint="The subject line filled in when a visitor taps the email link." />
           </FormSection>
 
           <FormSection title="Footer and contact labels">
@@ -72,6 +75,8 @@ export function SiteSettingsForm({ defaultValues }: { defaultValues: SiteValues 
             <TextField form={form} name="formSubmitLabel" label="Send button" />
             <TextField form={form} name="formSuccessTitle" label="Thank-you heading" />
             <TextAreaField form={form} name="formSuccessText" label="Thank-you text" rows={3} />
+            <TextAreaField form={form} name="privacyNote" label="Privacy note" rows={2} hint="Under the form, before the privacy link." />
+            <TextField form={form} name="privacyLinkLabel" label="Privacy link text" hint="Under the form and at the bottom of the footer." />
           </FormSection>
         </>
       )}

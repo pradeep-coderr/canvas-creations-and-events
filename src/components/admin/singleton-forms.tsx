@@ -10,7 +10,7 @@ import {
   type VideoValues,
 } from "@/lib/cms/singletons";
 import type { MediaImage } from "@/lib/media/types";
-import { FormSection, MediaFormField, TextAreaField, TextField, type CmsFormApi } from "./cms-fields";
+import { CheckboxField, FormSection, MediaFormField, TextAreaField, TextField, type CmsFormApi } from "./cms-fields";
 import { CmsForm } from "./cms-form";
 
 /*
@@ -97,6 +97,21 @@ export function HomeForm({ defaultValues, imageOptions }: { defaultValues: HomeV
               images={imageOptions}
               use="hero"
               emptyText="No photo: the Canvas Creations monogram is shown."
+            />
+            <CheckboxField
+              form={form}
+              name="showBackground"
+              label="Show the background"
+              hint="Behind the hero and “The studio”: a soft animated glow, or a blurred photo if you choose one below."
+            />
+            <MediaFormField
+              form={form}
+              name="backgroundImageId"
+              label="Background photo"
+              optional
+              images={imageOptions}
+              use="hero"
+              emptyText="No photo chosen: the animated glow is shown."
             />
           </FormSection>
 

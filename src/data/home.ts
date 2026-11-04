@@ -30,7 +30,13 @@ export const hero = {
   // No client photography yet. Add the hero photo to public/images/ and set
   // it here, e.g. { src: "/images/gallery/hero.jpg", alt: "…" }.
   image: null as EditorialImage | null,
+  // Behind the hero and "The studio": a library photo (blurred), or (image
+  // null) the animated glow (components/motion/ambient-glow); `show` turns it off.
+  background: { image: null as EditorialImage | null, show: true },
 };
+
+/** The built-in background photo (Max Titov on Unsplash, Unsplash License). */
+export const DEFAULT_BACKGROUND = "/images/backgrounds/blush-ballroom.jpg";
 
 export const intro = {
   eyebrow: "The studio",
@@ -98,17 +104,25 @@ export interface FounderCredit {
 }
 
 export const about = {
-  eyebrow: "About",
-  title: "A personal approach to every celebration.",
-  // Provisional, brand-level copy (no founder details supplied yet).
+  eyebrow: "About us",
+  title: "Meet Neha – The Creative Mind Behind Canvas Creations and Events",
+  // The founder's own words (supplied by the client).
   body: [
-    "Canvas Creations and Events is built on a simple idea: the setting of a celebration should feel as personal as the moment itself.",
-    "Every event starts as a blank canvas. The colours, textures and details are chosen around the people it celebrates, so the finished space tells their story.",
+    "I’m Neha, a 25-year-old passionate creator and the founder of Canvas Creations and Events, based in Adelaide, South Australia.",
+    "My journey began over 10 years ago through volunteering in decorations and events. What started as a childhood passion gradually grew into a dream of creating something bigger. Inspired by the appreciation and encouragement I received, I decided to turn my creativity into a business that brings people’s visions to life.",
+    "What makes us unique is our personal touch, fresh ideas, attention to detail, and commitment to creating beautiful decorations that suit every style and budget. From elegant weddings and birthdays to baby showers and corporate events, we believe every celebration deserves something special.",
+    "Your vision inspires us. Our creativity brings it to life.",
   ],
-  // Founder or studio portrait: real photography only (public/images/founder/).
-  image: null as EditorialImage | null,
-  // Shown under the text once the client provides a real name.
-  founder: null as FounderCredit | null,
+  // Neha's portrait (supplied by the client; already cut to a circle). Used
+  // until a photo is picked in the admin, which replaces it.
+  image: {
+    src: "/images/founder/neha-founder-portrait.webp",
+    alt: "Neha, founder of Canvas Creations and Events",
+    width: 1200,
+    height: 1200,
+  } as EditorialImage | null,
+  // Shown under the text (the client's real name).
+  founder: { name: "Neha", role: "Founder" } as FounderCredit | null,
   cta: { label: "Tell us about your celebration", href: "/#enquire" } satisfies NavLink,
 };
 
@@ -223,7 +237,7 @@ export const enquirySection = {
 };
 
 export const contactSection = {
-  eyebrow: "Contact",
+  eyebrow: "Contact us",
   title: "Let's make something memorable.",
   description: "Prefer to talk it through? Give us a call, or follow along online.",
 };

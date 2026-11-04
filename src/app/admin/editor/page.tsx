@@ -79,6 +79,10 @@ export default async function EditorPage() {
     mobileCallLabel: live("site", "mobileCallLabel"),
     menuLabel: live("site", "menuLabel"),
     callPrompt: t("site", "callPrompt"),
+    heroBrand: t("site", "heroBrand"),
+    // Inside a link: edited in the Hero panel (the subject too).
+    emailLink: { label: live("site", "emailLinkLabel"), href: saved.emailLink.href },
+    privacy: { note: t("site", "privacyNote"), linkLabel: live("site", "privacyLinkLabel") },
     footerHeadings: {
       explore: t("site", "footerExploreHeading"),
       contact: t("site", "footerContactHeading"),
@@ -121,6 +125,8 @@ export default async function EditorPage() {
         description: t("home", "heroDescription"),
         secondaryCta: { label: live("home", "heroSecondaryCtaLabel"), href: localHero.secondaryCta.href },
         image: page.heroImage,
+        // The background photo shows once saved (set in the Hero panel).
+        background: { image: page.backgroundImage, show: page.data.saved.home.showBackground },
       },
       intro: { eyebrow: t("home", "introEyebrow"), title: t("home", "introTitle"), body: t("home", "introBody") },
       services: {
@@ -179,7 +185,7 @@ export default async function EditorPage() {
       eyebrow: t("about", "eyebrow"),
       title: t("about", "title"),
       body: [<EditableText key="body" scope="about" field="body" />],
-      image: page.aboutImage,
+      image: page.aboutImage ?? localAbout.image,
       cta: { label: live("about", "ctaLabel"), href: localAbout.cta.href },
       // The credit line appears once a founder name is saved (never invented).
       founder: page.hasFounder
@@ -231,7 +237,7 @@ export default async function EditorPage() {
       {/* The page is shown in the live global theme (admin → Design). */}
       <SiteThemeStyle />
       <SiteFrame settings={settings}>
-        <main id="main">
+        <main id="main" className="overflow-x-clip">
           <HomeSections content={content} slots={slots} />
         </main>
       </SiteFrame>

@@ -34,6 +34,44 @@ const SPECS: { cls: string; vars: Record<string, [Edge, Edge]> }[] = [
     },
   },
   { cls: "reveal-line", vars: { "--cc-in": [["entry", 0.1], ["cover", 0.4]], "--cc-out": [["exit", 0.4], ["exit", 1]] } },
+  { cls: "ink-write", vars: { "--cc-ink": [["entry", 0.4], ["cover", 0.45]] } },
+  {
+    cls: "ribbon-bow",
+    vars: {
+      "--cc-rib": [["entry", 0], ["cover", 0.24]],
+      "--cc-loop": [["cover", 0.22], ["cover", 0.32]],
+      "--cc-tail": [["cover", 0.3], ["cover", 0.38]],
+      "--cc-knot": [["cover", 0.28], ["cover", 0.34]],
+    },
+  },
+  {
+    cls: "envelope-story",
+    vars: {
+      // Lower than the CSS ranges: this counts the full window, CSS starts under the header.
+      "--cc-seal": [["cover", 0.3], ["cover", 0.335]],
+      "--cc-flap": [["cover", 0.335], ["cover", 0.41]],
+      "--cc-rise": [["cover", 0.4], ["cover", 0.447]],
+      "--cc-settle": [["cover", 0.447], ["cover", 0.54]],
+      "--cc-away": [["cover", 0.438], ["cover", 0.54]],
+    },
+  },
+  { cls: "process-ribbon", vars: { "--proc": [["cover", 0.15], ["cover", 0.55]] } },
+  {
+    cls: "easel",
+    vars: {
+      "--cc-legs": [["entry", 0.05], ["entry", 0.7]],
+      "--cc-ledge": [["entry", 0.45], ["entry", 0.85]],
+      "--cc-board": [["entry", 0.7], ["cover", 0.4]],
+    },
+  },
+  { cls: "moodboard", vars: { "--cc-in": [["entry", 0], ["cover", 0.34]] } },
+  { cls: "note-card", vars: { "--cc-in": [["entry", 0.2], ["cover", 0.4]] } },
+  { cls: "faq-tag", vars: { "--cc-in": [["entry", 0.1], ["cover", 0.3]] } },
+  { cls: "invite-corner", vars: { "--cc-in": [["entry", 1], ["cover", 0.35]] } },
+  { cls: "footer-party", vars: { "--party": [["entry", 0], ["entry", 0.85]] } },
+  { cls: "calling-card", vars: { "--cc-in": [["entry", 0], ["cover", 0.3]] } },
+  { cls: "seal-stamp", vars: { "--cc-in": [["entry", 0.6], ["cover", 0.3]] } },
+  { cls: "tilt-card", vars: { "--cc-cover": [["cover", 0], ["cover", 1]] } },
   { cls: "drift", vars: { "--cc-cover": [["cover", 0], ["cover", 1]] } },
   { cls: "drift-slow", vars: { "--cc-cover": [["cover", 0], ["cover", 1]] } },
 ];

@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -162,7 +162,7 @@ export function OptionGroup<V extends string>({
                 onChange={() => onChange(key)}
                 className="sr-only"
               />
-              {checked && <span aria-hidden="true">✓</span>}
+              {checked && <Check aria-hidden="true" className="size-3.5" />}
               {label}
             </label>
           );

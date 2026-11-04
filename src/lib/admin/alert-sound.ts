@@ -67,10 +67,18 @@ export function canPlayChime() {
   );
 }
 
-/** Two soft bell tones (~0.9 s). Safe to call anytime; silent if audio is locked. */
+let lastChime = 0;
+
+/**
+ * Two soft bell tones (~0.9 s). Safe to call anytime; silent if audio is
+ * locked. Calls within 2 s of the last chime are skipped, so one event heard
+ * twice (a push alert and the open chat inbox) plays once.
+ */
 export async function playChime() {
   const ac = context();
   if (!ac) return;
+  if (Date.now() - lastChime < 2000) return;
+  lastChime = Date.now();
   if (ac.state !== "running") await ac.resume().catch(() => {});
   if (ac.state !== "running") return;
   const start = ac.currentTime + 0.02;

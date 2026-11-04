@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { CircleCheck } from "lucide-react";
 import { safeAdminNext } from "@/lib/admin/safe-next";
@@ -11,7 +12,11 @@ export const metadata: Metadata = { title: "Sign in" };
 export default async function AdminLoginPage({ searchParams }: PageProps<"/admin/login">) {
   const { reset, next: nextParam } = await searchParams;
   const next = safeAdminNext(nextParam);
-  if (await getAdmin()) redirect(next);
+  // Already signed in: straight to the admin. Not while the sign-in form is
+  // finishing (the page is re-drawn as part of its request): the form first
+  // offers to save the password, then goes there itself.
+  const signingIn = (await headers()).has("next-action");
+  if (!signingIn && (await getAdmin())) redirect(next);
 
   return (
     <AuthCard title="Welcome back" description="Sign in to manage enquiries, reviews and the website.">

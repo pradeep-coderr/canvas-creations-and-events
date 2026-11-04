@@ -25,6 +25,7 @@ export const sectionSpacings = ["compact", "normal", "spacious"] as const;
 /** Text on the page that can be styled: the `data-sk` keys the components render. */
 export const STYLE_KEYS = [
   "home.heroEyebrow",
+  "site.heroBrand",
   "site.headlineLead",
   "site.headlineEmphasis",
   "home.heroDescription",

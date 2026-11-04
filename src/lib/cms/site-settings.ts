@@ -56,6 +56,11 @@ export const siteColumns = {
   formOptionalLabel: "form_optional_label",
   formSuccessTitle: "form_success_title",
   formSuccessText: "form_success_text",
+  heroBrand: "hero_brand",
+  emailLinkLabel: "email_link_label",
+  emailSubject: "email_subject",
+  privacyNote: "privacy_note",
+  privacyLinkLabel: "privacy_link_label",
 } as const;
 
 export type SiteField = keyof typeof siteColumns;
@@ -128,6 +133,12 @@ export const siteSchema = z.object({
   formMessageLabel: line(),
   formSubmitLabel: line(),
   formOptionalLabel: line(),
+  // The studio's name above the hero headline (empty: not shown).
+  heroBrand: optionalLine(),
+  emailLinkLabel: line(),
+  emailSubject: line(),
+  privacyNote: text(),
+  privacyLinkLabel: line(),
   formSuccessTitle: line(),
   formSuccessText: text(),
 });
@@ -174,6 +185,12 @@ export interface SiteSettings {
   mobileCallLabel: string;
   menuLabel: string;
   callPrompt: string;
+  /** The studio's name above the hero headline (null: not shown). */
+  heroBrand: string | null;
+  /** The hero's email link: its text before the address, and the link (with the email's subject). Null href: no email set. */
+  emailLink: { label: string; href: string | null };
+  /** Under the enquiry form, and the privacy page link's text (form and footer). */
+  privacy: { note: string; linkLabel: string };
   footerHeadings: { explore: string; contact: string; follow: string };
   basedInLabel: string;
   phone: { display: string; href: string };
@@ -224,6 +241,12 @@ export function settingsFromValues(v: SiteValues): SiteSettings {
     mobileCallLabel: v.mobileCallLabel,
     menuLabel: v.menuLabel,
     callPrompt: v.callPrompt,
+    heroBrand: v.heroBrand || null,
+    emailLink: {
+      label: v.emailLinkLabel,
+      href: v.contactEmail ? `mailto:${v.contactEmail}?subject=${encodeURIComponent(v.emailSubject)}` : null,
+    },
+    privacy: { note: v.privacyNote, linkLabel: v.privacyLinkLabel },
     footerHeadings: { explore: v.footerExploreHeading, contact: v.footerContactHeading, follow: v.footerFollowHeading },
     basedInLabel: v.basedInLabel,
     phone: { display: v.phoneDisplay, href: phoneHref(v.phoneDisplay) },
@@ -293,6 +316,11 @@ export const defaultSiteValues: SiteValues = {
   formOptionalLabel: "(optional)",
   formSuccessTitle: "Thank you.",
   formSuccessText: "We've received your enquiry.",
+  heroBrand: site.name,
+  emailLinkLabel: "Email",
+  emailSubject: "Enquiry from the website",
+  privacyNote: "We use your details to reply to you, and note a few things about the visit to keep spam out.",
+  privacyLinkLabel: "Privacy policy",
 };
 
 export const defaultSiteSettings = settingsFromValues(defaultSiteValues);
