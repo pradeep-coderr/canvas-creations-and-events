@@ -6,8 +6,9 @@ import { CircleUserRound, UserRoundCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 /*
- * Site header: "Admin" in a browser that's signed in to the admin (it has a
- * Supabase auth cookie), otherwise "Login". The cookie check is a hint only:
+ * Site header: a round icon, "Admin" in a browser that's signed in to the
+ * admin (it has a Supabase auth cookie), otherwise "Login", so it stays quiet
+ * beside the enquiry button. The cookie check is a hint only:
  * /admin itself still checks the session and the admin role. No Supabase
  * code is loaded on the public site for this.
  */
@@ -37,10 +38,10 @@ const subscribe = (onChange: () => void) => {
 export function AdminSwitch() {
   const signedIn = useSyncExternalStore(subscribe, hasSession, () => false);
   return (
-    <Button asChild variant="outline">
+    <Button asChild variant="ghost" size="icon" className="rounded-full" title={signedIn ? "Admin" : "Login"}>
       <Link href={signedIn ? "/admin" : "/admin/login"} prefetch={false}>
-        {signedIn ? <UserRoundCog data-icon="inline-start" /> : <CircleUserRound data-icon="inline-start" />}
-        {signedIn ? "Admin" : "Login"}
+        {signedIn ? <UserRoundCog className="size-5" /> : <CircleUserRound className="size-5" />}
+        <span className="sr-only">{signedIn ? "Admin" : "Login"}</span>
       </Link>
     </Button>
   );

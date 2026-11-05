@@ -56,14 +56,7 @@ const SPECS: { cls: string; vars: Record<string, [Edge, Edge]> }[] = [
     },
   },
   { cls: "process-ribbon", vars: { "--proc": [["cover", 0.15], ["cover", 0.55]] } },
-  {
-    cls: "easel",
-    vars: {
-      "--cc-legs": [["entry", 0.05], ["entry", 0.7]],
-      "--cc-ledge": [["entry", 0.45], ["entry", 0.85]],
-      "--cc-board": [["entry", 0.7], ["cover", 0.4]],
-    },
-  },
+  { cls: "why-track", vars: { "--why": [["entry", 0.8], ["exit", 0]] } },
   { cls: "moodboard", vars: { "--cc-in": [["entry", 0], ["cover", 0.34]] } },
   { cls: "note-card", vars: { "--cc-in": [["entry", 0.2], ["cover", 0.4]] } },
   { cls: "faq-tag", vars: { "--cc-in": [["entry", 0.1], ["cover", 0.3]] } },

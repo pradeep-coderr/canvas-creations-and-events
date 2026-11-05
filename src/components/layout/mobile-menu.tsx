@@ -14,7 +14,9 @@ import {
 } from "@/components/ui/sheet";
 import { scrollPageTo } from "@/components/motion/smooth-scroll";
 import { scrollHomeToTop } from "@/components/shared/scroll-home";
+import { site } from "@/data/site";
 import type { SiteCopy } from "@/lib/cms/site-settings";
+import { useActiveHref } from "./header-nav";
 
 // Scroll to an in-page anchor, or navigate normally if it isn't on this page.
 function goTo(href: string) {
@@ -43,6 +45,7 @@ function goTo(href: string) {
 export function MobileMenu({ settings }: { settings: SiteCopy }) {
   const [open, setOpen] = useState(false);
   const pendingHref = useRef<string | null>(null);
+  const active = useActiveHref(settings.navigation);
 
   const navigate = (event: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
@@ -54,8 +57,9 @@ export function MobileMenu({ settings }: { settings: SiteCopy }) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" className="gap-2.5 px-3 lg:hidden">
-          <span className="text-eyebrow font-semibold uppercase">{settings.menuLabel}</span>
+        <Button variant="ghost" className="gap-2.5 px-2.5 sm:px-3 lg:hidden">
+          {/* Phones: the icon alone, to leave room for the name. */}
+          <span className="text-eyebrow font-semibold uppercase max-sm:sr-only">{settings.menuLabel}</span>
           <MenuIcon className="size-5" />
         </Button>
       </SheetTrigger>
@@ -76,25 +80,31 @@ export function MobileMenu({ settings }: { settings: SiteCopy }) {
           Site navigation and enquiry
         </SheetDescription>
 
-        <div className="flex h-(--header-height) shrink-0 items-center justify-between px-5 sm:px-8">
-          <Image
-            src="/images/logo/canvas-creations-logo-512.png"
-            alt=""
-            width={512}
-            height={512}
-            sizes="52px"
-            className="size-13"
-          />
+        <div className="flex h-(--header-height) shrink-0 items-center justify-between gap-3 border-b border-border px-5 sm:px-8">
+          <span className="flex min-w-0 items-center gap-3">
+            <Image
+              src="/images/logo/canvas-creations-logo-512.png"
+              alt=""
+              width={512}
+              height={512}
+              sizes="48px"
+              className="size-12 shrink-0"
+            />
+            <span className="logo-name">
+              <span className="font-display text-lg font-title sm:text-xl">{site.shortName}</span>
+              <span className="logo-sub text-muted-foreground">and Events</span>
+            </span>
+          </span>
           <SheetClose asChild>
-            <Button variant="ghost" className="gap-2.5 px-3">
-              <span className="text-eyebrow font-semibold uppercase">Close</span>
+            <Button variant="ghost" className="gap-2.5 px-2.5 sm:px-3">
+              <span className="text-eyebrow font-semibold uppercase max-sm:sr-only">Close</span>
               <XIcon className="size-5" />
             </Button>
           </SheetClose>
         </div>
 
-        <nav aria-label="Main" className="flex-1 overflow-y-auto px-5 pt-6 sm:px-8">
-          <ul className="border-t border-highlight/40">
+        <nav aria-label="Main" className="flex-1 overflow-y-auto px-5 pt-2 sm:px-8">
+          <ul>
             {settings.navigation.map((item, i) => (
               <li
                 key={item.href}
@@ -104,7 +114,8 @@ export function MobileMenu({ settings }: { settings: SiteCopy }) {
                 <a
                   href={item.href}
                   onClick={(e) => navigate(e, item.href)}
-                  className="block py-3.5 font-display text-display-sm font-title transition-colors duration-300 hover:text-primary"
+                  aria-current={item.href === active ? "location" : undefined}
+                  className="menu-link flex items-center justify-between py-3.5 font-display text-display-sm font-title transition-colors duration-300 hover:text-primary"
                 >
                   {item.label}
                 </a>

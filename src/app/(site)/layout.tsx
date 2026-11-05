@@ -71,7 +71,7 @@ export default async function SiteLayout({ children }: LayoutProps<"/">) {
         {/* Contact details for the error page (everything else gets them as props). */}
         <SiteContactProvider contact={{ phone: saved.phone, email: saved.email }}>{children}</SiteContactProvider>
       </SiteFrame>
-      <ChatWidget ctx={chatContext} />
+      <ChatWidget ctx={chatContext} socials={saved.socials} />
       <VisitTracker />
       <ServiceWorkerRegistration />
       <SmoothScroll />

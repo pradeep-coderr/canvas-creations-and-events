@@ -26,6 +26,7 @@ import { chatDayLabel } from "@/lib/chat/dates";
 import { asQuote, type QuoteData, type QuoteDetails } from "@/lib/chat/quote";
 import { clientSignals, createTypingCounter } from "@/lib/visitor/signals";
 import { QuoteFormCard, QuoteOffer } from "./chat-quote";
+import { ChatSocials } from "./chat-socials";
 import { botActive, botReplies } from "@/lib/chat/knowledge";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,8 @@ import { cn } from "@/lib/utils";
 const TOKEN_KEY = "cc-chat-token";
 const POS_KEY = "cc-chat-button";
 const SIZE = 60;
+const PHONE_SIZE = 48;
+const PHONE_RESERVE = 84; // above the phone's Call / Enquire bar
 const EDGE = 16;
 /** Within this many px of the bottom, new messages scroll into view by themselves. */
 const STICK_PX = 80;
@@ -163,7 +166,7 @@ function buildItems(messages: ChatMessage[], ctx: ChatBotContext, name: string |
 
 const subscribeNothing = () => () => {};
 
-export function ChatWidget({ ctx }: { ctx: ChatBotContext }) {
+export function ChatWidget({ ctx, socials = [] }: { ctx: ChatBotContext; socials?: React.ComponentProps<typeof ChatSocials>["socials"] }) {
   // Client only: the button's spot and the chat live in this browser.
   const mounted = useSyncExternalStore(subscribeNothing, () => true, () => false);
   const desktop = useMediaQuery("(min-width: 1024px)");
@@ -432,8 +435,9 @@ export function ChatWidget({ ctx }: { ctx: ChatBotContext }) {
   };
 
   // ---- dragging the button -------------------------------------------------
-  const bottomReserve = () => (desktop ? EDGE : 96); // above the phone's Call / Enquire bar
-  const clampTop = (top: number) => Math.max(88, Math.min(window.innerHeight - SIZE - bottomReserve(), top));
+  const size = desktop ? SIZE : PHONE_SIZE;
+  const bottomReserve = () => (desktop ? EDGE : PHONE_RESERVE);
+  const clampTop = (top: number) => Math.max(88, Math.min(window.innerHeight - size - bottomReserve(), top));
 
   const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (e.button !== 0) return;
@@ -453,8 +457,8 @@ export function ChatWidget({ ctx }: { ctx: ChatBotContext }) {
     if (!s.moved && Math.hypot(dx, dy) < 6) return;
     s.moved = true;
     setDrag({
-      x: Math.max(0, Math.min(window.innerWidth - SIZE, s.x0 + dx)),
-      y: Math.max(0, Math.min(window.innerHeight - SIZE, s.y0 + dy)),
+      x: Math.max(0, Math.min(window.innerWidth - size, s.x0 + dx)),
+      y: Math.max(0, Math.min(window.innerHeight - size, s.y0 + dy)),
     });
   };
   const onPointerUp = () => {
@@ -466,7 +470,7 @@ export function ChatWidget({ ctx }: { ctx: ChatBotContext }) {
       return;
     }
     justDragged.current = true;
-    const next: Spot = { side: drag.x + SIZE / 2 > window.innerWidth / 2 ? "right" : "left", top: clampTop(drag.y) };
+    const next: Spot = { side: drag.x + size / 2 > window.innerWidth / 2 ? "right" : "left", top: clampTop(drag.y) };
     setDrag(null);
     setSpot(next);
     write(POS_KEY, JSON.stringify(next));
@@ -477,12 +481,12 @@ export function ChatWidget({ ctx }: { ctx: ChatBotContext }) {
   // The button is hidden while the chat is open (the window has its own close button).
   const resting = spot.top === null;
   const sideGap = desktop ? 24 : EDGE;
-  const buttonBottom = resting ? (desktop ? 24 : 96) : window.innerHeight - clampTop(spot.top!) - SIZE;
+  const buttonBottom = resting ? (desktop ? 24 : PHONE_RESERVE) : window.innerHeight - clampTop(spot.top!) - size;
   const buttonStyle: React.CSSProperties = drag
     ? { left: drag.x, top: drag.y }
     : { [spot.side]: sideGap, ...(resting ? { bottom: buttonBottom } : { top: clampTop(spot.top!) }) };
   // The preview card sits just above the button, on the same side.
-  const previewStyle: React.CSSProperties = { [spot.side]: sideGap, bottom: Math.max(buttonBottom, 8) + SIZE + 12 };
+  const previewStyle: React.CSSProperties = { [spot.side]: sideGap, bottom: Math.max(buttonBottom, 8) + size + 12 };
 
   const status = ctx.away ? "Away right now · we'll reply soon" : "We're online";
 
@@ -624,6 +628,7 @@ export function ChatWidget({ ctx }: { ctx: ChatBotContext }) {
           <p role="alert" className="px-4 text-sm font-medium text-destructive empty:hidden">
             {error ?? ""}
           </p>
+          <ChatSocials socials={socials} />
           <form
             className="flex items-end gap-2 border-t border-border p-3"
             onSubmit={(e) => {
@@ -730,7 +735,7 @@ export function ChatWidget({ ctx }: { ctx: ChatBotContext }) {
             }
             toggle();
           }}
-          style={{ ...buttonStyle, width: SIZE, height: SIZE }}
+          style={{ ...buttonStyle, width: size, height: size }}
           className={cn(
             "fixed z-50 flex touch-none items-center justify-center rounded-full bg-(--btn-bg) text-(--btn-fg) shadow-[0_0_0_3px_var(--background),0_0_0_5px_var(--cc-gold),0_10px_28px_rgb(48_42_41/0.22)] select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring",
             drag ? "scale-105 cursor-grabbing" : "cursor-grab transition-[left,right,top,bottom,transform,opacity] duration-300 ease-elegant hover:scale-105",
@@ -739,7 +744,7 @@ export function ChatWidget({ ctx }: { ctx: ChatBotContext }) {
           aria-hidden={pageTyping || undefined}
           tabIndex={pageTyping ? -1 : undefined}
         >
-          <MessageCircle className="size-6" aria-hidden="true" />
+          <MessageCircle className={desktop ? "size-6" : "size-5"} aria-hidden="true" />
           {unread > 0 && (
             <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-background bg-emphasis px-1 text-[11px] font-bold text-white">
               {unread}

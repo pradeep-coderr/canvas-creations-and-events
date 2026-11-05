@@ -452,18 +452,6 @@
     translate: calc((1 - var(--cc-in, 1)) * -3rem) calc((1 - var(--cc-in, 1)) * -1.75rem);
     rotate: calc((1 - var(--cc-in, 1)) * -16deg);
   }
-  html.js-motion .easel-leg {
-    stroke-dasharray: 1 2;
-    stroke-dashoffset: calc(1 - var(--cc-legs, 1));
-  }
-  html.js-motion .easel-ledge {
-    scale: var(--cc-ledge, 1) 1;
-  }
-  html.js-motion .easel-board {
-    opacity: min(1, calc(var(--cc-board, 1) * 1.7));
-    translate: 0 calc((1 - var(--cc-board, 1)) * -2.5rem);
-    rotate: calc((1 - var(--cc-board, 1)) * -3deg);
-  }
   html.js-motion .seal-stamp {
     opacity: min(1, calc(var(--cc-in, 1) * 1.7));
     scale: calc(1 + 0.9 * (1 - var(--cc-in, 1)));
@@ -824,8 +812,12 @@
 /*
  * Balloon garland (components/sections/balloon, the Categories section):
  * each balloon bobs on its own rhythm (--bob-d, --bob-delay set per
- * balloon), its tag swinging beneath it; on hover the balloon lifts and
- * leans. Balloons rise further than other reveals as they scroll in.
+ * balloon), its tag swinging beneath it; on hover the balloon swells and
+ * leans, turning about its neck so it stays tied to the string. It can be
+ * pulled away and springs back (useTether in balloon.tsx sets its transform;
+ * data-held lifts it above its neighbours until it's back). touch-action
+ * lets a finger pull it, so a scroll has to start off the balloon itself.
+ * Balloons rise further than other reveals as they scroll in.
  */
 .balloon-rise {
   --motion-rise: 4.5rem;
@@ -844,14 +836,34 @@
 .balloon {
   transform-origin: 50% 0;
 }
+.balloon-body {
+  transform-origin: 50% 100%;
+}
+#what-we-style li:has(.balloon[data-held]) {
+  position: relative;
+  z-index: 5;
+}
 @media (prefers-reduced-motion: no-preference) {
   .balloon {
     animation: cc-bob var(--bob-d, 6s) ease-in-out var(--bob-delay, 0s) infinite;
   }
-  .group:hover .balloon-body,
-  .group:focus-visible .balloon-body {
-    translate: 0 -6px;
+  .balloon-body {
+    transition:
+      rotate 0.7s var(--ease-elegant),
+      scale 0.7s var(--ease-elegant);
+  }
+  .balloon-body[data-pull] {
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+  .balloon[data-held] .balloon-body {
+    cursor: grabbing;
+  }
+  .group:hover .balloon:not([data-held]) .balloon-body,
+  .group:focus-visible .balloon:not([data-held]) .balloon-body {
     rotate: -4deg;
+    scale: 1.05;
   }
 }
 
@@ -936,7 +948,9 @@
   transform-origin: 0 50%;
   transform-style: preserve-3d;
   transform: perspective(2400px) rotateY(calc(var(--open) * -180deg));
-  opacity: clamp(0, (1 - var(--open)) * 1000, 1);
+  /* All or nothing: any transparency flattens the 3D, showing the cover's
+     front mirrored for the last frames of the opening. */
+  opacity: clamp(0, (1 - var(--open)) * 1000000, 1);
 }
 .book-cover-face {
   position: absolute;
@@ -1244,12 +1258,25 @@
 }
 
 /*
- * Easels (components/sections/why-canvas), each on its own view timeline
- * (--easel): the legs draw down from the mast, the ledge widens into
- * place, then the board is set down on it, dipping and settling. On hover
- * the board tips forward on its ledge. Complete and still with reduced
- * motion.
+ * Easels (components/sections/why-canvas): put up one at a time. One scroll
+ * value for the whole group (--why, 0-1, on .why-track) is shared out in
+ * equal slices by each easel's place (--i of --n, set in why-canvas), so
+ * an easel starts only when the one before has finished: its legs draw down
+ * from the mast, the ledge widens into place, then the board is set down on
+ * it, dipping and settling. On wide screens (.why-pin) the heading and row
+ * hold still, centred under the header, while the scroll plays them, with
+ * room added for each easel; other layouts play as they scroll past. The
+ * legs are revealed with a clip: dashes miscount on these stretched,
+ * non-scaling strokes. --why comes from a view
+ * timeline, or from ScrollMotion where unsupported. On hover the board tips
+ * forward on its ledge. Complete and still with reduced motion (--why stays
+ * at its initial 1).
  */
+@property --why {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
 .easel-board {
   transform-origin: 50% 100%;
   transition: transform 0.6s var(--ease-elegant);
@@ -1257,65 +1284,63 @@
 .easel-ledge {
   transform-origin: 50% 50%;
 }
-@keyframes cc-easel-leg {
+@keyframes cc-why {
   from {
-    stroke-dashoffset: 1;
+    --why: 0;
   }
   to {
-    stroke-dashoffset: 0;
-  }
-}
-@keyframes cc-easel-ledge {
-  from {
-    scale: 0 1;
-  }
-}
-@keyframes cc-easel-board {
-  0% {
-    opacity: 0;
-    translate: 0 -2.5rem;
-    rotate: -3deg;
-  }
-  60% {
-    opacity: 1;
-    translate: 0 4px;
-    rotate: 0.6deg;
-  }
-  80% {
-    translate: 0 -2px;
-    rotate: -0.2deg;
-  }
-  100% {
-    opacity: 1;
-    translate: 0 0;
-    rotate: 0deg;
+    --why: 1;
   }
 }
 @media (prefers-reduced-motion: no-preference) {
+  /* --s: this easel's own progress. The 0.9 leaves a beat before the next;
+     the 1.1 finishes the last one a little before the row lets go. */
+  .easel {
+    --s: clamp(0, (var(--why, 1) * 1.1 * var(--n, 1) - var(--i, 0)) / 0.9, 1);
+  }
+  .easel-legs {
+    --l: clamp(0, var(--s) / 0.45, 1);
+    clip-path: inset(-1rem -1rem calc((1 - var(--l)) * (100% + 2rem) - 1rem) -1rem);
+  }
+  .easel-ledge {
+    scale: clamp(0, (var(--s) - 0.3) / 0.3, 1) 1;
+  }
+  /* --b: the board's progress. --drop lands it, --dip is the settle after. */
+  .easel-board {
+    --b: clamp(0, (var(--s) - 0.5) / 0.5, 1);
+    --drop: clamp(0, var(--b) / 0.6, 1);
+    --dip: sin(calc(clamp(0, (var(--b) - 0.45) / 0.55, 1) * 3.1416));
+    opacity: var(--drop);
+    translate: 0 calc((1 - var(--drop)) * -2.5rem + var(--dip) * 5px);
+    rotate: calc((1 - var(--drop)) * -3deg + var(--dip) * 0.6deg);
+  }
   @media (hover: hover) {
     .easel:hover .easel-board {
       transform: perspective(900px) rotateX(-7deg);
     }
   }
+  /* Only where the heading and row fit on screen; others play unpinned. */
+  @media (min-width: 1280px) and (min-height: 720px) {
+    .why-pin > .why-stage {
+      position: sticky;
+      top: var(--header-height);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: calc(100svh - var(--header-height));
+    }
+    .why-pin::after {
+      content: "";
+      display: block;
+      height: calc(var(--n, 1) * 40svh);
+    }
+  }
   @supports (animation-timeline: view()) {
-    .easel {
-      view-timeline: --easel block;
-    }
-    .easel-leg {
-      stroke-dasharray: 1 2;
-      animation: cc-easel-leg linear both;
-      animation-timeline: --easel;
-      animation-range: entry 5% entry 70%;
-    }
-    .easel-ledge {
-      animation: cc-easel-ledge linear both;
-      animation-timeline: --easel;
-      animation-range: entry 45% entry 85%;
-    }
-    .easel-board {
-      animation: cc-easel-board linear both;
-      animation-timeline: --easel;
-      animation-range: entry 70% cover 40%;
+    .why-track {
+      view-timeline: --why-track block;
+      animation: cc-why linear both;
+      animation-timeline: --why-track;
+      animation-range: entry 80% exit 0%;
     }
   }
 }
@@ -1852,10 +1877,21 @@
   flex-direction: column;
   line-height: 1;
 }
-@media (min-width: 640px) {
+@media (min-width: 360px) {
   .logo-name {
     display: flex;
   }
+}
+/* Phone menu: the section on screen, marked by a line as well as colour. */
+.menu-link[aria-current] {
+  color: var(--emphasis);
+}
+.menu-link[aria-current]::after {
+  content: "";
+  width: 1.5rem;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--primary);
 }
 .logo-sub {
   margin-top: 0.3rem;

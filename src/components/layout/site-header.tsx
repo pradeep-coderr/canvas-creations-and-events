@@ -13,7 +13,7 @@ export function SiteHeader({ settings }: { settings: SiteCopy }) {
   return (
     <HeaderShell>
       {/* Full width with edge padding (the sections below keep their reading width). */}
-      <Container className="flex h-(--header-height) max-w-none items-center justify-between gap-6">
+      <Container className="flex h-(--header-height) max-w-none items-center justify-between gap-3 lg:gap-6">
         {/* The logo and name; a quick gold sparkle round the logo on hover (globals.css "Header ribbon"). */}
         <SiteLink href="/" className="logo-sparkle flex shrink-0 items-center gap-3 rounded-sm">
           <span className="relative shrink-0">
@@ -34,14 +34,14 @@ export function SiteHeader({ settings }: { settings: SiteCopy }) {
           </span>
           {/* Repeats the logo's alt text, so hidden from screen readers. */}
           <span aria-hidden="true" className="logo-name">
-            <span className="font-display text-xl font-title">{site.shortName}</span>
+            <span className="font-display text-lg font-title sm:text-xl">{site.shortName}</span>
             <span className="logo-sub text-muted-foreground">and Events</span>
           </span>
         </SiteLink>
 
         <HeaderNav items={settings.navigation} />
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 lg:gap-2">
           <AdminSwitch />
           <Button asChild className="hidden lg:inline-flex">
             <SiteLink href={settings.enquiry.href}>{settings.enquiry.label}</SiteLink>

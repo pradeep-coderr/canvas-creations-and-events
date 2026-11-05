@@ -15,7 +15,7 @@ const linkClass =
  * linked sections whose top has passed 40% of the way down the screen, or
  * Home above them all. Elsewhere, nothing.
  */
-function useActiveHref(items: NavItem[]) {
+export function useActiveHref(items: NavItem[]) {
   const pathname = usePathname();
   const [active, setActive] = useState<string | null>(null);
   useEffect(() => {
